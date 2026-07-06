@@ -1,44 +1,44 @@
+# cupolas — Security Dome
+
+> Four-layer inherent security: every agent action must pass through the dome before it reaches the kernel.
+> Leaf repository under the [agentrt](../) management repo.
+
 **Language:** English | [简体中文](README_zh.md)
 
-# Airymax Cupolas — Security Dome
+[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/cupolas)
+[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
+[![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
-`agentrt/cupolas/`
-
-**Version:** 0.1.1
-**License:** AGPL-3.0-or-later OR Apache-2.0 (dual-licensed)
-**Branch:** `feature/official-hubs-01`
-
----
-
-## 1. Module Positioning
-
-Cupolas (literally "dome") is the **application-semantic security layer** (B-tier)
-of the Airymax agent runtime. It is the umbrella under which every runtime
-security decision is made and enforced. Cupolas implements a four-layer
-endogenous-security model — every layer must be passed before an agent action
-reaches the kernel:
-
-1. **Sandbox isolation** — every untrusted task runs in a confined workbench
-   (process / container isolation with resource limits).
-2. **RBAC permission adjudication** — every action is checked against an
-   RBAC + ABAC permission engine with rule-priority ordering and a
-   permission cache.
-3. **Input sanitization** — every input is scrubbed for XSS, SQL injection,
-   command injection, and path traversal before it touches an executor.
-4. **Audit tracing** — every security event is written to an asynchronous,
-   HMAC-signed, rotating audit log for forensic traceability.
-
-Cupolas follows defense-in-depth and zero-trust principles: default-deny,
-identity-and-context-based authorization per call, full auditability, least
-privilege, and a dynamically-extensible guard framework.
+- **Repository:** `git@atomgit.com:openairymax/cupolas.git`
+- **Branch:** `feature/official-hubs-01`
+- **Version:** 0.1.1 (Airymax foundational release)
 
 ---
 
-## 2. Directory Structure
+## Overview
+
+**cupolas** (literally "dome") is the **application-semantic security layer** of the Airymax agent runtime. It is the umbrella under which every runtime security decision is made and enforced. cupolas implements a four-layer endogenous-security model — every layer must be passed before an agent action reaches the kernel:
+
+1. **Sandbox isolation** — every untrusted task runs in a confined workbench (process / container isolation with resource limits).
+2. **RBAC permission adjudication** — every action is checked against an RBAC + ABAC permission engine with rule-priority ordering and a permission cache.
+3. **Input sanitization** — every input is scrubbed for XSS, SQL injection, command injection, and path traversal before it touches an executor.
+4. **Audit tracing** — every security event is written to an asynchronous, HMAC-signed, rotating audit log for forensic traceability.
+
+cupolas follows defense-in-depth and zero-trust principles: default-deny, identity-and-context-based authorization per call, full auditability, least privilege, and a dynamically-extensible guard framework. It builds a single static library `agentrt_cupolas` aggregating all security subsystems, with OpenSSL-conditional iOS-grade modules (signature, vault, entitlements, runtime protection, network/TLS security) gated by `AGENTRT_HAS_OPENSSL`.
+
+Within the Airymax 0.1.1 release, the workspace is partitioned into **38 repositories** (1 umbrella + 5 management + 29 leaf + 3 top-level); `cupolas` is one of the 7 leaf repositories aggregated by the [agentrt](../) management repo, sitting between the kernel layer (`atoms`) and the service/composition layer (`gateway`, `daemons`) in the cyclic layered architecture.
+
+## Module Classification
+
+**Class B — Behavioral / Safety.**
+
+Unlike Class-A foundational modules (atoms, commons), cupolas is a behavioral module: it does not provide primitives that other modules build *on*, but rather enforces policies that other modules must *pass through*. It depends on `atoms` (for the Syscall sandbox/seccomp/capability surface and CoreKern IPC primitives for the audit queue) and `commons` (for sync, error framework, types, memory macros). Its consumers — `gateway` and `daemons` — invoke cupolas at every security boundary (request authentication, input sanitization, permission checks, audit emission).
+
+## Directory Structure
 
 ```
 cupolas/
-├── CMakeLists.txt                        # CMake build configuration
+├── CMakeLists.txt                        # CMake build configuration (single static lib agentrt_cupolas)
 ├── README.md                             # This file (English)
 ├── README_zh.md                          # Chinese version
 ├── LICENSE                               # Dual license texts (AGPL-3.0 + Apache-2.0)
@@ -102,22 +102,22 @@ cupolas/
         └── cupolas_utils.c/.h            # Memory, error, logging, bit ops helpers
 ```
 
-### Core Subsystems
+## Core Components
 
 | Subsystem | Path | Responsibility |
 |-----------|------|----------------|
-| **Input Sanitizer** | `src/sanitizer/` | XSS / SQL injection / command injection / path traversal defense |
-| **Permission** | `src/permission/` | RBAC + ABAC engine, rule-priority ordering, cache |
-| **Audit** | `src/audit/` | Async writes, HMAC signature chain, log rotation |
+| **Workbench** (Layer 1) | `src/workbench/` | Isolated execution, resource control, process management, container isolation |
+| **Permission** (Layer 2) | `src/permission/` | RBAC + ABAC engine, rule-priority ordering, permission cache |
+| **Input Sanitizer** (Layer 3) | `src/sanitizer/` | XSS / SQL injection / command injection / path traversal defense; rule engine + cache |
+| **Audit** (Layer 4) | `src/audit/` | Async writes, HMAC signature chain, log rotation, overflow handling, thread-safe queue |
 | **Security Engine** | `src/security/` | Digital signature, key vault, entitlements, runtime protection, network security |
-| **Workbench** | `src/workbench/` | Isolated execution, resource control, process management |
 | **Guards** | `src/guards/` | Extensible detection framework (rule / model / behavior / heuristic / external / composite / custom) |
-| **Utils** | `src/utils/` | Memory mgmt, error handling, logging, compiler hints, bit ops, time |
+| **Core** | `src/cupolas.c` | Module lifecycle, config, metrics, monitoring, circuit breaker |
+| **Utils** | `src/utils/` | Memory mgmt (slab/mempool), error handling, logging, compiler hints, bit ops, time |
 
 ### OpenSSL-conditional modules
 
-When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules
-are enabled:
+When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules are enabled:
 
 | Module | Source | Responsibility |
 |--------|--------|----------------|
@@ -128,58 +128,19 @@ are enabled:
 | **Network Security** | `cupolas_network_security.c` | TLS connection mgmt, firewall rules, cert verification |
 | **TLS Security** | `network/tls_security.c` | TLS/SSL connection management and cert verification |
 
----
-
-## 3. Upstream / Downstream Dependencies
-
-### Upstream (Cupolas depends on)
-
-| Dependency | Required | Purpose |
-|------------|----------|---------|
-| **commons** | Yes | Sync primitives, error framework, type definitions, memory management macros — Cupolas consumes the foundational layer directly |
-| **atoms** | Yes | Provides the Syscall surface that Cupolas enforces (sandbox, seccomp, capability), and the CoreKern IPC primitives for the audit queue |
-| OpenSSL | No | Digital signature, key vault, TLS — gated by `AGENTRT_HAS_OPENSSL` |
-| libyaml | No | Full YAML support; built-in `yaml_minimal.c` is the fallback |
-| cJSON | No | JSON config parsing |
-
-> **BAN-12**: All `find_package` calls are centralized in the umbrella root
-> `CMakeLists.txt`; sub-modules only consume cache variables.
-
-### Downstream (consumers of Cupolas)
-
-| Consumer | What it uses |
-|----------|--------------|
-| **daemons** | Every daemon calls Cupolas for permission checks, input sanitization, and to emit audit events; the workbench hosts untrusted tool execution |
-| **gateway** | Gateway invokes Cupolas for request authentication and input sanitization at the protocol boundary |
-| External SDK / Agent apps | Use `cupolas_check_permission` and `cupolas_sanitize_input` to participate in the security contract |
-
----
-
-## 4. Public API (`cupolas.h`)
-
-| Function | Description |
-|----------|-------------|
-| `cupolas_init(config_path, error)` | Initialize the Cupolas module |
-| `cupolas_cleanup()` | Tear down the Cupolas module |
-| `cupolas_version()` | Get version string |
-| `cupolas_check_permission(agent_id, action, resource, context)` | Permission check (1 = allow, 0 = deny) |
-| `cupolas_add_permission_rule(agent_id, action, resource, allow, priority)` | Add a permission rule |
-| `cupolas_clear_permission_cache()` | Clear the permission cache |
-| `cupolas_sanitize_input(input, output, output_size)` | Sanitize input |
-| `cupolas_execute_command(command, argv, exit_code, ...)` | Execute a command inside the isolated workbench |
-| `cupolas_flush_audit_log()` | Flush the audit log |
-
-### Architecture Overview
+## Architecture
 
 ```
 +-----------------------------------------------------------------------+
-|                   Security Assurance System (Cupolas)                 |
+|                   Security Assurance System (cupolas)                 |
 +-----------------------------------------------------------------------+
 |  +-----------+  +-----------+  +-----------+                          |
 |  | Workbench |  | Sanitizer |  | Permission|   (4 endogenous layers)  |
+|  | (Layer 1) |  | (Layer 3) |  | (Layer 2) |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +-----------+  +-----------+  +-----------+                          |
-|  |   Audit   |  |   Utils   |  |  Security |                          |
+|  |   Audit   |  |   Utils   |  |  Security |   (Layer 4 + engine)     |
+|  | (Layer 4) |  |           |  |  Engine   |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  |  Guards   |  |CircuitBrkr|  |YAMLParser |                          |
@@ -191,22 +152,51 @@ are enabled:
 +-----------------------------------------------------------------------+
 |                      Syscall layer (atoms/syscall)                    |
 +-----------------------------------------------------------------------+
+
+  Request flow:  gateway/daemon → cupolas → [sandbox → permission → sanitize] → atoms/kernel
+                                                                  ↓
+                                                              audit log
 ```
 
----
+**Design principles:** defense-in-depth, zero-trust (default-deny, identity + context per call), full auditability, least privilege, dynamically-extensible guard framework, endogenous security (every layer must pass).
 
-## 5. Build Instructions
+## Upstream Dependencies
+
+> `commons` is the foundation for all agentrt modules; cupolas consumes it directly. cupolas also depends on `atoms` for the enforcement substrate.
+
+| Dependency | Required | Purpose |
+|------------|----------|---------|
+| **commons** | Yes | Sync primitives, error framework, type definitions (`agentrt_types.h`), memory management macros (`AGENTRT_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
+| **atoms** | Yes | Provides the Syscall surface that cupolas enforces (sandbox, seccomp, capability, 4 protection rings), and the CoreKern IPC primitives (`are_ipc.h`) for the audit queue and workbench IPC |
+| OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AGENTRT_HAS_OPENSSL` |
+| libyaml | No | Full YAML support; built-in `yaml_minimal.c` is the fallback |
+| cJSON | No | JSON config parsing |
+
+> **BAN-12**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AGENTRT_HAS_OPENSSL`, `AGENTRT_HAS_YAML`, `AGENTRT_HAS_CJSON`).
+
+## Downstream Consumers
+
+| Consumer | What they use |
+|----------|---------------|
+| **daemons** | Every daemon calls cupolas for permission checks (`cupolas_check_permission`), input sanitization (`cupolas_sanitize_input`), and to emit audit events; the workbench hosts untrusted tool execution (e.g. `tool_d` runs tool commands inside `cupolas_execute_command`) |
+| **gateway** | Gateway invokes cupolas for request authentication and input sanitization at the protocol boundary, before translating HTTP/WS/stdio into JSON-RPC |
+| External SDK / Agent apps | Use `cupolas_check_permission` and `cupolas_sanitize_input` to participate in the security contract; the safety_guard / zero_trust_integration interfaces let external agents plug into the dome |
+
+## Build
 
 ```bash
-# Standard build (from the umbrella root, or standalone)
-cmake -B build -DBUILD_TESTS=ON -DBUILD_WITH_SANITIZERS=OFF
-cmake --build build
+# Standard build (out-of-source, enforced by BAN-33)
+cmake -S . -B /tmp/cupolas-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+cmake --build /tmp/cupolas-build --parallel $(nproc)
 
 # Run the test suite (unit / integration / stress / fuzz / benchmark)
-ctest --test-dir build
+ctest --test-dir /tmp/cupolas-build --output-on-failure
+
+# Install
+cmake --install /tmp/cupolas-build --prefix /opt/airymax
 ```
 
-### CMake Options
+**CMake options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -217,28 +207,32 @@ ctest --test-dir build
 | `AGENTRT_HAS_YAML` | auto | Auto-detected by umbrella CMake |
 | `AGENTRT_HAS_CJSON` | auto | Auto-detected by umbrella CMake |
 
-### Hardened build flags (Linux)
+**Hardened build flags (Linux):** `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=2`, `-fvisibility=hidden`, `-Wl,-z,relro,-z,now`, `-Wl,-z,noexecstack`.
 
-- `-fstack-protector-strong` — stack protection
-- `-D_FORTIFY_SOURCE=2` — buffer-overflow protection
-- `-fvisibility=hidden` — symbol hiding
-- `-Wl,-z,relro,-z,now` — read-only relocations
-- `-Wl,-z,noexecstack` — non-executable stack
-
-### Build Artifacts
+**Build artifacts:**
 
 - `agentrt_cupolas` — static library aggregating all security subsystems
 - Public headers installed under `include/agentrt/cupolas`
 
-### Installation
+## API
 
-```bash
-cmake --install build --prefix /opt/airymax
-```
+Public API surface is exported through `include/cupolas.h` (unified entry) and companion headers `zero_trust_integration.h`, `dynamic_policy_engine.h`, `safety_guard.h`.
 
----
+| Function | Description |
+|----------|-------------|
+| `cupolas_init(config_path, error)` | Initialize the cupolas module |
+| `cupolas_cleanup()` | Tear down the cupolas module |
+| `cupolas_version()` | Get version string |
+| `cupolas_check_permission(agent_id, action, resource, context)` | Permission check (1 = allow, 0 = deny) |
+| `cupolas_add_permission_rule(agent_id, action, resource, allow, priority)` | Add a permission rule |
+| `cupolas_clear_permission_cache()` | Clear the permission cache |
+| `cupolas_sanitize_input(input, output, output_size)` | Sanitize input (XSS / SQLi / cmd injection / path traversal) |
+| `cupolas_execute_command(command, argv, exit_code, ...)` | Execute a command inside the isolated workbench |
+| `cupolas_flush_audit_log()` | Flush the audit log |
 
-## 6. License
+The extensible guard framework (`safety_guard.h`) supports rule / model / behavior / heuristic / external / composite / custom guard types. The zero-trust integration interface lets external agents register context providers for identity-and-context-based authorization.
+
+## License
 
 Copyright (c) 2025-2026 SPHARX Ltd. All Rights Reserved.
 
@@ -251,8 +245,4 @@ This module is dual-licensed under the terms of either:
 
 SPDX-License-Identifier: `AGPL-3.0-or-later OR Apache-2.0`
 
-The full license texts are in the [LICENSE](LICENSE) file; the copyright
-notice is in [NOTICE](NOTICE). You may select either license to comply with.
-The AGPL-3.0-or-later terms apply by default; the Apache-2.0 alternative is
-provided for downstream integration scenarios (e.g., closed-source or
-proprietary distribution) that the AGPL does not accommodate.
+The full license texts are in the [LICENSE](LICENSE) file; the copyright notice is in [NOTICE](NOTICE). You may select either license to comply with. The AGPL-3.0-or-later terms apply by default; the Apache-2.0 alternative is provided for downstream integration scenarios (e.g., closed-source or proprietary distribution) that the AGPL does not accommodate.
