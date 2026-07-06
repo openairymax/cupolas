@@ -1,221 +1,258 @@
-# Cupolas — 安全穹顶
+**Language:** English | [简体中文](README_zh.md)
 
-**模块路径**: `agentrt/cupolas/`
-**版本**: v0.1.0
+# Airymax Cupolas — Security Dome
 
-## 概述
+`agentrt/cupolas/`
 
-Cupolas（穹顶）是 AgentRT 的安全组件集合，提供全方位的安全防护能力。Cupolas 寓意全方位、无死角的系统保护，涵盖输入清洗、权限管理、审计追踪、安全防护引擎、隔离工作台和可扩展的安全守卫框架。所有组件遵循纵深防御和零信任架构原则。
-
-## 设计目标
-
-- **纵深防御**：多层安全防护，单层突破不导致系统失守
-- **零信任架构**：默认拒绝所有访问，基于身份和上下文逐次授权
-- **可审计性**：所有安全事件完整记录，支持溯源和取证
-- **最小权限**：按需授权，权限粒度精确到单个操作
-- **可扩展**：安全守卫框架支持规则/模型/行为分析守卫的动态加载
-
-## 目录结构
-
-```
-cupolas/
-├── include/                         # 公共头文件
-│   ├── cupolas.h                    # Cupolas 统一入口
-│   ├── zero_trust_integration.h     # 零信任集成接口
-│   ├── dynamic_policy_engine.h      # 动态策略引擎
-│   └── safety_guard.h               # 安全守卫接口
-├── src/
-│   ├── cupolas.c                    # Cupolas 核心实现
-│   ├── cupolas_config.c/h           # 配置管理
-│   ├── cupolas_metrics.c/h          # 指标采集
-│   ├── cupolas_monitoring.c/h       # 监控系统
-│   ├── circuit_breaker.c/h          # 熔断器
-│   ├── yaml_minimal.c/h             # YAML 1.1 解析器
-│   ├── platform/                    # 平台安全适配
-│   │   └── platform.c/h
-│   ├── sanitizer/                   # 输入清洗器
-│   │   ├── sanitizer.h              # 公共接口
-│   │   ├── sanitizer_core.c         # 清洗核心引擎
-│   │   ├── sanitizer_rules.c/h      # 规则引擎
-│   │   └── sanitizer_cache.c/h      # 清洗缓存
-│   ├── permission/                  # 权限管理
-│   │   ├── permission.h             # 公共接口
-│   │   ├── permission_engine.c/h    # 权限引擎
-│   │   ├── permission_rule.c/h      # 规则管理
-│   │   └── permission_cache.c/h     # 权限缓存
-│   ├── audit/                       # 审计系统
-│   │   ├── audit.h                  # 公共接口
-│   │   ├── audit_logger.c           # 审计日志器
-│   │   ├── audit_queue.c/h          # 线程安全队列
-│   │   ├── audit_rotator.c/h        # 日志轮转
-│   │   └── audit_overflow.c/h       # 溢出处理
-│   ├── security/                    # 安全防护引擎
-│   │   ├── cupolas_error.c/h        # 统一错误处理
-│   │   ├── cupolas_signature.c/h    # 数字签名（需 OpenSSL）
-│   │   ├── cupolas_vault.c/h        # 密钥保险库（需 OpenSSL）
-│   │   ├── cupolas_entitlements.c/h # 权利管理（需 OpenSSL）
-│   │   ├── cupolas_runtime_protection.c/h  # 运行时保护（需 OpenSSL）
-│   │   ├── cupolas_network_security.c/h    # 网络安全（需 OpenSSL）
-│   │   └── network/                 # 网络安全子模块
-│   │       ├── http_security.c/h    # HTTP 安全
-│   │       ├── dns_security.c/h     # DNS 安全
-│   │       ├── network_filter.c/h   # 网络过滤
-│   │       ├── network_utils.c/h    # 网络工具
-│   │       └── tls_security.c/h     # TLS 安全（需 OpenSSL）
-│   ├── guards/                      # 安全守卫框架
-│   │   ├── guard_core.c/h           # 守卫核心
-│   │   └── guard_integration.c/h    # 守卫集成
-│   ├── workbench/                   # 安全工作台
-│   │   ├── workbench.c/h            # 工作台核心
-│   │   ├── workbench_process.h      # 进程管理接口
-│   │   ├── workbench_process_core.c # 进程管理实现
-│   │   ├── workbench_container.c/h  # 容器隔离
-│   │   └── workbench_limits.c/h     # 资源限制
-│   └── utils/                       # 安全工具库
-│       └── cupolas_utils.c/h        # 通用工具宏与函数
-├── tests/                           # 测试套件
-│   ├── unit/                        # 单元测试
-│   │   ├── test_cupolas_core.c
-│   │   ├── test_cupolas_config.c
-│   │   ├── test_cupolas_metrics.c
-│   │   ├── test_cupolas_security.c
-│   │   ├── test_cupolas_signature.c
-│   │   ├── test_cupolas_vault.c
-│   │   ├── test_cupolas_workbench.c
-│   │   ├── test_circuit_breaker.c
-│   │   ├── test_sanitizer_cache.c
-│   │   ├── test_audit_overflow.c
-│   │   └── test_yaml_minimal.c
-│   ├── integration/                 # 集成测试
-│   │   └── test_cupolas_integration.c
-│   ├── stress/                      # 压力测试
-│   │   └── test_stress_concurrent.c
-│   ├── fuzz/                        # 模糊测试
-│   │   ├── fuzz_permission.c
-│   │   └── fuzz_sanitizer.c
-│   └── benchmark/                   # 性能基准
-│       └── benchmark_cupolas.c
-├── CMakeLists.txt                   # CMake 构建配置
-└── README.md                        # 本文档
-```
-
-## 核心子系统
-
-| 子系统 | 路径 | 职责 |
-|--------|------|------|
-| **输入清洗器** | `src/sanitizer/` | XSS/SQL 注入/命令注入/路径遍历防护 |
-| **权限管理** | `src/permission/` | RBAC + ABAC 权限引擎，规则优先级排序 |
-| **审计系统** | `src/audit/` | 异步写入、HMAC 签名链、日志轮转 |
-| **安全防护引擎** | `src/security/` | 数字签名、密钥保险库、权利管理、运行时保护、网络安全 |
-| **安全工作台** | `src/workbench/` | 隔离执行环境、资源控制、进程管理 |
-| **安全守卫** | `src/guards/` | 可扩展的安全检测框架（规则/模型/行为/启发式/外部/复合/自定义） |
-| **安全工具库** | `src/utils/` | 内存管理、错误处理、日志、编译器提示、位操作、时间工具 |
-
-### 独立组件
-
-| 组件 | 源文件 | 职责 |
-|------|--------|------|
-| **熔断器** | `src/circuit_breaker.c` | 故障快速失败与自动恢复模式 |
-| **YAML 解析器** | `src/yaml_minimal.c` | YAML 1.1 配置文件解析（锚点/别名/标签/折叠标量） |
-| **配置管理** | `src/cupolas_config.c` | Cupolas 安全策略配置 |
-| **指标采集** | `src/cupolas_metrics.c` | 安全事件指标统计 |
-| **监控系统** | `src/cupolas_monitoring.c` | 运行时安全监控 |
-
-### OpenSSL 条件编译
-
-当定义 `AGENTRT_HAS_OPENSSL` 时，以下 iOS 级安全模块会被启用：
-
-| 模块 | 源文件 | 职责 |
-|------|--------|------|
-| **数字签名** | `cupolas_signature.c` | RSA/ECDSA/Ed25519 签名验证、证书链校验、完整性校验 |
-| **密钥保险库** | `cupolas_vault.c` | AES-256-GCM 安全凭证存储，ACL 访问控制，凭证轮换 |
-| **权利管理** | `cupolas_entitlements.c` | 声明式权限（文件系统/网络/IPC/Vault/资源限制/Syscall/Capability） |
-| **运行时保护** | `cupolas_runtime_protection.c` | seccomp、CFI、内存保护、完整性校验 |
-| **网络安全** | `cupolas_network_security.c` | TLS 连接管理、防火墙规则、证书验证 |
-| **TLS 安全** | `network/tls_security.c` | TLS/SSL 连接管理与证书验证 |
-
-## 公共 API（cupolas.h）
-
-| 函数 | 说明 |
-|------|------|
-| `cupolas_init(config_path, error)` | 初始化 Cupolas 模块 |
-| `cupolas_cleanup()` | 清理 Cupolas 模块 |
-| `cupolas_version()` | 获取版本字符串 |
-| `cupolas_check_permission(agent_id, action, resource, context)` | 权限检查（1=允许，0=拒绝） |
-| `cupolas_add_permission_rule(agent_id, action, resource, allow, priority)` | 添加权限规则 |
-| `cupolas_clear_permission_cache()` | 清除权限缓存 |
-| `cupolas_sanitize_input(input, output, output_size)` | 输入清洗 |
-| `cupolas_execute_command(command, argv, exit_code, ...)` | 隔离工作台执行命令 |
-| `cupolas_flush_audit_log()` | 刷新审计日志 |
-
-## 架构总览
-
-```
-+-----------------------------------------------------------------------+
-|                        安全保障体系（Cupolas）                           |
-+-----------------------------------------------------------------------+
-|  +----------------+  +----------------+  +----------------+            |
-|  |   Workbench    |  |   Sanitizer    |  |  Permission    |            |
-|  |  隔离执行环境   |  |  输入清洗器     |  |  权限管理      |            |
-|  +----------------+  +----------------+  +----------------+            |
-|  +----------------+  +----------------+  +----------------+            |
-|  |    Audit       |  |    Utils       |  |   Security     |            |
-|  |  审计系统       |  |  安全工具库     |  |  安全防护引擎   |            |
-|  +----------------+  +----------------+  +----------------+            |
-|  +----------------+  +----------------+  +----------------+            |
-|  |    Guards      |  |Circuit Breaker |  |  YAML Parser   |            |
-|  |  安全守卫框架   |  |    熔断器       |  |  配置解析器     |            |
-|  +----------------+  +----------------+  +----------------+            |
-|  +----------------------------------------------------------------+   |
-|  |              OpenSSL 条件模块（AGENTRT_HAS_OPENSSL）              |   |
-|  |  Signature | Vault | Entitlements | RuntimeProt | NetSec | TLS  |   |
-|  +----------------------------------------------------------------+   |
-+-----------------------------------------------------------------------+
-|                         系统调用层（Syscall）                            |
-+-----------------------------------------------------------------------+
-```
-
-## 构建说明
-
-```bash
-mkdir build && cd build
-cmake .. -DBUILD_TESTS=ON -DBUILD_WITH_SANITIZERS=OFF
-cmake --build .
-```
-
-CMake 选项：
-- `BUILD_TESTS`（默认 ON）：构建测试套件
-- `BUILD_WITH_SANITIZERS`（默认 OFF）：启用 ASAN/MSAN/TSAN
-- `BUILD_WITH_LOGGING`（默认 ON）：启用详细日志
-- `AGENTRT_HAS_OPENSSL`：由根 CMakeLists 自动检测
-
-编译安全选项（Linux）：
-- `-fstack-protector-strong`：栈保护
-- `-D_FORTIFY_SOURCE=2`：缓冲区溢出保护
-- `-fvisibility=hidden`：符号隐藏
-- `-Wl,-z,relro,-z,now`：只读重定位
-- `-Wl,-z,noexecstack`：禁止栈执行
-
-## 依赖
-
-| 依赖 | 必需 | 说明 |
-|------|------|------|
-| **agentrt_common** | 是 | 同步原语、错误框架、类型定义、内存管理 |
-| **OpenSSL** | 否 | 数字签名、密钥保险库、TLS 等（`AGENTRT_HAS_OPENSSL`） |
-| **libyaml** | 否 | 完整 YAML 支持（内置 `yaml_minimal.c` 作为后备） |
-| **cJSON** | 否 | JSON 配置解析 |
-
-> **BAN-12**：所有 `find_package` 在根 CMakeLists.txt 中集中完成，子模块仅引用缓存变量。
-
-## 与其它模块的关系
-
-| 模块 | 关系 |
-|------|------|
-| **Commons** | 使用 Commons 的同步原语、错误框架、类型定义和内存管理宏 |
-| **Syscall** | Cupolas 为系统调用层提供安全校验 |
-| **Gateway** | Gateway 调用 Cupolas 进行请求鉴权和输入清洗 |
-| **Manager** | Manager 管理 Cupolas 的安全策略配置 |
+**Version:** 0.1.1
+**License:** AGPL-3.0-or-later OR Apache-2.0 (dual-licensed)
+**Branch:** `feature/official-hubs-01`
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+## 1. Module Positioning
+
+Cupolas (literally "dome") is the **application-semantic security layer** (B-tier)
+of the Airymax agent runtime. It is the umbrella under which every runtime
+security decision is made and enforced. Cupolas implements a four-layer
+endogenous-security model — every layer must be passed before an agent action
+reaches the kernel:
+
+1. **Sandbox isolation** — every untrusted task runs in a confined workbench
+   (process / container isolation with resource limits).
+2. **RBAC permission adjudication** — every action is checked against an
+   RBAC + ABAC permission engine with rule-priority ordering and a
+   permission cache.
+3. **Input sanitization** — every input is scrubbed for XSS, SQL injection,
+   command injection, and path traversal before it touches an executor.
+4. **Audit tracing** — every security event is written to an asynchronous,
+   HMAC-signed, rotating audit log for forensic traceability.
+
+Cupolas follows defense-in-depth and zero-trust principles: default-deny,
+identity-and-context-based authorization per call, full auditability, least
+privilege, and a dynamically-extensible guard framework.
+
+---
+
+## 2. Directory Structure
+
+```
+cupolas/
+├── CMakeLists.txt                        # CMake build configuration
+├── README.md                             # This file (English)
+├── README_zh.md                          # Chinese version
+├── LICENSE                               # Dual license texts (AGPL-3.0 + Apache-2.0)
+├── NOTICE                                # Copyright notice
+├── include/                              # Public headers
+│   ├── cupolas.h                         # Cupolas unified entry
+│   ├── zero_trust_integration.h          # Zero-trust integration interface
+│   ├── dynamic_policy_engine.h           # Dynamic policy engine
+│   └── safety_guard.h                    # Safety guard interface
+└── src/
+    ├── cupolas.c                         # Cupolas core implementation
+    ├── cupolas_config.c/.h               # Configuration management
+    ├── cupolas_metrics.c/.h              # Metric collection
+    ├── cupolas_monitoring.c/.h           # Runtime monitoring
+    ├── circuit_breaker.c/.h              # Circuit breaker
+    ├── yaml_minimal.c/.h                 # YAML 1.1 parser (fallback)
+    ├── slab.c/.h                         # Slab allocator
+    ├── mempool.c/.h                      # Memory pool
+    ├── platform/
+    │   └── platform.c/.h                 # Platform security adaptation
+    ├── sanitizer/                        # (Layer 3) Input sanitizer
+    │   ├── sanitizer.h
+    │   ├── sanitizer_core.c
+    │   ├── sanitizer_rules.c/.h          # Rule engine
+    │   └── sanitizer_cache.c/.h          # Sanitization cache
+    ├── permission/                       # (Layer 2) RBAC permission engine
+    │   ├── permission.h
+    │   ├── permission_engine.c/.h
+    │   ├── permission_rule.c/.h
+    │   └── permission_cache.c/.h
+    ├── audit/                            # (Layer 4) Audit system
+    │   ├── audit.h
+    │   ├── audit_logger.c                # Audit logger
+    │   ├── audit_queue.c/.h              # Thread-safe queue
+    │   ├── audit_rotator.c/.h            # Log rotation
+    │   └── audit_overflow.c/.h           # Overflow handling
+    ├── security/                         # Security defense engine
+    │   ├── cupolas_error.c/.h            # Unified error handling
+    │   ├── cupolas_signature.c/.h        # Digital signature (OpenSSL)
+    │   ├── cupolas_vault.c/.h            # Key vault (OpenSSL)
+    │   ├── cupolas_entitlements.c/.h     # Entitlements (OpenSSL)
+    │   ├── cupolas_runtime_protection.c/.h  # Runtime protection (OpenSSL)
+    │   ├── cupolas_network_security.c/.h    # Network security (OpenSSL)
+    │   └── network/                      # Network security sub-modules
+    │       ├── http_security.c/.h        # HTTP security
+    │       ├── dns_security.c/.h         # DNS security
+    │       ├── network_filter.c/.h       # Network filter
+    │       ├── network_utils.c/.h        # Network utilities
+    │       └── tls_security.c/.h         # TLS security (OpenSSL)
+    ├── guards/                           # Extensible guard framework
+    │   ├── guard_core.c/.h
+    │   ├── guard_integration.c/.h
+    │   └── safety_guard.c/.h
+    ├── workbench/                        # (Layer 1) Sandbox workbench
+    │   ├── workbench.c/.h
+    │   ├── workbench_process.h           # Process management interface
+    │   ├── workbench_process_core.c      # Process management impl
+    │   ├── workbench_container.c/.h      # Container isolation
+    │   └── workbench_limits.c/.h         # Resource limits
+    └── utils/
+        └── cupolas_utils.c/.h            # Memory, error, logging, bit ops helpers
+```
+
+### Core Subsystems
+
+| Subsystem | Path | Responsibility |
+|-----------|------|----------------|
+| **Input Sanitizer** | `src/sanitizer/` | XSS / SQL injection / command injection / path traversal defense |
+| **Permission** | `src/permission/` | RBAC + ABAC engine, rule-priority ordering, cache |
+| **Audit** | `src/audit/` | Async writes, HMAC signature chain, log rotation |
+| **Security Engine** | `src/security/` | Digital signature, key vault, entitlements, runtime protection, network security |
+| **Workbench** | `src/workbench/` | Isolated execution, resource control, process management |
+| **Guards** | `src/guards/` | Extensible detection framework (rule / model / behavior / heuristic / external / composite / custom) |
+| **Utils** | `src/utils/` | Memory mgmt, error handling, logging, compiler hints, bit ops, time |
+
+### OpenSSL-conditional modules
+
+When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules
+are enabled:
+
+| Module | Source | Responsibility |
+|--------|--------|----------------|
+| **Digital Signature** | `cupolas_signature.c` | RSA/ECDSA/Ed25519 verification, certificate chain, integrity |
+| **Key Vault** | `cupolas_vault.c` | AES-256-GCM credential storage, ACL, rotation |
+| **Entitlements** | `cupolas_entitlements.c` | Declarative permissions (FS / network / IPC / vault / quota / syscall / capability) |
+| **Runtime Protection** | `cupolas_runtime_protection.c` | seccomp, CFI, memory protection, integrity checks |
+| **Network Security** | `cupolas_network_security.c` | TLS connection mgmt, firewall rules, cert verification |
+| **TLS Security** | `network/tls_security.c` | TLS/SSL connection management and cert verification |
+
+---
+
+## 3. Upstream / Downstream Dependencies
+
+### Upstream (Cupolas depends on)
+
+| Dependency | Required | Purpose |
+|------------|----------|---------|
+| **commons** | Yes | Sync primitives, error framework, type definitions, memory management macros — Cupolas consumes the foundational layer directly |
+| **atoms** | Yes | Provides the Syscall surface that Cupolas enforces (sandbox, seccomp, capability), and the CoreKern IPC primitives for the audit queue |
+| OpenSSL | No | Digital signature, key vault, TLS — gated by `AGENTRT_HAS_OPENSSL` |
+| libyaml | No | Full YAML support; built-in `yaml_minimal.c` is the fallback |
+| cJSON | No | JSON config parsing |
+
+> **BAN-12**: All `find_package` calls are centralized in the umbrella root
+> `CMakeLists.txt`; sub-modules only consume cache variables.
+
+### Downstream (consumers of Cupolas)
+
+| Consumer | What it uses |
+|----------|--------------|
+| **daemons** | Every daemon calls Cupolas for permission checks, input sanitization, and to emit audit events; the workbench hosts untrusted tool execution |
+| **gateway** | Gateway invokes Cupolas for request authentication and input sanitization at the protocol boundary |
+| External SDK / Agent apps | Use `cupolas_check_permission` and `cupolas_sanitize_input` to participate in the security contract |
+
+---
+
+## 4. Public API (`cupolas.h`)
+
+| Function | Description |
+|----------|-------------|
+| `cupolas_init(config_path, error)` | Initialize the Cupolas module |
+| `cupolas_cleanup()` | Tear down the Cupolas module |
+| `cupolas_version()` | Get version string |
+| `cupolas_check_permission(agent_id, action, resource, context)` | Permission check (1 = allow, 0 = deny) |
+| `cupolas_add_permission_rule(agent_id, action, resource, allow, priority)` | Add a permission rule |
+| `cupolas_clear_permission_cache()` | Clear the permission cache |
+| `cupolas_sanitize_input(input, output, output_size)` | Sanitize input |
+| `cupolas_execute_command(command, argv, exit_code, ...)` | Execute a command inside the isolated workbench |
+| `cupolas_flush_audit_log()` | Flush the audit log |
+
+### Architecture Overview
+
+```
++-----------------------------------------------------------------------+
+|                   Security Assurance System (Cupolas)                 |
++-----------------------------------------------------------------------+
+|  +-----------+  +-----------+  +-----------+                          |
+|  | Workbench |  | Sanitizer |  | Permission|   (4 endogenous layers)  |
+|  +-----------+  +-----------+  +-----------+                          |
+|  +-----------+  +-----------+  +-----------+                          |
+|  |   Audit   |  |   Utils   |  |  Security |                          |
+|  +-----------+  +-----------+  +-----------+                          |
+|  +-----------+  +-----------+  +-----------+                          |
+|  |  Guards   |  |CircuitBrkr|  |YAMLParser |                          |
+|  +-----------+  +-----------+  +-----------+                          |
+|  +----------------------------------------------------------------+   |
+|  |        OpenSSL-conditional (AGENTRT_HAS_OPENSSL)               |   |
+|  | Signature | Vault | Entitlements | RuntimeProt | NetSec | TLS  |   |
+|  +----------------------------------------------------------------+   |
++-----------------------------------------------------------------------+
+|                      Syscall layer (atoms/syscall)                    |
++-----------------------------------------------------------------------+
+```
+
+---
+
+## 5. Build Instructions
+
+```bash
+# Standard build (from the umbrella root, or standalone)
+cmake -B build -DBUILD_TESTS=ON -DBUILD_WITH_SANITIZERS=OFF
+cmake --build build
+
+# Run the test suite (unit / integration / stress / fuzz / benchmark)
+ctest --test-dir build
+```
+
+### CMake Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `BUILD_TESTS` | `ON` | Build the test suite (unit / integration / stress / fuzz / benchmark) |
+| `BUILD_WITH_SANITIZERS` | `OFF` | Enable ASAN / MSAN / TSAN |
+| `BUILD_WITH_LOGGING` | `ON` | Enable verbose logging |
+| `AGENTRT_HAS_OPENSSL` | auto | Auto-detected by umbrella CMake; gates OpenSSL-conditional modules |
+| `AGENTRT_HAS_YAML` | auto | Auto-detected by umbrella CMake |
+| `AGENTRT_HAS_CJSON` | auto | Auto-detected by umbrella CMake |
+
+### Hardened build flags (Linux)
+
+- `-fstack-protector-strong` — stack protection
+- `-D_FORTIFY_SOURCE=2` — buffer-overflow protection
+- `-fvisibility=hidden` — symbol hiding
+- `-Wl,-z,relro,-z,now` — read-only relocations
+- `-Wl,-z,noexecstack` — non-executable stack
+
+### Build Artifacts
+
+- `agentrt_cupolas` — static library aggregating all security subsystems
+- Public headers installed under `include/agentrt/cupolas`
+
+### Installation
+
+```bash
+cmake --install build --prefix /opt/airymax
+```
+
+---
+
+## 6. License
+
+Copyright (c) 2025-2026 SPHARX Ltd. All Rights Reserved.
+
+This module is dual-licensed under the terms of either:
+
+- **GNU Affero General Public License v3.0 or later**
+  ([AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.txt)), or
+- **Apache License, Version 2.0**
+  ([Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0.txt))
+
+SPDX-License-Identifier: `AGPL-3.0-or-later OR Apache-2.0`
+
+The full license texts are in the [LICENSE](LICENSE) file; the copyright
+notice is in [NOTICE](NOTICE). You may select either license to comply with.
+The AGPL-3.0-or-later terms apply by default; the Apache-2.0 alternative is
+provided for downstream integration scenarios (e.g., closed-source or
+proprietary distribution) that the AGPL does not accommodate.
