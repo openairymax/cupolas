@@ -105,7 +105,7 @@ audit/
 #include "audit.h"
 
 audit_logger_t *logger = audit_logger_create(
-    "/var/log/agentos/audit", "security", 10 * 1024 * 1024, 100);
+    "/var/log/agentrt/audit", "security", 10 * 1024 * 1024, 100);
 
 audit_logger_log_permission(logger, "agent-001", "api:write", "/api/v1/config", 0);
 audit_logger_log_sanitizer(logger, "agent-002", "<script>alert(1)</script>", "", 0);
