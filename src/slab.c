@@ -501,9 +501,9 @@ void agentrt_slab_free(agentrt_slab_t *slab, void *obj)
 
 int agentrt_slab_get_stats(agentrt_slab_t *slab, agentrt_slab_stats_t *stats)
 {
-    if (!slab || !stats) return -1;
+    if (!slab || !stats) return AGENTRT_ERR_INVALID_PARAM;
 
-    memset(stats, 0, sizeof(*stats));
+    AGENTRT_MEMSET(stats, 0, sizeof(*stats));
 
     stats->obj_size = slab->obj_size;
     stats->objs_per_slab = slab->objs_per_page;
