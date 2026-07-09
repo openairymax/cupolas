@@ -134,10 +134,12 @@ static void audit_compute_chain_hash(const audit_entry_t *entry, const char *pre
                                      char *hash_out)
 {
 #ifdef AGENTRT_HAS_OPENSSL
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
     SHA256_Update(&sha256, prev_hash, strlen(prev_hash));
-    SHA256_Update(&sha256, entry->agent_id ? entry->agent_id : "", 
+    SHA256_Update(&sha256, entry->agent_id ? entry->agent_id : "",
                   entry->agent_id ? strlen(entry->agent_id) : 0);
     SHA256_Update(&sha256, &entry->timestamp_ms, sizeof(entry->timestamp_ms));
     SHA256_Update(&sha256, entry->action ? entry->action : "",
@@ -150,6 +152,7 @@ static void audit_compute_chain_hash(const audit_entry_t *entry, const char *pre
 
     unsigned char digest[SHA256_DIGEST_LENGTH];
     SHA256_Final(digest, &sha256);
+#pragma GCC diagnostic pop
 
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
     {
