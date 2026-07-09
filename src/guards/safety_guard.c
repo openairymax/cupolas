@@ -383,8 +383,8 @@ int safety_guard_register_guard(safety_guard_context_t *ctx,
                                 const safety_guard_descriptor_t *descriptor,
                                 safety_guard_check_fn check_fn, void *user_data)
 {
-    if (!ctx || !descriptor) return -1;
-    if (ctx->guard_count >= ctx->guard_capacity) return -1;
+    if (!ctx || !descriptor) return AGENTRT_ERR_INVALID_PARAM;
+    if (ctx->guard_count >= ctx->guard_capacity) return AGENTRT_ERR_FAIL;
 
     guard_entry_t *entry = &ctx->guards[ctx->guard_count];
     __builtin_memcpy(&entry->descriptor, descriptor, sizeof(*descriptor));
@@ -396,7 +396,7 @@ int safety_guard_register_guard(safety_guard_context_t *ctx,
 
 int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return -1;
+    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             if (i < ctx->guard_count - 1) {
@@ -407,31 +407,31 @@ int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_enable_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return -1;
+    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = true;
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_disable_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return -1;
+    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = false;
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 safety_decision_t safety_guard_check(safety_guard_context_t *ctx,
@@ -637,13 +637,13 @@ chain_done:
 
 int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *policy)
 {
-    if (!ctx || !policy) return -1;
+    if (!ctx || !policy) return AGENTRT_ERR_INVALID_PARAM;
     if (ctx->policy_count >= ctx->policy_capacity) {
         /* 扩容 */
         size_t new_cap = ctx->policy_capacity * 2;
         safety_policy_t *new_policies = (safety_policy_t *)AGENTRT_REALLOC(
             ctx->policies, new_cap * sizeof(safety_policy_t));
-        if (!new_policies) return -1;
+        if (!new_policies) return AGENTRT_ERR_OUT_OF_MEMORY;
         ctx->policies = new_policies;
         ctx->policy_capacity = new_cap;
     }
@@ -663,7 +663,7 @@ int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *
 
 int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_id)
 {
-    if (!ctx || !policy_id) return -1;
+    if (!ctx || !policy_id) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
             AGENTRT_FREE(ctx->policies[i].rules_json);
@@ -675,13 +675,13 @@ int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_i
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_update_policy(safety_guard_context_t *ctx, const char *policy_id,
                                const char *new_rules_json)
 {
-    if (!ctx || !policy_id || !new_rules_json) return -1;
+    if (!ctx || !policy_id || !new_rules_json) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
             AGENTRT_FREE(ctx->policies[i].rules_json);
@@ -689,16 +689,16 @@ int safety_guard_update_policy(safety_guard_context_t *ctx, const char *policy_i
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies_json)
 {
-    if (!ctx || !policies_json) return -1;
+    if (!ctx || !policies_json) return AGENTRT_ERR_INVALID_PARAM;
 
     /* 使用 config_unified 解析 JSON 策略数组 */
     config_context_t *cfg = config_context_create("safety_policies");
-    if (!cfg) return -1;
+    if (!cfg) return AGENTRT_ERR_FAIL;
 
     /* 从内存解析 JSON */
     config_memory_source_options_t mem_opts = {
@@ -709,12 +709,12 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
     config_source_t *mem_source = config_source_create_memory(&mem_opts);
     if (!mem_source) {
         config_context_destroy(cfg);
-        return -1;
+        return AGENTRT_ERR_FAIL;
     }
     config_error_t err = config_service_load(cfg, &mem_source, 1);
     if (err != CONFIG_SUCCESS) {
         config_context_destroy(cfg);
-        return -1;
+        return AGENTRT_ERR_PARSE_ERROR;
     }
 
     /* 遍历策略键: policy.0.id, policy.1.id, ... */
@@ -785,13 +785,13 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
 
     config_source_destroy(mem_source);
     config_context_destroy(cfg);
-    return loaded > 0 ? 0 : -1;
+    return loaded > 0 ? 0 : AGENTRT_ERR_FAIL;
 }
 
 int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *policy_a_id,
                                   const char *policy_b_id, safety_decision_t *resolved_decision)
 {
-    if (!ctx || !policy_a_id || !policy_b_id || !resolved_decision) return -1;
+    if (!ctx || !policy_a_id || !policy_b_id || !resolved_decision) return AGENTRT_ERR_INVALID_PARAM;
 
     /* 冲突解决策略：优先级高的策略胜出 */
     safety_policy_t *policy_a = NULL, *policy_b = NULL;
@@ -815,7 +815,7 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
          * 安全穹顶遵循 fail-closed 原则——拒绝而非放行，
          * 并返回错误码告知调用方策略 ID 无效。 */
         *resolved_decision = SAFETY_DECISION_DENY;
-        return -1;
+        return AGENTRT_ERR_NOT_FOUND;
     }
     return 0;
 }
@@ -823,7 +823,7 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
 int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
                            int64_t limit, uint64_t reset_interval_ms)
 {
-    if (!ctx || !resource_id) return -1;
+    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
 
     /* 查找已有配额或创建新配额 */
     for (size_t i = 0; i < ctx->quota_count; i++) {
@@ -834,7 +834,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
         }
     }
 
-    if (ctx->quota_count >= ctx->quota_capacity) return -1;
+    if (ctx->quota_count >= ctx->quota_capacity) return AGENTRT_ERR_FAIL;
     safety_quota_t *q = &ctx->quotas[ctx->quota_count];
     snprintf(q->resource_id, sizeof(q->resource_id), "%s", resource_id);
     q->limit = limit;
@@ -849,7 +849,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
 int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_id,
                              int64_t requested, bool *allowed)
 {
-    if (!ctx || !resource_id || !allowed) return -1;
+    if (!ctx || !resource_id || !allowed) return AGENTRT_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
@@ -864,20 +864,20 @@ int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_i
 int safety_guard_consume_quota(safety_guard_context_t *ctx, const char *resource_id,
                                int64_t amount)
 {
-    if (!ctx || !resource_id) return -1;
+    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage += amount;
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource_id,
                                int64_t amount)
 {
-    if (!ctx || !resource_id) return -1;
+    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage -= amount;
@@ -885,24 +885,24 @@ int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource
             return 0;
         }
     }
-    return -1;
+    return AGENTRT_ERR_NOT_FOUND;
 }
 
 int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t *event,
                               const safety_result_t *result, const char *guard_name)
 {
-    if (!ctx || !event) return -1;
+    if (!ctx || !event) return AGENTRT_ERR_INVALID_PARAM;
 
     /* P1.4.3: 每次 DENY 必须写入审计日志 */
     if (ctx->audit_count >= ctx->audit_capacity) {
         /* 扩容审计日志 */
         size_t new_cap = ctx->audit_capacity * 2;
         if (new_cap > SAFETY_MAX_AUDIT_ENTRIES) new_cap = SAFETY_MAX_AUDIT_ENTRIES;
-        if (ctx->audit_count >= new_cap) return -1; /* 已满 */
+        if (ctx->audit_count >= new_cap) return AGENTRT_ERR_FAIL; /* 已满 */
 
         safety_audit_entry_t *new_entries = (safety_audit_entry_t *)AGENTRT_REALLOC(
             ctx->audit_entries, new_cap * sizeof(safety_audit_entry_t));
-        if (!new_entries) return -1;
+        if (!new_entries) return AGENTRT_ERR_OUT_OF_MEMORY;
         ctx->audit_entries = new_entries;
         ctx->audit_capacity = new_cap;
     }
@@ -933,7 +933,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
     if (!ctx) {
         if (entries) *entries = NULL;
         if (entry_count) *entry_count = 0;
-        return -1;
+        return AGENTRT_ERR_INVALID_PARAM;
     }
 
     /* 统计匹配的条目数 */
@@ -954,7 +954,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
 
     safety_audit_entry_t *result = (safety_audit_entry_t *)AGENTRT_CALLOC(
         match_count, sizeof(safety_audit_entry_t));
-    if (!result) return -1;
+    if (!result) return AGENTRT_ERR_OUT_OF_MEMORY;
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->audit_count; i++) {
@@ -974,7 +974,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
 int safety_guard_set_violation_callback(safety_guard_context_t *ctx,
                                         safety_violation_callback_t callback, void *user_data)
 {
-    if (!ctx) return -1;
+    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
     ctx->violation_callback = callback;
     ctx->violation_user_data = user_data;
     return 0;
@@ -984,7 +984,7 @@ int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
                                             safety_policy_change_callback_t callback,
                                             void *user_data)
 {
-    if (!ctx) return -1;
+    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
     ctx->policy_change_callback = callback;
     ctx->policy_change_user_data = user_data;
     return 0;
@@ -992,7 +992,7 @@ int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
 
 int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason)
 {
-    if (!ctx) return -1;
+    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
     ctx->emergency_stopped = true;
     if (reason) {
         snprintf(ctx->emergency_reason, sizeof(ctx->emergency_reason), "%s", reason);
@@ -1004,7 +1004,7 @@ int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason)
 
 int safety_guard_emergency_release(safety_guard_context_t *ctx)
 {
-    if (!ctx) return -1;
+    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
     ctx->emergency_stopped = false;
     ctx->emergency_reason[0] = '\0';
     return 0;
@@ -1014,7 +1014,7 @@ int safety_guard_check_permission(safety_guard_context_t *ctx,
                                   safety_guard_type_t guard_type,
                                   const char *agent_id, bool *allowed)
 {
-    if (!ctx || !agent_id || !allowed) return -1;
+    if (!ctx || !agent_id || !allowed) return AGENTRT_ERR_INVALID_PARAM;
 
     /* 构造安全事件进行权限检查 */
     safety_event_t event;

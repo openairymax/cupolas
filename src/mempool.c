@@ -267,7 +267,7 @@ static int mempool_init_blocks(agentrt_mempool_t *pool)
                                pool->block_count;
 
     char *raw = (char *)calloc(1, total_alloc_size);
-    if (!raw) return -1;
+    if (!raw) return AGENTRT_ERR_OUT_OF_MEMORY;
 
     pool->free_list = NULL;
     pool->free_blocks = 0;
@@ -504,7 +504,7 @@ void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr)
 int agentrt_mempool_get_stats(agentrt_mempool_t *pool,
                                agentrt_mempool_stats_t *stats)
 {
-    if (!pool || !stats) return -1;
+    if (!pool || !stats) return AGENTRT_ERR_INVALID_PARAM;
 
     mempool_mutex_lock(pool);
 
