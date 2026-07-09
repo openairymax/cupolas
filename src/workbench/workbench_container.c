@@ -209,7 +209,7 @@ void container_manager_destroy(void *mgr)
 static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 {
     if (!cmd || !argv || max_args < 2)
-        return -1;
+        return AGENTRT_ERR_INVALID_PARAM;
 
     int argc = 0;
     char *p = cmd;

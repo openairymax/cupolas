@@ -29,7 +29,7 @@
  *     CUPOLAS_MUTEX_INIT(&lock);
  *
  *     my_data_t* data = CUPOLAS_ALLOC_STRUCT(my_data_t);
- *     if (!data) return -1;
+ *     if (!data) return AGENTRT_ERR_OUT_OF_MEMORY;  BAN-073
  *
  *     CUPOLAS_MUTEX_LOCK(&lock);
  *     // Critical section...
