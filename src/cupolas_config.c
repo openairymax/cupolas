@@ -182,9 +182,12 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
     if (file_path) {
         snprintf(entry->file_path, sizeof(entry->file_path), "%s", file_path);
     } else {
+        /* 拷贝 config_dir 到局部变量，避免 snprintf 源/目标重叠警告 (-Wrestrict) */
+        char config_dir_copy[sizeof(entry->file_path)];
+        snprintf(config_dir_copy, sizeof(config_dir_copy), "%s", cfg->config_dir);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-        snprintf(entry->file_path, sizeof(entry->file_path), "%s/%s.yaml", cfg->config_dir,
+        snprintf(entry->file_path, sizeof(entry->file_path), "%s/%s.yaml", config_dir_copy,
                  config_type_names[type]);
 #pragma GCC diagnostic pop
     }
