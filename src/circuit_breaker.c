@@ -15,8 +15,6 @@
 
 #include "error_compat.h"
 
-#define CUP_RET_ERR(c) \
-    do { agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentrt_error_str(c)); return (c); } while(0)
 
 #define DEFAULT_FAILURE_THRESHOLD 5
 #define DEFAULT_SUCCESS_THRESHOLD 3
@@ -343,7 +341,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
                          uint32_t timeout_ms)
 {
     if (!breaker || !func)
-        CUP_RET_ERR(AGENTRT_EINVAL);
+        AIRY_RET_ERR(AIRY_EINVAL);
 
     circuit_state_t state = circuit_breaker_get_state(breaker);
 
@@ -351,7 +349,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
         cupolas_mutex_lock(&breaker->lock);
         breaker->rejected_calls++;
         cupolas_mutex_unlock(&breaker->lock);
-        return AGENTRT_ERR_BUSY;
+        return AIRY_ERR_BUSY;
     }
 
     if (state == CIRCUIT_STATE_HALF_OPEN) {
@@ -359,7 +357,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
         if (breaker->half_open_calls >= breaker->config.half_open_max_calls) {
             breaker->rejected_calls++;
             cupolas_mutex_unlock(&breaker->lock);
-            return AGENTRT_ERR_BUSY;
+            return AIRY_ERR_BUSY;
         }
         breaker->half_open_calls++;
         cupolas_mutex_unlock(&breaker->lock);
@@ -517,7 +515,7 @@ int circuit_breaker_registry_register(circuit_breaker_registry_t *registry, cons
                                       circuit_breaker_t *breaker)
 {
     if (!registry || !name || !breaker)
-        CUP_RET_ERR(AGENTRT_EINVAL);
+        AIRY_RET_ERR(AIRY_EINVAL);
 
     cupolas_mutex_lock(&registry->lock);
 
@@ -525,7 +523,7 @@ int circuit_breaker_registry_register(circuit_breaker_registry_t *registry, cons
     while (entry) {
         if (strcmp(entry->name, name) == 0) {
             cupolas_mutex_unlock(&registry->lock);
-            return AGENTRT_ERR_ALREADY_EXISTS;
+            return AIRY_ERR_ALREADY_EXISTS;
         }
         entry = entry->next;
     }
@@ -535,7 +533,7 @@ int circuit_breaker_registry_register(circuit_breaker_registry_t *registry, cons
             sizeof(struct circuit_breaker_registry_entry));
     if (!new_entry) {
         cupolas_mutex_unlock(&registry->lock);
-        CUP_RET_ERR(AGENTRT_EINVAL);
+        AIRY_RET_ERR(AIRY_EINVAL);
     }
 
     snprintf(new_entry->name, sizeof(new_entry->name), "%s", name);

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
-/** @note This API is planned for next release. Enable with AGENTRT_ENABLE_V2_API to access. */
+/** @note This API is planned for next release. Enable with AIRY_ENABLE_V2_API to access. */
 /**
  * @file dynamic_policy_engine.h
  * @brief Dynamic Policy Engine for AgentRT SafetyGuard
@@ -11,8 +11,8 @@
  * @since 0.1.0
  */
 
-#ifndef AGENTRT_DYNAMIC_POLICY_ENGINE_H
-#define AGENTRT_DYNAMIC_POLICY_ENGINE_H
+#ifndef AIRY_RT_DYNAMIC_POLICY_ENGINE_H
+#define AIRY_RT_DYNAMIC_POLICY_ENGINE_H
 
 #include "safety_guard.h"
 
@@ -91,7 +91,7 @@ typedef struct dpolicy_engine_s dpolicy_engine_t;
 
 typedef void (*dpolicy_change_callback_t)(const dpolicy_change_record_t *record, void *user_data);
 
-#ifdef AGENTRT_ENABLE_V2_API
+#ifdef AIRY_ENABLE_V2_API
 
 dpolicy_engine_t *dpolicy_engine_create(dpolicy_conflict_strategy_t default_strategy);
 void dpolicy_engine_destroy(dpolicy_engine_t *engine);
@@ -125,10 +125,10 @@ int dpolicy_engine_validate_compliance(dpolicy_engine_t *engine, const char *sta
 size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine);
 size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine);
 
-#endif /* AGENTRT_ENABLE_V2_API */
+#endif /* AIRY_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* AGENTRT_DYNAMIC_POLICY_ENGINE_H */
+#endif /* AIRY_RT_DYNAMIC_POLICY_ENGINE_H */

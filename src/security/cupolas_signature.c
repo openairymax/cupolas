@@ -78,7 +78,7 @@ int cupolas_signature_init(const cupolas_sig_config_t *config)
         g_sig_ctx.config.allow_self_signed = false;
         g_sig_ctx.config.allow_expired_test = false;
         g_sig_ctx.config.max_chain_depth = 10;
-        g_sig_ctx.config.crl_path = getenv("AGENTRT_CRL_PATH");
+        g_sig_ctx.config.crl_path = getenv("AIRY_CRL_PATH");
     }
 
     cupolas_rwlock_init(&g_sig_ctx.lock);
@@ -102,10 +102,10 @@ void cupolas_signature_cleanup(void)
 
     if (g_sig_ctx.trusted_signers) {
         for (size_t i = 0; i < g_sig_ctx.trusted_count; i++) {
-            AGENTRT_FREE(g_sig_ctx.trusted_signers[i].signer_cn);
-            AGENTRT_FREE(g_sig_ctx.trusted_signers[i].public_key_pem);
+            AIRY_FREE(g_sig_ctx.trusted_signers[i].signer_cn);
+            AIRY_FREE(g_sig_ctx.trusted_signers[i].public_key_pem);
         }
-        AGENTRT_FREE(g_sig_ctx.trusted_signers);
+        AIRY_FREE(g_sig_ctx.trusted_signers);
     }
 
     cupolas_rwlock_unlock(&g_sig_ctx.lock);
@@ -296,8 +296,8 @@ int cupolas_signature_get_signer_info(const char *file_path, cupolas_signer_info
 
     __builtin_memset(info, 0, sizeof(cupolas_signer_info_t));
 
-    info->subject_cn = AGENTRT_STRDUP("unavailable");
-    info->subject_org = AGENTRT_STRDUP("unavailable");
+    info->subject_cn = AIRY_STRDUP("unavailable");
+    info->subject_org = AIRY_STRDUP("unavailable");
     info->not_before = 0;
     info->not_after = 0;
     info->is_ca = false;
@@ -312,13 +312,13 @@ void cupolas_signature_free_signer_info(cupolas_signer_info_t *info)
         return;
     }
 
-    AGENTRT_FREE(info->subject_cn);
-    AGENTRT_FREE(info->subject_org);
-    AGENTRT_FREE(info->subject_ou);
-    AGENTRT_FREE(info->issuer_cn);
-    AGENTRT_FREE(info->serial_number);
-    AGENTRT_FREE(info->key_id);
-    AGENTRT_FREE(info->algorithm);
+    AIRY_FREE(info->subject_cn);
+    AIRY_FREE(info->subject_org);
+    AIRY_FREE(info->subject_ou);
+    AIRY_FREE(info->issuer_cn);
+    AIRY_FREE(info->serial_number);
+    AIRY_FREE(info->key_id);
+    AIRY_FREE(info->algorithm);
     __builtin_memset(info, 0, sizeof(cupolas_signer_info_t));
 }
 
@@ -352,7 +352,7 @@ int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *publ
     if (g_sig_ctx.trusted_count >= g_sig_ctx.trusted_capacity) {
         size_t new_capacity = g_sig_ctx.trusted_capacity == 0 ? 16 : g_sig_ctx.trusted_capacity * 2;
         trusted_signer_t *new_signers =
-            AGENTRT_REALLOC(g_sig_ctx.trusted_signers, new_capacity * sizeof(trusted_signer_t));
+            AIRY_REALLOC(g_sig_ctx.trusted_signers, new_capacity * sizeof(trusted_signer_t));
         if (!new_signers) {
             cupolas_rwlock_unlock(&g_sig_ctx.lock);
             return CUPOLAS_SIG_INVALID;
@@ -362,8 +362,8 @@ int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *publ
     }
 
     trusted_signer_t *ts = &g_sig_ctx.trusted_signers[g_sig_ctx.trusted_count];
-    ts->signer_cn = AGENTRT_STRDUP(signer_cn);
-    ts->public_key_pem = AGENTRT_STRDUP(public_key);
+    ts->signer_cn = AIRY_STRDUP(signer_cn);
+    ts->public_key_pem = AIRY_STRDUP(public_key);
     ts->is_trusted = true;
 
     g_sig_ctx.trusted_count++;

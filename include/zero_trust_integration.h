@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
-/** @note This API is planned for next release. Enable with AGENTRT_ENABLE_V2_API to access. */
+/** @note This API is planned for next release. Enable with AIRY_ENABLE_V2_API to access. */
 /**
  * @file zero_trust_integration.h
  * @brief Zero Trust Architecture Integration for AgentRT
@@ -18,8 +18,8 @@
  * @since 0.1.0
  */
 
-#ifndef AGENTRT_ZERO_TRUST_INTEGRATION_H
-#define AGENTRT_ZERO_TRUST_INTEGRATION_H
+#ifndef AIRY_RT_ZERO_TRUST_INTEGRATION_H
+#define AIRY_RT_ZERO_TRUST_INTEGRATION_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -105,7 +105,7 @@ typedef bool (*zta_verify_identity_fn)(const zta_identity_t *identity, const cha
 typedef void (*zta_session_callback_t)(const zta_session_t *session, const char *event_type,
                                        void *user_data);
 
-#ifdef AGENTRT_ENABLE_V2_API
+#ifdef AIRY_ENABLE_V2_API
 
 zta_context_t *zta_context_create(void);
 void zta_context_destroy(zta_context_t *ctx);
@@ -143,10 +143,10 @@ size_t zta_get_identity_count(zta_context_t *ctx);
 size_t zta_get_session_count(zta_context_t *ctx);
 size_t zta_get_policy_count(zta_context_t *ctx);
 
-#endif /* AGENTRT_ENABLE_V2_API */
+#endif /* AIRY_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* AGENTRT_ZERO_TRUST_INTEGRATION_H */
+#endif /* AIRY_RT_ZERO_TRUST_INTEGRATION_H */

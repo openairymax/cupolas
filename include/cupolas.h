@@ -16,8 +16,8 @@
  * - Cross-Platform: Windows/Linux/macOS
  *
  * Error Handling:
- * - All functions return agentrt_error_t error codes
- * - Success returns AGENTRT_OK (0)
+ * - All functions return airy_err_t error codes
+ * - Success returns AIRY_OK (0)
  * - Error codes are defined in agentrt/atoms/corekern/include/error.h
  *
  * @note For backward compatibility, cupolas_ERROR_* aliases are preserved
@@ -26,7 +26,7 @@
 #ifndef CUPOLAS_H
 #define CUPOLAS_H
 
-#include "../../commons/include/agentrt_types.h"
+#include "../../commons/include/airy_types.h"
 #include "../../commons/utils/error/include/error.h"
 
 #include <stddef.h>
@@ -50,40 +50,40 @@ extern "C" {
 #endif
 
 #ifndef cupolas_OK
-#define cupolas_OK AGENTRT_OK
+#define cupolas_OK AIRY_OK
 #endif
 #ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN AGENTRT_ERR_UNKNOWN
+#define cupolas_ERROR_UNKNOWN AIRY_ERR_UNKNOWN
 #endif
 #ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG AGENTRT_ERR_INVALID_PARAM
+#define cupolas_ERROR_INVALID_ARG AIRY_ERR_INVALID_PARAM
 #endif
 #ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY AGENTRT_ERR_OUT_OF_MEMORY
+#define cupolas_ERROR_NO_MEMORY AIRY_ERR_OUT_OF_MEMORY
 #endif
 #ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND AGENTRT_ERR_NOT_FOUND
+#define cupolas_ERROR_NOT_FOUND AIRY_ERR_NOT_FOUND
 #endif
 #ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION AGENTRT_ERR_PERMISSION_DENIED
+#define cupolas_ERROR_PERMISSION AIRY_ERR_PERMISSION_DENIED
 #endif
 #ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY AGENTRT_ERR_STATE_ERROR
+#define cupolas_ERROR_BUSY AIRY_ERR_STATE_ERROR
 #endif
 #ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT AGENTRT_ERR_TIMEOUT
+#define cupolas_ERROR_TIMEOUT AIRY_ERR_TIMEOUT
 #endif
 #ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK AGENTRT_ERR_STATE_ERROR
+#define cupolas_ERROR_WOULD_BLOCK AIRY_ERR_STATE_ERROR
 #endif
 #ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW AGENTRT_ERR_OVERFLOW
+#define cupolas_ERROR_OVERFLOW AIRY_ERR_OVERFLOW
 #endif
 #ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED AGENTRT_ERR_NOT_SUPPORTED
+#define cupolas_ERROR_NOT_SUPPORTED AIRY_ERR_NOT_SUPPORTED
 #endif
 #ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO AGENTRT_ERR_IO
+#define cupolas_ERROR_IO AIRY_ERR_IO
 #endif
 
 #ifndef CUPOLAS_OK
@@ -103,7 +103,7 @@ extern "C" {
  * @note Thread-safe: Multiple threads may call init, only first succeeds
  * @ownership config_path string: caller retains ownership, may be NULL
  */
-int cupolas_init(const char *config_path, agentrt_error_t *error);
+int cupolas_init(const char *config_path, airy_err_t *error);
 
 /**
  * @brief Cleanup cupolas module

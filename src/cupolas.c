@@ -46,12 +46,12 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t *cfg
     __builtin_memset(cfg, 0, sizeof(*cfg));
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             AGENTRT_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
-    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AGENTRT_LOG_DIR "\\cupolas");
+             AIRY_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AIRY_LOG_DIR "\\cupolas");
 #else
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             AGENTRT_CONFIG_DIR "/cupolas/permission_rules.yaml");
-    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AGENTRT_LOG_DIR "/cupolas");
+             AIRY_CONFIG_DIR "/cupolas/permission_rules.yaml");
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AIRY_LOG_DIR "/cupolas");
 #endif
 }
 
@@ -73,7 +73,7 @@ static struct {
     cupolas_mutex_t lock;
 } g_cupolas = {0};
 
-int cupolas_init(const char *config_path, agentrt_error_t *error)
+int cupolas_init(const char *config_path, airy_err_t *error)
 {
     if (g_cupolas.initialized) {
         return CUPOLAS_OK;
@@ -83,7 +83,7 @@ int cupolas_init(const char *config_path, agentrt_error_t *error)
 
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
-            *error = AGENTRT_ERR_IO;
+            *error = AIRY_ERR_IO;
         CUPOLAS_LOG_ERROR("cupolas_init: mutex init failed");
         return cupolas_ERR_UNKNOWN;
     }
@@ -98,7 +98,7 @@ int cupolas_init(const char *config_path, agentrt_error_t *error)
             int result = cupolas_config_load(g_cupolas.config_mgr, CONFIG_TYPE_ALL, config_path);
             if (result != 0) {
                 if (error)
-                    *error = AGENTRT_ERR_IO;
+                    *error = AIRY_ERR_IO;
                 cupolas_config_destroy(g_cupolas.config_mgr);
                 g_cupolas.config_mgr = NULL;
                 cupolas_mutex_unlock(&g_cupolas.lock);
@@ -111,7 +111,7 @@ int cupolas_init(const char *config_path, agentrt_error_t *error)
         g_cupolas.config.permission_rules_path[0] ? g_cupolas.config.permission_rules_path : NULL);
     if (!g_cupolas.perm) {
         if (error)
-            *error = AGENTRT_ERR_OUT_OF_MEMORY;
+            *error = AIRY_ERR_OUT_OF_MEMORY;
         if (g_cupolas.config_mgr) {
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
@@ -124,7 +124,7 @@ int cupolas_init(const char *config_path, agentrt_error_t *error)
     g_cupolas.san = sanitizer_create(NULL);
     if (!g_cupolas.san) {
         if (error)
-            *error = AGENTRT_ERR_OUT_OF_MEMORY;
+            *error = AIRY_ERR_OUT_OF_MEMORY;
         permission_engine_destroy(g_cupolas.perm);
         g_cupolas.perm = NULL;
         if (g_cupolas.config_mgr) {
@@ -143,7 +143,7 @@ int cupolas_init(const char *config_path, agentrt_error_t *error)
         CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE, CUPOLAS_DEFAULT_AUDIT_MAX_FILES);
     if (!g_cupolas.audit) {
         if (error)
-            *error = AGENTRT_ERR_OUT_OF_MEMORY;
+            *error = AIRY_ERR_OUT_OF_MEMORY;
         sanitizer_destroy(g_cupolas.san);
         g_cupolas.san = NULL;
         permission_engine_destroy(g_cupolas.perm);
@@ -439,11 +439,11 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
     }
 
     if (stdout_buf && stdout_size > 0 && result.stdout_data) {
-        AGENTRT_STRNCPY_TERM(stdout_buf, result.stdout_data, stdout_size);
+        AIRY_STRNCPY_TERM(stdout_buf, result.stdout_data, stdout_size);
     }
 
     if (stderr_buf && stderr_size > 0 && result.stderr_data) {
-        AGENTRT_STRNCPY_TERM(stderr_buf, result.stderr_data, stderr_size);
+        AIRY_STRNCPY_TERM(stderr_buf, result.stderr_data, stderr_size);
     }
 
     workbench_result_free(&result);

@@ -47,7 +47,7 @@ void cupolas_memset_s(void *ptr, size_t len)
 int cupolas_memcmp_s(const void *ptr1, const void *ptr2, size_t size)
 {
     if (!ptr1 || !ptr2)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     const unsigned char *p1 = (const unsigned char *)ptr1;
     const unsigned char *p2 = (const unsigned char *)ptr2;
@@ -125,6 +125,6 @@ void cupolas_log_message(const char *level, const char *format, ...)
 
     va_list args;
     va_start(args, format);
-    agentrt_log_write_va(log_level, __FILE__, __LINE__, prefixed_fmt, args);
+    airy_log_write_va(log_level, __FILE__, __LINE__, prefixed_fmt, args);
     va_end(args);
 }

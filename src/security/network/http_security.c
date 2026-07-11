@@ -47,16 +47,16 @@ void http_security_cleanup(void)
 
     if (g_http.config.allowed_methods) {
         for (size_t i = 0; i < g_http.config.method_count; i++) {
-            AGENTRT_FREE(g_http.config.allowed_methods[i]);
+            AIRY_FREE(g_http.config.allowed_methods[i]);
         }
-        AGENTRT_FREE(g_http.config.allowed_methods);
+        AIRY_FREE(g_http.config.allowed_methods);
     }
 
     if (g_http.config.forbidden_headers) {
         for (size_t i = 0; i < g_http.config.forbidden_count; i++) {
-            AGENTRT_FREE(g_http.config.forbidden_headers[i]);
+            AIRY_FREE(g_http.config.forbidden_headers[i]);
         }
-        AGENTRT_FREE(g_http.config.forbidden_headers);
+        AIRY_FREE(g_http.config.forbidden_headers);
     }
 
     __builtin_memset(&g_http, 0, sizeof(g_http));
@@ -65,7 +65,7 @@ void http_security_cleanup(void)
 int http_configure(const cupolas_http_security_config_t *config)
 {
     if (!config)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     g_http.config = *config;
     return 0;
 }
@@ -74,17 +74,17 @@ int http_validate_request(const char *method, const char *url, const char **head
                           size_t header_count, size_t body_size)
 {
     if (!method || !url)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     if (g_http.config.max_url_length > 0) {
         if (strlen(url) > g_http.config.max_url_length) {
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
     }
 
     if (g_http.config.max_body_size > 0) {
         if (body_size > g_http.config.max_body_size) {
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
     }
 
@@ -97,7 +97,7 @@ int http_validate_request(const char *method, const char *url, const char **head
             }
         }
         if (!method_allowed)
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
     }
 
     if (g_http.config.forbidden_headers && headers) {
@@ -105,7 +105,7 @@ int http_validate_request(const char *method, const char *url, const char **head
             for (size_t j = 0; j < g_http.config.forbidden_count; j++) {
                 if (strncmp(headers[i], g_http.config.forbidden_headers[j],
                             strlen(g_http.config.forbidden_headers[j])) == 0) {
-                    return AGENTRT_EINVAL;
+                    return AIRY_EINVAL;
                 }
             }
         }
@@ -117,7 +117,7 @@ int http_validate_request(const char *method, const char *url, const char **head
 int http_add_security_headers(const char **headers, size_t header_count, size_t max_headers)
 {
     if (!headers)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     static const char *security_headers[] = {
         "Strict-Transport-Security: max-age=31536000; includeSubDomains",
@@ -128,7 +128,7 @@ int http_add_security_headers(const char **headers, size_t header_count, size_t 
     size_t total = header_count + num_sec_headers;
 
     if (total > max_headers) {
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     for (size_t i = 0; i < num_sec_headers; i++) {

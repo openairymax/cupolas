@@ -114,9 +114,9 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
     } else {
 #if cupolas_PLATFORM_WINDOWS
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AGENTRT_CONFIG_DIR "\\cupolas\\conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AIRY_CONFIG_DIR "\\cupolas\\conf");
 #else
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AGENTRT_CONFIG_DIR "/cupolas/conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AIRY_CONFIG_DIR "/cupolas/conf");
 #endif
     }
 
@@ -144,19 +144,19 @@ void cupolas_config_destroy(cupolas_config_t *cfg)
             yaml_destroy((yaml_document_t *)cfg->entries[i].data);
             cfg->entries[i].data = NULL;
         }
-        AGENTRT_FREE(cfg->entries[i].file_path);
+        AIRY_FREE(cfg->entries[i].file_path);
         cfg->entries[i].file_path[0] = '\0';
     }
 
     cupolas_rwlock_destroy(&cfg->lock);
 
-    AGENTRT_FREE(cfg);
+    AIRY_FREE(cfg);
 }
 
 int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *file_path)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -173,7 +173,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
 
     if (type >= CONFIG_TYPE_ALL || type < 0) {
         cupolas_rwlock_unlock(&cfg->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     config_entry_t *entry = &cfg->entries[type];
@@ -199,7 +199,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
                  entry->file_path);
         entry->status = CONFIG_STATUS_ERROR;
         cupolas_rwlock_unlock(&cfg->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 #else
     struct stat st;
@@ -208,26 +208,26 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
                  entry->file_path);
         entry->status = CONFIG_STATUS_ERROR;
         cupolas_rwlock_unlock(&cfg->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 #endif
 
     if (entry->data) {
         if (entry->snapshot)
-            AGENTRT_FREE(entry->snapshot);
+            AIRY_FREE(entry->snapshot);
         entry->snapshot = NULL;
         entry->snapshot_size = 0;
 
         char *serialized = yaml_serialize((yaml_document_t *)entry->data);
         if (serialized) {
             size_t slen = strlen(serialized) + 1;
-            entry->snapshot = AGENTRT_MALLOC(slen);
+            entry->snapshot = AIRY_MALLOC(slen);
             if (entry->snapshot) {
                 __builtin_memcpy(entry->snapshot, serialized, slen);
                 entry->snapshot_size = slen;
                 entry->snapshot_version = entry->version;
             }
-            AGENTRT_FREE(serialized);
+            AIRY_FREE(serialized);
         }
 
         yaml_destroy((yaml_document_t *)entry->data);
@@ -239,7 +239,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
         snprintf(cfg->last_error, sizeof(cfg->last_error), "Memory allocation failed");
         entry->status = CONFIG_STATUS_ERROR;
         cupolas_rwlock_unlock(&cfg->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     if (yaml_parse_file(doc, entry->file_path) != 0) {
@@ -249,7 +249,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
         yaml_destroy(doc);
         entry->status = CONFIG_STATUS_ERROR;
         cupolas_rwlock_unlock(&cfg->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     entry->data = doc;
@@ -278,7 +278,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
 int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -297,7 +297,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
                      "Reload %s: memory allocation failed", config_type_names[type]);
             entry->status = CONFIG_STATUS_ERROR;
             cupolas_rwlock_unlock(&cfg->lock);
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
 
         int ret = yaml_parse_file(doc, entry->file_path);
@@ -308,7 +308,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
             yaml_destroy(doc);
             entry->status = CONFIG_STATUS_ROLLBACK;
             cupolas_rwlock_unlock(&cfg->lock);
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
 
         entry->data = doc;
@@ -335,7 +335,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
                             config_validation_result_t *result)
 {
     if (!cfg || !result)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_rdlock(&cfg->lock);
 
@@ -351,7 +351,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
             result->errors = &err;
             result->error_count = 1;
             cupolas_rwlock_unlock(&cfg->lock);
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
 
         struct yaml_node *root = yaml_root(doc);
@@ -420,7 +420,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
 int cupolas_config_apply(cupolas_config_t *cfg, config_type_t type)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -437,7 +437,7 @@ int cupolas_config_apply(cupolas_config_t *cfg, config_type_t type)
 int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -447,10 +447,10 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
 
         if (entry->snapshot && entry->snapshot_size > 0) {
             if (entry->data) {
-                AGENTRT_FREE(entry->data);
+                AIRY_FREE(entry->data);
                 entry->data = NULL;
             }
-            entry->data = AGENTRT_MALLOC(entry->snapshot_size);
+            entry->data = AIRY_MALLOC(entry->snapshot_size);
             if (entry->data) {
                 __builtin_memcpy(entry->data, entry->snapshot, entry->snapshot_size);
             }
@@ -478,10 +478,10 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
             config_entry_t *entry = &cfg->entries[t];
             if (entry->snapshot && entry->snapshot_size > 0) {
                 if (entry->data) {
-                    AGENTRT_FREE(entry->data);
+                    AIRY_FREE(entry->data);
                     entry->data = NULL;
                 }
-                entry->data = AGENTRT_MALLOC(entry->snapshot_size);
+                entry->data = AIRY_MALLOC(entry->snapshot_size);
                 if (entry->data)
                     __builtin_memcpy(entry->data, entry->snapshot, entry->snapshot_size);
                 entry->version = entry->snapshot_version;
@@ -501,7 +501,7 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
 int cupolas_config_get_version(cupolas_config_t *cfg, config_type_t type, config_version_t *version)
 {
     if (!cfg || !version)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_rdlock(&cfg->lock);
 
@@ -519,7 +519,7 @@ int cupolas_config_watch(cupolas_config_t *cfg, config_type_t type, config_obser
                          void *user_data)
 {
     if (!cfg || !callback)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -544,7 +544,7 @@ int cupolas_config_watch(cupolas_config_t *cfg, config_type_t type, config_obser
 int cupolas_config_unwatch(cupolas_config_t *cfg, int watcher_id)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 
@@ -558,7 +558,7 @@ int cupolas_config_unwatch(cupolas_config_t *cfg, int watcher_id)
 
     cupolas_rwlock_unlock(&cfg->lock);
 
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 }
 
 config_status_t cupolas_config_get_status(cupolas_config_t *cfg, config_type_t type)
@@ -581,7 +581,7 @@ config_status_t cupolas_config_get_status(cupolas_config_t *cfg, config_type_t t
 int cupolas_config_set_auto_reload(cupolas_config_t *cfg, config_type_t type, uint32_t interval_ms)
 {
     if (!cfg)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&cfg->lock);
 

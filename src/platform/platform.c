@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
-#include "agentrt_mman.h"
+#include "airy_mman.h"
 #endif
 
 #if cupolas_PLATFORM_WINDOWS
@@ -93,7 +93,7 @@ int cupolas_mutex_trylock(cupolas_mutex_t *mutex)
         return 0;
     if (ret == EBUSY)
         return cupolas_ERROR_BUSY;
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 #endif
 }
 
@@ -168,7 +168,7 @@ int cupolas_rwlock_tryrdlock(cupolas_rwlock_t *rwlock)
         return 0;
     if (ret == EBUSY)
         return cupolas_ERROR_BUSY;
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 #endif
 }
 
@@ -185,7 +185,7 @@ int cupolas_rwlock_trywrlock(cupolas_rwlock_t *rwlock)
         return 0;
     if (ret == EBUSY)
         return cupolas_ERROR_BUSY;
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 #endif
 }
 
@@ -260,7 +260,7 @@ int cupolas_cond_timedwait(cupolas_cond_t *cond, cupolas_mutex_t *mutex, uint32_
         return 0;
     if (ret == ETIMEDOUT)
         return cupolas_ERROR_TIMEOUT;
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 #endif
 }
 
@@ -299,7 +299,7 @@ static void *thread_wrapper(void *arg)
     thread_wrapper_arg_t *wrapper = (thread_wrapper_arg_t *)arg;
     cupolas_thread_func_t func = wrapper->func;
     void *user_arg = wrapper->arg;
-    AGENTRT_FREE(wrapper);
+    AIRY_FREE(wrapper);
     return func(user_arg);
 }
 #endif
@@ -308,7 +308,7 @@ int cupolas_thread_create(cupolas_thread_t *thread, cupolas_thread_func_t func, 
 {
 #if cupolas_PLATFORM_WINDOWS
     thread_wrapper_arg_t *wrapper =
-        (thread_wrapper_arg_t *)AGENTRT_MALLOC(sizeof(thread_wrapper_arg_t));
+        (thread_wrapper_arg_t *)AIRY_MALLOC(sizeof(thread_wrapper_arg_t));
     if (!wrapper)
         return cupolas_ERROR_NO_MEMORY;
     wrapper->func = func;
@@ -316,14 +316,14 @@ int cupolas_thread_create(cupolas_thread_t *thread, cupolas_thread_func_t func, 
 
     *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(void (*)(void *))func, arg, 0, NULL);
     if (*thread == NULL) {
-        AGENTRT_FREE(wrapper);
+        AIRY_FREE(wrapper);
         return cupolas_ERROR_UNKNOWN;
     }
-    AGENTRT_FREE(wrapper);
+    AIRY_FREE(wrapper);
     return 0;
 #else
     thread_wrapper_arg_t *wrapper =
-        (thread_wrapper_arg_t *)AGENTRT_MALLOC(sizeof(thread_wrapper_arg_t));
+        (thread_wrapper_arg_t *)AIRY_MALLOC(sizeof(thread_wrapper_arg_t));
     if (!wrapper)
         return cupolas_ERROR_NO_MEMORY;
     wrapper->func = func;
@@ -331,8 +331,8 @@ int cupolas_thread_create(cupolas_thread_t *thread, cupolas_thread_func_t func, 
 
     int ret = pthread_create(thread, NULL, thread_wrapper, wrapper);
     if (ret != 0) {
-        AGENTRT_FREE(wrapper);
-        return AGENTRT_EINVAL;
+        AIRY_FREE(wrapper);
+        return AIRY_EINVAL;
     }
     return 0;
 #endif
@@ -784,7 +784,7 @@ int cupolas_file_mkdir(const char *path, bool recursive)
 #if cupolas_PLATFORM_WINDOWS
     if (recursive) {
         char tmp[cupolas_PATH_MAX];
-        AGENTRT_STRNCPY_TERM(tmp, path, sizeof(tmp));
+        AIRY_STRNCPY_TERM(tmp, path, sizeof(tmp));
         for (char *p = tmp + 1; *p; p++) {
             if (*p == '\\' || *p == '/') {
                 *p = '\0';
@@ -797,7 +797,7 @@ int cupolas_file_mkdir(const char *path, bool recursive)
 #else
     if (recursive) {
         char tmp[cupolas_PATH_MAX];
-        AGENTRT_STRNCPY_TERM(tmp, path, sizeof(tmp));
+        AIRY_STRNCPY_TERM(tmp, path, sizeof(tmp));
         for (char *p = tmp + 1; *p; p++) {
             if (*p == '/') {
                 *p = '\0';
@@ -848,7 +848,7 @@ char *cupolas_file_abspath(const char *path, char *buf, size_t size)
     if (realpath(path, buf))
         return buf;
     if (strlen(path) < size) {
-        AGENTRT_STRNCPY_TERM(buf, path, size);
+        AIRY_STRNCPY_TERM(buf, path, size);
         return buf;
     }
     return NULL;
@@ -864,7 +864,7 @@ char *cupolas_file_dirname(const char *path, char *buf, size_t size)
     if (len >= size)
         return NULL;
 
-    AGENTRT_STRNCPY_TERM(buf, path, size);
+    AIRY_STRNCPY_TERM(buf, path, size);
 
     char *last_slash = strrchr(buf, '/');
 #if cupolas_PLATFORM_WINDOWS
@@ -893,7 +893,7 @@ void *cupolas_mem_alloc(size_t size)
 #if cupolas_PLATFORM_WINDOWS
     return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 #else
-    void *ptr = AGENTRT_MALLOC(size);
+    void *ptr = AIRY_MALLOC(size);
     if (ptr)
         __builtin_memset(ptr, 0, size);
     return ptr;
@@ -922,7 +922,7 @@ void cupolas_mem_free(void *ptr)
 #if cupolas_PLATFORM_WINDOWS
     HeapFree(GetProcessHeap(), 0, ptr);
 #else
-    AGENTRT_FREE(ptr);
+    AIRY_FREE(ptr);
 #endif
 }
 
@@ -931,7 +931,7 @@ void *cupolas_mem_realloc(void *ptr, size_t size)
 #if cupolas_PLATFORM_WINDOWS
     return HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ptr, size);
 #else
-    return AGENTRT_REALLOC(ptr, size);
+    return AIRY_REALLOC(ptr, size);
 #endif
 }
 

@@ -26,14 +26,14 @@
 int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t *port, char *path)
 {
     if (!url)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     const char *p = url;
 
     const char *colon = strstr(p, "://");
     if (colon && scheme) {
         size_t scheme_len = colon - p;
-        AGENTRT_STRNCPY_TERM(scheme, p, scheme_len);
+        AIRY_STRNCPY_TERM(scheme, p, scheme_len);
         p = colon + 3;
     }
 
@@ -49,7 +49,7 @@ int network_utils_parse_url(const char *url, char *scheme, char *host, uint16_t 
         } else {
             host_len = strlen(p);
         }
-        AGENTRT_STRNCPY_TERM(host, p, host_len);
+        AIRY_STRNCPY_TERM(host, p, host_len);
     }
 
     if (port_colon && (!slash || port_colon < slash)) {
@@ -88,7 +88,7 @@ int network_utils_ip_in_cidr(const char *ip, const char *cidr)
         return 0;
 
     char cidr_copy[64];
-    AGENTRT_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
+    AIRY_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
 
     char *slash = strchr(cidr_copy, '/');
     if (!slash)

@@ -114,7 +114,7 @@ bool container_runtime_is_available(container_runtime_t runtime)
     }
     /* BAN-211/235: 直接 execvp（不经 shell），消除命令注入风险 */
     const char *const argv[] = {exe, "--version", NULL};
-    int exit_code = agentrt_process_run_capture(exe, (char *const *)argv, NULL, 10000, NULL, 0);
+    int exit_code = airy_process_run_capture(exe, (char *const *)argv, NULL, 10000, NULL, 0);
     return exit_code == 0;
 }
 
@@ -169,7 +169,7 @@ void *container_manager_create(const container_config_t *manager)
     handle->is_running = false;
 
     snprintf(handle->container_id, CONTAINER_ID_LENGTH, "%s%08x%08x", CONTAINER_NAME_PREFIX,
-             agentrt_random_uint32(0, 0xFFFFFFFF), agentrt_random_uint32(0, 0xFFFFFFFF));
+             airy_random_uint32(0, 0xFFFFFFFF), airy_random_uint32(0, 0xFFFFFFFF));
 
     return handle;
 }
@@ -209,7 +209,7 @@ void container_manager_destroy(void *mgr)
 static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 {
     if (!cmd || !argv || max_args < 2)
-        return AGENTRT_ERR_INVALID_PARAM;
+        return AIRY_ERR_INVALID_PARAM;
 
     int argc = 0;
     char *p = cmd;
@@ -264,18 +264,18 @@ static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 static int execute_command(const char *cmd, int timeout_ms, char *output, size_t output_size)
 {
     if (!cmd)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     char cmd_buf[MAX_COMMAND_LENGTH];
-    AGENTRT_STRNCPY_TERM(cmd_buf, cmd, sizeof(cmd_buf));
+    AIRY_STRNCPY_TERM(cmd_buf, cmd, sizeof(cmd_buf));
     cmd_buf[sizeof(cmd_buf) - 1] = '\0';
 
     char *argv[64];
     int argc = split_command_to_argv(cmd_buf, argv, 64);
     if (argc < 1)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
-    return agentrt_process_run_capture(argv[0], (char *const *)argv, NULL,
+    return airy_process_run_capture(argv[0], (char *const *)argv, NULL,
                                        (uint32_t)timeout_ms, output, output_size);
 }
 
@@ -432,7 +432,7 @@ int container_get_stats(void *mgr, container_info_t *info)
         unsigned long mem_used = 0;
         unsigned long mem_limit_val = 0;
         char out_copy[256];
-        AGENTRT_STRNCPY_TERM(out_copy, output, sizeof(out_copy));
+        AIRY_STRNCPY_TERM(out_copy, output, sizeof(out_copy));
         out_copy[sizeof(out_copy) - 1] = '\0';
         char *saveptr = NULL;
         char *tok_used = strtok_r(out_copy, " /", &saveptr);

@@ -292,9 +292,9 @@ int main(void)
     printf("Cupolas Concurrent Stress Test Suite\n");
     printf("========================================\n\n");
 
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int init_result = cupolas_init(NULL, &error);
-    if (init_result != AGENTRT_OK) {
+    if (init_result != AIRY_OK) {
         printf("Failed to initialize cupolas: result=%d, error=%d\n", init_result, error);
         printf("Skipping stress tests (cupolas unavailable)\n");
         printf("\n========================================\n");

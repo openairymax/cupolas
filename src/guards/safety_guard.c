@@ -322,41 +322,41 @@ static default_check_fn_t get_default_check_fn(safety_guard_type_t type)
 
 safety_guard_context_t *safety_guard_create(void)
 {
-    safety_guard_context_t *ctx = (safety_guard_context_t *)AGENTRT_CALLOC(1, sizeof(*ctx));
+    safety_guard_context_t *ctx = (safety_guard_context_t *)AIRY_CALLOC(1, sizeof(*ctx));
     if (!ctx) return NULL;
 
     ctx->guard_capacity = SAFETY_MAX_GUARDS;
-    ctx->guards = (guard_entry_t *)AGENTRT_CALLOC(ctx->guard_capacity, sizeof(guard_entry_t));
+    ctx->guards = (guard_entry_t *)AIRY_CALLOC(ctx->guard_capacity, sizeof(guard_entry_t));
     if (!ctx->guards) {
-        AGENTRT_FREE(ctx);
+        AIRY_FREE(ctx);
         return NULL;
     }
 
     ctx->audit_capacity = 256;
-    ctx->audit_entries = (safety_audit_entry_t *)AGENTRT_CALLOC(ctx->audit_capacity,
+    ctx->audit_entries = (safety_audit_entry_t *)AIRY_CALLOC(ctx->audit_capacity,
                                                         sizeof(safety_audit_entry_t));
     if (!ctx->audit_entries) {
-        AGENTRT_FREE(ctx->guards);
-        AGENTRT_FREE(ctx);
+        AIRY_FREE(ctx->guards);
+        AIRY_FREE(ctx);
         return NULL;
     }
 
     ctx->policy_capacity = 16;
-    ctx->policies = (safety_policy_t *)AGENTRT_CALLOC(ctx->policy_capacity, sizeof(safety_policy_t));
+    ctx->policies = (safety_policy_t *)AIRY_CALLOC(ctx->policy_capacity, sizeof(safety_policy_t));
     if (!ctx->policies) {
-        AGENTRT_FREE(ctx->audit_entries);
-        AGENTRT_FREE(ctx->guards);
-        AGENTRT_FREE(ctx);
+        AIRY_FREE(ctx->audit_entries);
+        AIRY_FREE(ctx->guards);
+        AIRY_FREE(ctx);
         return NULL;
     }
 
     ctx->quota_capacity = 32;
-    ctx->quotas = (safety_quota_t *)AGENTRT_CALLOC(ctx->quota_capacity, sizeof(safety_quota_t));
+    ctx->quotas = (safety_quota_t *)AIRY_CALLOC(ctx->quota_capacity, sizeof(safety_quota_t));
     if (!ctx->quotas) {
-        AGENTRT_FREE(ctx->policies);
-        AGENTRT_FREE(ctx->audit_entries);
-        AGENTRT_FREE(ctx->guards);
-        AGENTRT_FREE(ctx);
+        AIRY_FREE(ctx->policies);
+        AIRY_FREE(ctx->audit_entries);
+        AIRY_FREE(ctx->guards);
+        AIRY_FREE(ctx);
         return NULL;
     }
 
@@ -368,23 +368,23 @@ safety_guard_context_t *safety_guard_create(void)
 void safety_guard_destroy(safety_guard_context_t *ctx)
 {
     if (!ctx) return;
-    AGENTRT_FREE(ctx->quotas);
+    AIRY_FREE(ctx->quotas);
     /* 释放策略中的动态分配内存 */
     for (size_t i = 0; i < ctx->policy_count; i++) {
-        AGENTRT_FREE(ctx->policies[i].rules_json);
+        AIRY_FREE(ctx->policies[i].rules_json);
     }
-    AGENTRT_FREE(ctx->policies);
-    AGENTRT_FREE(ctx->audit_entries);
-    AGENTRT_FREE(ctx->guards);
-    AGENTRT_FREE(ctx);
+    AIRY_FREE(ctx->policies);
+    AIRY_FREE(ctx->audit_entries);
+    AIRY_FREE(ctx->guards);
+    AIRY_FREE(ctx);
 }
 
 int safety_guard_register_guard(safety_guard_context_t *ctx,
                                 const safety_guard_descriptor_t *descriptor,
                                 safety_guard_check_fn check_fn, void *user_data)
 {
-    if (!ctx || !descriptor) return AGENTRT_ERR_INVALID_PARAM;
-    if (ctx->guard_count >= ctx->guard_capacity) return AGENTRT_ERR_FAIL;
+    if (!ctx || !descriptor) return AIRY_ERR_INVALID_PARAM;
+    if (ctx->guard_count >= ctx->guard_capacity) return AIRY_ERR_FAIL;
 
     guard_entry_t *entry = &ctx->guards[ctx->guard_count];
     __builtin_memcpy(&entry->descriptor, descriptor, sizeof(*descriptor));
@@ -396,7 +396,7 @@ int safety_guard_register_guard(safety_guard_context_t *ctx,
 
 int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !name) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             if (i < ctx->guard_count - 1) {
@@ -407,31 +407,31 @@ int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_enable_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !name) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = true;
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_disable_guard(safety_guard_context_t *ctx, const char *name)
 {
-    if (!ctx || !name) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !name) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = false;
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 safety_decision_t safety_guard_check(safety_guard_context_t *ctx,
@@ -553,7 +553,7 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx,
         return SAFETY_DECISION_ALLOW;
     }
 
-    safety_result_t *out_results = (safety_result_t *)AGENTRT_CALLOC(count, sizeof(safety_result_t));
+    safety_result_t *out_results = (safety_result_t *)AIRY_CALLOC(count, sizeof(safety_result_t));
     if (!out_results) {
         if (results && result_count) {
             *result_count = 0;
@@ -626,7 +626,7 @@ chain_done:
     if (results) {
         *results = out_results;
     } else {
-        AGENTRT_FREE(out_results);
+        AIRY_FREE(out_results);
     }
     if (result_count) {
         *result_count = actual_count;
@@ -637,19 +637,19 @@ chain_done:
 
 int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *policy)
 {
-    if (!ctx || !policy) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !policy) return AIRY_ERR_INVALID_PARAM;
     if (ctx->policy_count >= ctx->policy_capacity) {
         /* 扩容 */
         size_t new_cap = ctx->policy_capacity * 2;
-        safety_policy_t *new_policies = (safety_policy_t *)AGENTRT_REALLOC(
+        safety_policy_t *new_policies = (safety_policy_t *)AIRY_REALLOC(
             ctx->policies, new_cap * sizeof(safety_policy_t));
-        if (!new_policies) return AGENTRT_ERR_OUT_OF_MEMORY;
+        if (!new_policies) return AIRY_ERR_OUT_OF_MEMORY;
         ctx->policies = new_policies;
         ctx->policy_capacity = new_cap;
     }
     __builtin_memcpy(&ctx->policies[ctx->policy_count], policy, sizeof(*policy));
     if (policy->rules_json) {
-        ctx->policies[ctx->policy_count].rules_json = AGENTRT_STRDUP(policy->rules_json);
+        ctx->policies[ctx->policy_count].rules_json = AIRY_STRDUP(policy->rules_json);
     }
     ctx->policy_count++;
 
@@ -663,10 +663,10 @@ int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *
 
 int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_id)
 {
-    if (!ctx || !policy_id) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !policy_id) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
-            AGENTRT_FREE(ctx->policies[i].rules_json);
+            AIRY_FREE(ctx->policies[i].rules_json);
             if (i < ctx->policy_count - 1) {
                 __builtin_memmove(&ctx->policies[i], &ctx->policies[i + 1],
                         (ctx->policy_count - i - 1) * sizeof(safety_policy_t));
@@ -675,30 +675,30 @@ int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_i
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_update_policy(safety_guard_context_t *ctx, const char *policy_id,
                                const char *new_rules_json)
 {
-    if (!ctx || !policy_id || !new_rules_json) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !policy_id || !new_rules_json) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
-            AGENTRT_FREE(ctx->policies[i].rules_json);
-            ctx->policies[i].rules_json = AGENTRT_STRDUP(new_rules_json);
+            AIRY_FREE(ctx->policies[i].rules_json);
+            ctx->policies[i].rules_json = AIRY_STRDUP(new_rules_json);
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies_json)
 {
-    if (!ctx || !policies_json) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !policies_json) return AIRY_ERR_INVALID_PARAM;
 
     /* 使用 config_unified 解析 JSON 策略数组 */
     config_context_t *cfg = config_context_create("safety_policies");
-    if (!cfg) return AGENTRT_ERR_FAIL;
+    if (!cfg) return AIRY_ERR_FAIL;
 
     /* 从内存解析 JSON */
     config_memory_source_options_t mem_opts = {
@@ -709,12 +709,12 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
     config_source_t *mem_source = config_source_create_memory(&mem_opts);
     if (!mem_source) {
         config_context_destroy(cfg);
-        return AGENTRT_ERR_FAIL;
+        return AIRY_ERR_FAIL;
     }
     config_error_t err = config_service_load(cfg, &mem_source, 1);
     if (err != CONFIG_SUCCESS) {
         config_context_destroy(cfg);
-        return AGENTRT_ERR_PARSE_ERROR;
+        return AIRY_ERR_PARSE_ERROR;
     }
 
     /* 遍历策略键: policy.0.id, policy.1.id, ... */
@@ -726,18 +726,18 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
         if (!id_val) break; /* 没有更多策略 */
 
         safety_policy_t policy;
-        AGENTRT_MEMSET(&policy, 0, sizeof(policy));
+        AIRY_MEMSET(&policy, 0, sizeof(policy));
 
         const char *s = config_value_get_string(id_val, "");
-        AGENTRT_STRNCPY_TERM(policy.id, s, sizeof(policy.id) - 1);
+        AIRY_STRNCPY_TERM(policy.id, s, sizeof(policy.id) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.name", i);
         s = config_value_get_string(config_context_get(cfg, key_buf), "");
-        AGENTRT_STRNCPY_TERM(policy.name, s, sizeof(policy.name) - 1);
+        AIRY_STRNCPY_TERM(policy.name, s, sizeof(policy.name) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.description", i);
         s = config_value_get_string(config_context_get(cfg, key_buf), "");
-        AGENTRT_STRNCPY_TERM(policy.description, s, sizeof(policy.description) - 1);
+        AIRY_STRNCPY_TERM(policy.description, s, sizeof(policy.description) - 1);
 
         snprintf(key_buf, sizeof(key_buf), "%d.default_decision", i);
         policy.default_decision = (safety_decision_t)config_value_get_int(
@@ -759,7 +759,7 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
         snprintf(key_buf, sizeof(key_buf), "%d.rules_json", i);
         const config_value_t *rules_val = config_context_get(cfg, key_buf);
         if (rules_val) {
-            policy.rules_json = AGENTRT_STRDUP(config_value_get_string(rules_val, ""));
+            policy.rules_json = AIRY_STRDUP(config_value_get_string(rules_val, ""));
         } else {
             policy.rules_json = NULL;
         }
@@ -779,19 +779,19 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
         }
 
         if (policy.rules_json) {
-            AGENTRT_FREE(policy.rules_json);
+            AIRY_FREE(policy.rules_json);
         }
     }
 
     config_source_destroy(mem_source);
     config_context_destroy(cfg);
-    return loaded > 0 ? 0 : AGENTRT_ERR_FAIL;
+    return loaded > 0 ? 0 : AIRY_ERR_FAIL;
 }
 
 int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *policy_a_id,
                                   const char *policy_b_id, safety_decision_t *resolved_decision)
 {
-    if (!ctx || !policy_a_id || !policy_b_id || !resolved_decision) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !policy_a_id || !policy_b_id || !resolved_decision) return AIRY_ERR_INVALID_PARAM;
 
     /* 冲突解决策略：优先级高的策略胜出 */
     safety_policy_t *policy_a = NULL, *policy_b = NULL;
@@ -815,7 +815,7 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
          * 安全穹顶遵循 fail-closed 原则——拒绝而非放行，
          * 并返回错误码告知调用方策略 ID 无效。 */
         *resolved_decision = SAFETY_DECISION_DENY;
-        return AGENTRT_ERR_NOT_FOUND;
+        return AIRY_ERR_NOT_FOUND;
     }
     return 0;
 }
@@ -823,7 +823,7 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
 int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
                            int64_t limit, uint64_t reset_interval_ms)
 {
-    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !resource_id) return AIRY_ERR_INVALID_PARAM;
 
     /* 查找已有配额或创建新配额 */
     for (size_t i = 0; i < ctx->quota_count; i++) {
@@ -834,7 +834,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
         }
     }
 
-    if (ctx->quota_count >= ctx->quota_capacity) return AGENTRT_ERR_FAIL;
+    if (ctx->quota_count >= ctx->quota_capacity) return AIRY_ERR_FAIL;
     safety_quota_t *q = &ctx->quotas[ctx->quota_count];
     snprintf(q->resource_id, sizeof(q->resource_id), "%s", resource_id);
     q->limit = limit;
@@ -849,7 +849,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
 int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_id,
                              int64_t requested, bool *allowed)
 {
-    if (!ctx || !resource_id || !allowed) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !resource_id || !allowed) return AIRY_ERR_INVALID_PARAM;
 
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
@@ -864,20 +864,20 @@ int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_i
 int safety_guard_consume_quota(safety_guard_context_t *ctx, const char *resource_id,
                                int64_t amount)
 {
-    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !resource_id) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage += amount;
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource_id,
                                int64_t amount)
 {
-    if (!ctx || !resource_id) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !resource_id) return AIRY_ERR_INVALID_PARAM;
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage -= amount;
@@ -885,24 +885,24 @@ int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource
             return 0;
         }
     }
-    return AGENTRT_ERR_NOT_FOUND;
+    return AIRY_ERR_NOT_FOUND;
 }
 
 int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t *event,
                               const safety_result_t *result, const char *guard_name)
 {
-    if (!ctx || !event) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !event) return AIRY_ERR_INVALID_PARAM;
 
     /* P1.4.3: 每次 DENY 必须写入审计日志 */
     if (ctx->audit_count >= ctx->audit_capacity) {
         /* 扩容审计日志 */
         size_t new_cap = ctx->audit_capacity * 2;
         if (new_cap > SAFETY_MAX_AUDIT_ENTRIES) new_cap = SAFETY_MAX_AUDIT_ENTRIES;
-        if (ctx->audit_count >= new_cap) return AGENTRT_ERR_FAIL; /* 已满 */
+        if (ctx->audit_count >= new_cap) return AIRY_ERR_FAIL; /* 已满 */
 
-        safety_audit_entry_t *new_entries = (safety_audit_entry_t *)AGENTRT_REALLOC(
+        safety_audit_entry_t *new_entries = (safety_audit_entry_t *)AIRY_REALLOC(
             ctx->audit_entries, new_cap * sizeof(safety_audit_entry_t));
-        if (!new_entries) return AGENTRT_ERR_OUT_OF_MEMORY;
+        if (!new_entries) return AIRY_ERR_OUT_OF_MEMORY;
         ctx->audit_entries = new_entries;
         ctx->audit_capacity = new_cap;
     }
@@ -933,7 +933,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
     if (!ctx) {
         if (entries) *entries = NULL;
         if (entry_count) *entry_count = 0;
-        return AGENTRT_ERR_INVALID_PARAM;
+        return AIRY_ERR_INVALID_PARAM;
     }
 
     /* 统计匹配的条目数 */
@@ -952,9 +952,9 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
         return 0;
     }
 
-    safety_audit_entry_t *result = (safety_audit_entry_t *)AGENTRT_CALLOC(
+    safety_audit_entry_t *result = (safety_audit_entry_t *)AIRY_CALLOC(
         match_count, sizeof(safety_audit_entry_t));
-    if (!result) return AGENTRT_ERR_OUT_OF_MEMORY;
+    if (!result) return AIRY_ERR_OUT_OF_MEMORY;
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->audit_count; i++) {
@@ -974,7 +974,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
 int safety_guard_set_violation_callback(safety_guard_context_t *ctx,
                                         safety_violation_callback_t callback, void *user_data)
 {
-    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx) return AIRY_ERR_INVALID_PARAM;
     ctx->violation_callback = callback;
     ctx->violation_user_data = user_data;
     return 0;
@@ -984,7 +984,7 @@ int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
                                             safety_policy_change_callback_t callback,
                                             void *user_data)
 {
-    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx) return AIRY_ERR_INVALID_PARAM;
     ctx->policy_change_callback = callback;
     ctx->policy_change_user_data = user_data;
     return 0;
@@ -992,7 +992,7 @@ int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
 
 int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason)
 {
-    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx) return AIRY_ERR_INVALID_PARAM;
     ctx->emergency_stopped = true;
     if (reason) {
         snprintf(ctx->emergency_reason, sizeof(ctx->emergency_reason), "%s", reason);
@@ -1004,7 +1004,7 @@ int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason)
 
 int safety_guard_emergency_release(safety_guard_context_t *ctx)
 {
-    if (!ctx) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx) return AIRY_ERR_INVALID_PARAM;
     ctx->emergency_stopped = false;
     ctx->emergency_reason[0] = '\0';
     return 0;
@@ -1014,7 +1014,7 @@ int safety_guard_check_permission(safety_guard_context_t *ctx,
                                   safety_guard_type_t guard_type,
                                   const char *agent_id, bool *allowed)
 {
-    if (!ctx || !agent_id || !allowed) return AGENTRT_ERR_INVALID_PARAM;
+    if (!ctx || !agent_id || !allowed) return AIRY_ERR_INVALID_PARAM;
 
     /* 构造安全事件进行权限检查 */
     safety_event_t event;

@@ -28,9 +28,9 @@ static int g_tests_failed = 0;
 
 static void test_cupolas_init_cleanup(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret == AGENTRT_OK) {
+    if (ret == AIRY_OK) {
         TEST_PASS("cupolas_init");
         cupolas_cleanup();
         TEST_PASS("cupolas_cleanup");
@@ -56,9 +56,9 @@ static void test_cupolas_version(void)
  * ============================================================================ */
 static void test_cupolas_sanitize_integration(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_FAIL("sanitize_integration", "init failed");
         return;
     }
@@ -67,7 +67,7 @@ static void test_cupolas_sanitize_integration(void)
     char output[256] = {0};
 
     ret = cupolas_sanitize_input(input, output, sizeof(output));
-    if (ret == AGENTRT_OK) {
+    if (ret == AIRY_OK) {
         TEST_PASS("sanitize_integration");
     } else {
         TEST_PASS("sanitize_integration (rejected as expected)");
@@ -78,9 +78,9 @@ static void test_cupolas_sanitize_integration(void)
 
 static void test_fourfold_protection_chain(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_FAIL("fourfold_chain", "init failed");
         return;
     }
@@ -89,7 +89,7 @@ static void test_fourfold_protection_chain(void)
     /* 添加规则并验证权限检查 */
     int perm_err = cupolas_add_permission_rule(
         "test_agent_1", "read", "/data/reports/*", 1, 100);
-    if (perm_err == AGENTRT_OK) {
+    if (perm_err == AIRY_OK) {
         TEST_PASS("fourfold_chain: permission rule added");
 
         /* 检查应允许的操作 */
@@ -167,9 +167,9 @@ static void test_fourfold_protection_chain(void)
  * ============================================================================ */
 static void test_sanitization_latency(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_FAIL("sanitize_latency", "init failed");
         return;
     }
@@ -233,9 +233,9 @@ static void test_sanitization_latency(void)
  * ============================================================================ */
 static void test_sha256_audit_chain(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_FAIL("sha256_audit", "init failed");
         return;
     }
@@ -281,9 +281,9 @@ static void test_sha256_audit_chain(void)
  * ============================================================================ */
 static void test_credential_rotation_strategies(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_PASS("credential_rotation: vault init skipped (no separate init needed)");
         /* vault 可能内嵌在 cupolas_init 中 */
     }
@@ -339,9 +339,9 @@ static void test_credential_rotation_strategies(void)
  * ============================================================================ */
 static void test_signature_verification(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_PASS("signature_verification: init skipped");
         return;
     }

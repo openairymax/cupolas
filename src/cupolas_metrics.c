@@ -173,12 +173,12 @@ static metric_entry_t *find_or_create_entry(const char *name)
 int metrics_register(const metric_desc_t *desc)
 {
     if (!desc || !desc->name) {
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     metric_entry_t *entry = find_or_create_entry(desc->name);
     if (!entry) {
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     cupolas_rwlock_wrlock(&g_metrics_lock);

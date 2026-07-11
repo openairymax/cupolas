@@ -5,14 +5,14 @@
  * test_error_code_consistency.c - P0.25.6 (ACC-STD06) 错误码一致性测试
  *
  * 验证全项目错误码数值无冲突：
- *   1. cupolas_ERR_* enum 与 AGENTRT_ERR_* commons 宏核心数值一致（语义对齐）
+ *   1. cupolas_ERR_* enum 与 AIRY_ERR_* commons 宏核心数值一致（语义对齐）
  *   2. cupolas_ERROR_* 别名宏正确映射到 cupolas_ERR_*
- *   3. AGENTRT_ERR_CUPOLAS_* 段（-712~-723）与 AGENTRT_ERR_SEC_* 段（-700~-711）不冲突
+ *   3. AIRY_ERR_CUPOLAS_* 段（-712~-723）与 AIRY_ERR_SEC_* 段（-700~-711）不冲突
  *   4. 各模块错误码段区间互不重叠（通用/系统/内核/服务/LLM/执行/记忆/安全/Cupolas/协调）
  *   5. cupolas_error_string / 转换函数基本可用性
  *
  * 已知差异（非 bug，0.1.1 内保留 cupolas enum 数值不变以避免破坏 ABI）：
- *   - cupolas_ERR_TRY_AGAIN=-15 与 AGENTRT_ERR_WOULD_BLOCK=-18 数值不同
+ *   - cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
  *     （cupolas_ERROR_WOULD_BLOCK 别名映射到 cupolas_ERR_TRY_AGAIN=-15）
  *     留待 1.0.1+ 统一为 commons 权威值。
  *
@@ -47,48 +47,48 @@ static int g_failed = 0;
     } while (0)
 
 /* ============================================================================
- * 测试 1: cupolas_ERR_* enum 与 AGENTRT_ERR_* commons 宏核心数值一致
+ * 测试 1: cupolas_ERR_* enum 与 AIRY_ERR_* commons 宏核心数值一致
  *
  * 设计意图：cupolas_error.h 已 #include "error.h"，cupolas enum 核心数值应与
  * commons 权威宏一致。若数值偏离，则 cupolas 公共 API 返回的错误码会被
- * 调用方误判（如 cupolas_ERR_OUT_OF_MEMORY=-4 必须等于 AGENTRT_ERR_OUT_OF_MEMORY=-4）。
+ * 调用方误判（如 cupolas_ERR_OUT_OF_MEMORY=-4 必须等于 AIRY_ERR_OUT_OF_MEMORY=-4）。
  *
- * 注意：cupolas_ERR_TRY_AGAIN=-15 与 AGENTRT_ERR_WOULD_BLOCK=-18 数值不同
+ * 注意：cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
  * （已知差异，留待 1.0.1+ 统一），本测试不检查此项。
  * ============================================================================ */
 
 static void test_cupolas_enum_matches_commons(void)
 {
     /* 成功码 */
-    if (cupolas_ERR_OK != AGENTRT_OK)
-        TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OK != AGENTRT_OK");
+    if (cupolas_ERR_OK != AIRY_OK)
+        TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OK != AIRY_OK");
 
     /* 通用错误码（-1 到 -14）— cupolas enum 与 commons 宏数值对齐 */
-    if ((int)cupolas_ERR_UNKNOWN != (int)AGENTRT_ERR_UNKNOWN)
+    if ((int)cupolas_ERR_UNKNOWN != (int)AIRY_ERR_UNKNOWN)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_UNKNOWN mismatch");
-    if ((int)cupolas_ERR_INVALID_PARAM != (int)AGENTRT_ERR_INVALID_PARAM)
+    if ((int)cupolas_ERR_INVALID_PARAM != (int)AIRY_ERR_INVALID_PARAM)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_INVALID_PARAM mismatch");
-    if ((int)cupolas_ERR_NULL_POINTER != (int)AGENTRT_ERR_NULL_POINTER)
+    if ((int)cupolas_ERR_NULL_POINTER != (int)AIRY_ERR_NULL_POINTER)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_NULL_POINTER mismatch");
-    if ((int)cupolas_ERR_OUT_OF_MEMORY != (int)AGENTRT_ERR_OUT_OF_MEMORY)
+    if ((int)cupolas_ERR_OUT_OF_MEMORY != (int)AIRY_ERR_OUT_OF_MEMORY)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OUT_OF_MEMORY mismatch");
-    if ((int)cupolas_ERR_BUFFER_TOO_SMALL != (int)AGENTRT_ERR_BUFFER_TOO_SMALL)
+    if ((int)cupolas_ERR_BUFFER_TOO_SMALL != (int)AIRY_ERR_BUFFER_TOO_SMALL)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_BUFFER_TOO_SMALL mismatch");
-    if ((int)cupolas_ERR_NOT_FOUND != (int)AGENTRT_ERR_NOT_FOUND)
+    if ((int)cupolas_ERR_NOT_FOUND != (int)AIRY_ERR_NOT_FOUND)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_NOT_FOUND mismatch");
-    if ((int)cupolas_ERR_ALREADY_EXISTS != (int)AGENTRT_ERR_ALREADY_EXISTS)
+    if ((int)cupolas_ERR_ALREADY_EXISTS != (int)AIRY_ERR_ALREADY_EXISTS)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_ALREADY_EXISTS mismatch");
-    if ((int)cupolas_ERR_TIMEOUT != (int)AGENTRT_ERR_TIMEOUT)
+    if ((int)cupolas_ERR_TIMEOUT != (int)AIRY_ERR_TIMEOUT)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_TIMEOUT mismatch");
-    if ((int)cupolas_ERR_NOT_SUPPORTED != (int)AGENTRT_ERR_NOT_SUPPORTED)
+    if ((int)cupolas_ERR_NOT_SUPPORTED != (int)AIRY_ERR_NOT_SUPPORTED)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_NOT_SUPPORTED mismatch");
-    if ((int)cupolas_ERR_PERMISSION_DENIED != (int)AGENTRT_ERR_PERMISSION_DENIED)
+    if ((int)cupolas_ERR_PERMISSION_DENIED != (int)AIRY_ERR_PERMISSION_DENIED)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_PERMISSION_DENIED mismatch");
-    if ((int)cupolas_ERR_IO != (int)AGENTRT_ERR_IO)
+    if ((int)cupolas_ERR_IO != (int)AIRY_ERR_IO)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_IO mismatch");
-    if ((int)cupolas_ERR_STATE_ERROR != (int)AGENTRT_ERR_STATE_ERROR)
+    if ((int)cupolas_ERR_STATE_ERROR != (int)AIRY_ERR_STATE_ERROR)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_STATE_ERROR mismatch");
-    if ((int)cupolas_ERR_OVERFLOW != (int)AGENTRT_ERR_OVERFLOW)
+    if ((int)cupolas_ERR_OVERFLOW != (int)AIRY_ERR_OVERFLOW)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OVERFLOW mismatch");
 
     TEST_PASS("cupolas_enum_matches_commons");
@@ -133,10 +133,10 @@ static void test_cupolas_alias_macros(void)
 }
 
 /* ============================================================================
- * 测试 3: AGENTRT_ERR_CUPOLAS_* 段与 AGENTRT_ERR_SEC_* 段不冲突
+ * 测试 3: AIRY_ERR_CUPOLAS_* 段与 AIRY_ERR_SEC_* 段不冲突
  *
- * 设计意图：P0.25.4 新增 AGENTRT_ERR_CUPOLAS_* 段（-712~-723），必须与
- * 已有的 AGENTRT_ERR_SEC_* 段（-700~-711）不重叠。若冲突，调用方无法
+ * 设计意图：P0.25.4 新增 AIRY_ERR_CUPOLAS_* 段（-712~-723），必须与
+ * 已有的 AIRY_ERR_SEC_* 段（-700~-711）不重叠。若冲突，调用方无法
  * 区分错误来源是通用安全违规还是 Cupolas 专属决策。
  *
  * 数值关系（负数）：-723 < -712 < -711 < -700
@@ -148,12 +148,12 @@ static void test_cupolas_alias_macros(void)
 static void test_cupolas_segment_no_conflict(void)
 {
     /* SEC_* 段：upper=-700（最接近 0），lower=-711（最远离 0） */
-    int sec_upper = AGENTRT_ERR_SEC_BASE;          /* -700 */
-    int sec_lower = AGENTRT_ERR_ESANITIZE;          /* -711 */
+    int sec_upper = AIRY_ERR_SEC_BASE;          /* -700 */
+    int sec_lower = AIRY_ERR_ESANITIZE;          /* -711 */
 
     /* CUPOLAS_* 段：upper=-712（最接近 0），lower=-723（最远离 0） */
-    int cupolas_upper = AGENTRT_ERR_CUPOLAS_BASE;   /* -712 */
-    int cupolas_lower = AGENTRT_ERR_CUPOLAS_NETWORK; /* -723 */
+    int cupolas_upper = AIRY_ERR_CUPOLAS_BASE;   /* -712 */
+    int cupolas_lower = AIRY_ERR_CUPOLAS_NETWORK; /* -723 */
 
     /* 数值校验 */
     if (sec_upper != -700)
@@ -171,25 +171,25 @@ static void test_cupolas_segment_no_conflict(void)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS segment overlaps with SEC segment");
 
     /* CUPOLAS 段内部连续（数值递减：-712, -713, -714, ...） */
-    if (AGENTRT_ERR_CUPOLAS_DENIED != -713)
+    if (AIRY_ERR_CUPOLAS_DENIED != -713)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_DENIED should be -713");
-    if (AGENTRT_ERR_CUPOLAS_QUARANTINE != -714)
+    if (AIRY_ERR_CUPOLAS_QUARANTINE != -714)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_QUARANTINE should be -714");
-    if (AGENTRT_ERR_CUPOLAS_POLICY != -715)
+    if (AIRY_ERR_CUPOLAS_POLICY != -715)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_POLICY should be -715");
-    if (AGENTRT_ERR_CUPOLAS_SANDBOX != -716)
+    if (AIRY_ERR_CUPOLAS_SANDBOX != -716)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_SANDBOX should be -716");
-    if (AGENTRT_ERR_CUPOLAS_AUDIT != -717)
+    if (AIRY_ERR_CUPOLAS_AUDIT != -717)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_AUDIT should be -717");
-    if (AGENTRT_ERR_CUPOLAS_TAMPERED != -718)
+    if (AIRY_ERR_CUPOLAS_TAMPERED != -718)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_TAMPERED should be -718");
-    if (AGENTRT_ERR_CUPOLAS_SIGNATURE != -719)
+    if (AIRY_ERR_CUPOLAS_SIGNATURE != -719)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_SIGNATURE should be -719");
-    if (AGENTRT_ERR_CUPOLAS_VAULT != -720)
+    if (AIRY_ERR_CUPOLAS_VAULT != -720)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_VAULT should be -720");
-    if (AGENTRT_ERR_CUPOLAS_ENTITLEMENT != -721)
+    if (AIRY_ERR_CUPOLAS_ENTITLEMENT != -721)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_ENTITLEMENT should be -721");
-    if (AGENTRT_ERR_CUPOLAS_RUNTIME != -722)
+    if (AIRY_ERR_CUPOLAS_RUNTIME != -722)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_RUNTIME should be -722");
 
     TEST_PASS("cupolas_segment_no_conflict");
@@ -229,25 +229,25 @@ static void test_error_segments_disjoint(void)
     const size_t n = sizeof(segments) / sizeof(segments[0]);
 
     /* 验证各段基址（upper）正确 */
-    if (segments[0].upper != AGENTRT_ERR_UNKNOWN)
+    if (segments[0].upper != AIRY_ERR_UNKNOWN)
         TEST_FAIL("error_segments_disjoint", "GENERIC upper mismatch");
-    if (segments[1].upper != AGENTRT_ERR_SYS_BASE)
+    if (segments[1].upper != AIRY_ERR_SYS_BASE)
         TEST_FAIL("error_segments_disjoint", "SYS upper mismatch");
-    if (segments[2].upper != AGENTRT_ERR_KERN_BASE)
+    if (segments[2].upper != AIRY_ERR_KERN_BASE)
         TEST_FAIL("error_segments_disjoint", "KERN upper mismatch");
-    if (segments[3].upper != AGENTRT_ERR_SVC_BASE)
+    if (segments[3].upper != AIRY_ERR_SVC_BASE)
         TEST_FAIL("error_segments_disjoint", "SVC upper mismatch");
-    if (segments[4].upper != AGENTRT_ERR_LLM_BASE)
+    if (segments[4].upper != AIRY_ERR_LLM_BASE)
         TEST_FAIL("error_segments_disjoint", "LLM upper mismatch");
-    if (segments[5].upper != AGENTRT_ERR_EXEC_BASE)
+    if (segments[5].upper != AIRY_ERR_EXEC_BASE)
         TEST_FAIL("error_segments_disjoint", "EXEC upper mismatch");
-    if (segments[6].upper != AGENTRT_ERR_MEM_BASE)
+    if (segments[6].upper != AIRY_ERR_MEM_BASE)
         TEST_FAIL("error_segments_disjoint", "MEM upper mismatch");
-    if (segments[7].upper != AGENTRT_ERR_SEC_BASE)
+    if (segments[7].upper != AIRY_ERR_SEC_BASE)
         TEST_FAIL("error_segments_disjoint", "SEC upper mismatch");
-    if (segments[8].upper != AGENTRT_ERR_CUPOLAS_BASE)
+    if (segments[8].upper != AIRY_ERR_CUPOLAS_BASE)
         TEST_FAIL("error_segments_disjoint", "CUPOLAS upper mismatch");
-    if (segments[9].upper != AGENTRT_ERR_COORD_BASE)
+    if (segments[9].upper != AIRY_ERR_COORD_BASE)
         TEST_FAIL("error_segments_disjoint", "COORD upper mismatch");
 
     /* 验证相邻段不重叠：前一段的 lower > 后一段的 upper

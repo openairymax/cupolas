@@ -3,7 +3,7 @@
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
-agentrt_print_info("[CUPOLAS] Configuring cupolas security module")
+airy_print_info("[CUPOLAS] Configuring cupolas security module")
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
@@ -17,26 +17,26 @@ if(PkgConfig_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 
-if(AGENTRT_HAS_OPENSSL)
-    agentrt_print_ok("Found OpenSSL: ${OpenSSL_VERSION}")
+if(AIRY_HAS_OPENSSL)
+    airy_print_ok("Found OpenSSL: ${OpenSSL_VERSION}")
 else()
-    agentrt_print_warn("OpenSSL not found, some security features may be limited")
+    airy_print_warn("OpenSSL not found, some security features may be limited")
 endif()
 
 if(YAML_FOUND OR YAML_LIBRARIES)
     set(HAVE_YAML 1)
-    agentrt_print_ok("Found libyaml: ${YAML_LIBRARIES}")
+    airy_print_ok("Found libyaml: ${YAML_LIBRARIES}")
 else()
     set(HAVE_YAML 0)
-    agentrt_print_warn("libyaml not found, YAML manager support disabled")
+    airy_print_warn("libyaml not found, YAML manager support disabled")
 endif()
 
 if(CJSON_FOUND OR CJSON_LIBRARIES)
     set(HAVE_CJSON 1)
-    agentrt_print_ok("Found libcjson: ${CJSON_LIBRARIES}")
+    airy_print_ok("Found libcjson: ${CJSON_LIBRARIES}")
 else()
     set(HAVE_CJSON 0)
-    agentrt_print_warn("libcjson not found, JSON support disabled")
+    airy_print_warn("libcjson not found, JSON support disabled")
 endif()
 
 set(CUPOLAS_SOURCES
@@ -73,7 +73,7 @@ set(CUPOLAS_SOURCES
     src/mempool.c
 )
 # OpenSSL-dependent sources
-if(AGENTRT_HAS_OPENSSL)
+if(AIRY_HAS_OPENSSL)
     list(APPEND CUPOLAS_SOURCES
         src/security/cupolas_signature.c
         src/security/cupolas_vault.c
@@ -140,12 +140,12 @@ set(COMMON_INCLUDE_DIRS
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
 
 # 豁免内存子系统实现层：mempool.c 和 slab.c 实现底层内存管理，
-# 必须使用底层 malloc/calloc/memset，需定义 AGENTRT_COMPLIANCE_IMPL 跳过 poison
-if(AGENTRT_COMPLIANCE_STRICT)
+# 必须使用底层 malloc/calloc/memset，需定义 AIRY_COMPLIANCE_IMPL 跳过 poison
+if(AIRY_COMPLIANCE_STRICT)
     set_source_files_properties(
         src/mempool.c
         src/slab.c
-        PROPERTIES COMPILE_DEFINITIONS AGENTRT_COMPLIANCE_IMPL
+        PROPERTIES COMPILE_DEFINITIONS AIRY_COMPLIANCE_IMPL
     )
 endif()
 
@@ -154,9 +154,9 @@ if(BUILD_WITH_LOGGING)
 endif()
 
 target_compile_definitions(cupolas PRIVATE
-    AGENTRT_CONFIG_DIR="/etc/agentrt"
-    AGENTRT_LOG_DIR="/var/log/agentrt"
-    AGENTRT_ENABLE_V2_API=1
+    AIRY_CONFIG_DIR="/etc/agentrt"
+    AIRY_LOG_DIR="/var/log/agentrt"
+    AIRY_ENABLE_V2_API=1
 )
 
 target_include_directories(cupolas PUBLIC
@@ -174,14 +174,14 @@ target_include_directories(cupolas PUBLIC
     ${COMMON_INCLUDE_DIRS}
 )
 
-if(AGENTRT_HAS_OPENSSL)
+if(AIRY_HAS_OPENSSL)
     target_include_directories(cupolas PRIVATE ${OPENSSL_INCLUDE_DIR})
     target_compile_definitions(cupolas PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
-target_link_libraries(cupolas PRIVATE agentrt_common)
+target_link_libraries(cupolas PRIVATE airy_common)
 
-if(AGENTRT_HAS_OPENSSL)
+if(AIRY_HAS_OPENSSL)
     target_link_libraries(cupolas PRIVATE ${OPENSSL_LIBRARIES})
 endif()
 
@@ -242,7 +242,7 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_executable(test_cupolas_core tests/unit/test_cupolas_core.c)
-    target_compile_definitions(test_cupolas_core PRIVATE AGENTRT_COMPLIANCE_IMPL)
+    target_compile_definitions(test_cupolas_core PRIVATE AIRY_COMPLIANCE_IMPL)
     target_include_directories(test_cupolas_core PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -251,11 +251,11 @@ if(BUILD_TESTS)
     target_link_libraries(test_cupolas_core cupolas)
 
     # P0.25.6 (ACC-STD06): 错误码一致性测试
-    # 验证 cupolas enum 与 commons AGENTRT_ERR_* 宏数值一致、CUPOLAS_* 段
+    # 验证 cupolas enum 与 commons AIRY_ERR_* 宏数值一致、CUPOLAS_* 段
     # 与 SEC_* 段不冲突、各模块错误码段区间互不重叠。该测试仅依赖头文件
     # （cupolas_error.h + error.h），但链接 cupolas 库以覆盖转换函数实现。
     add_executable(test_error_code_consistency tests/unit/test_error_code_consistency.c)
-    target_compile_definitions(test_error_code_consistency PRIVATE AGENTRT_COMPLIANCE_IMPL)
+    target_compile_definitions(test_error_code_consistency PRIVATE AIRY_COMPLIANCE_IMPL)
     target_include_directories(test_error_code_consistency PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src

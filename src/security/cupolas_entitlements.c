@@ -83,9 +83,9 @@ static void cupolas_free_string_array(char **arr, size_t count)
     if (!arr)
         return;
     for (size_t i = 0; i < count; i++) {
-        AGENTRT_FREE(arr[i]);
+        AIRY_FREE(arr[i]);
     }
-    AGENTRT_FREE(arr);
+    AIRY_FREE(arr);
 }
 
 static char **cupolas_parse_string_array(const char *content, size_t *count)
@@ -102,7 +102,7 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
 
     char *dup = cupolas_strdup(content);
     if (!dup) {
-        AGENTRT_FREE(arr);
+        AIRY_FREE(arr);
         return NULL;
     }
 
@@ -113,9 +113,9 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
         if (*token != '\0') {
             if (*count >= capacity) {
                 capacity *= 2;
-                char **new_arr = (char **)AGENTRT_REALLOC(arr, capacity * sizeof(char *));
+                char **new_arr = (char **)AIRY_REALLOC(arr, capacity * sizeof(char *));
                 if (!new_arr) {
-                    AGENTRT_FREE(dup);
+                    AIRY_FREE(dup);
                     cupolas_free_string_array(arr, *count);
                     return NULL;
                 }
@@ -128,7 +128,7 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
         token = strtok_r(NULL, ",\n", &saveptr);
     }
 
-    AGENTRT_FREE(dup);
+    AIRY_FREE(dup);
     return arr;
 }
 
@@ -146,12 +146,12 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
 
     const char *colon = strchr(p, ':');
     if (!colon)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     size_t key_len = colon - p;
-    *key = (char *)AGENTRT_MALLOC(key_len + 1);
+    *key = (char *)AIRY_MALLOC(key_len + 1);
     if (!*key)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     __builtin_memcpy(*key, p, key_len);
     (*key)[key_len] = '\0';
     *key = cupolas_str_trim(*key);
@@ -166,11 +166,11 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
                (v[value_len - 1] == '\n' || v[value_len - 1] == '\r' || v[value_len - 1] == ' ')) {
             value_len--;
         }
-        *value = (char *)AGENTRT_MALLOC(value_len + 1);
+        *value = (char *)AIRY_MALLOC(value_len + 1);
         if (!*value) {
-            AGENTRT_FREE(*key);
+            AIRY_FREE(*key);
             *key = NULL;
-            return AGENTRT_EINVAL;
+            return AIRY_EINVAL;
         }
         __builtin_memcpy(*value, v, value_len);
         (*value)[value_len] = '\0';
@@ -305,12 +305,12 @@ static int cupolas_parse_entitlements_content(const char *content,
             }
         }
 
-        AGENTRT_FREE(key);
-        AGENTRT_FREE(value);
+        AIRY_FREE(key);
+        AIRY_FREE(value);
         line = strtok_r(NULL, "\n", &saveptr);
     }
 
-    AGENTRT_FREE(dup);
+    AIRY_FREE(dup);
     return CUPOLAS_ENT_OK;
 }
 
@@ -349,7 +349,7 @@ int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **en
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *content = (char *)AGENTRT_MALLOC(size + 1);
+    char *content = (char *)AIRY_MALLOC(size + 1);
     if (!content) {
         fclose(f);
         return CUPOLAS_ENT_PARSE_ERROR;
@@ -358,13 +358,13 @@ int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **en
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
     if (read_size != (size_t)size) {
-        AGENTRT_FREE(content);
+        AIRY_FREE(content);
         return CUPOLAS_ENT_PARSE_ERROR;
     }
     content[read_size] = '\0';
 
     int result = cupolas_entitlements_load_string(content, entitlements);
-    AGENTRT_FREE(content);
+    AIRY_FREE(content);
 
     return result;
 }
@@ -382,7 +382,7 @@ int cupolas_entitlements_load_json(const char *json_path, cupolas_entitlements_t
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *content = (char *)AGENTRT_MALLOC(size + 1);
+    char *content = (char *)AIRY_MALLOC(size + 1);
     if (!content) {
         fclose(f);
         return CUPOLAS_ENT_PARSE_ERROR;
@@ -391,13 +391,13 @@ int cupolas_entitlements_load_json(const char *json_path, cupolas_entitlements_t
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
     if (read_size != (size_t)size) {
-        AGENTRT_FREE(content);
+        AIRY_FREE(content);
         return CUPOLAS_ENT_PARSE_ERROR;
     }
     content[read_size] = '\0';
 
     int result = cupolas_entitlements_load_string(content, entitlements);
-    AGENTRT_FREE(content);
+    AIRY_FREE(content);
 
     return result;
 }
@@ -408,7 +408,7 @@ int cupolas_entitlements_load_string(const char *yaml_content,
     if (!yaml_content || !entitlements)
         return CUPOLAS_ENT_INVALID;
 
-    *entitlements = (cupolas_entitlements_t *)AGENTRT_CALLOC(1, sizeof(cupolas_entitlements_t));
+    *entitlements = (cupolas_entitlements_t *)AIRY_CALLOC(1, sizeof(cupolas_entitlements_t));
     if (!*entitlements)
         return CUPOLAS_ENT_PARSE_ERROR;
 
@@ -433,39 +433,39 @@ void cupolas_entitlements_free(cupolas_entitlements_t *entitlements)
     if (!entitlements)
         return;
 
-    AGENTRT_FREE(entitlements->raw_content);
-    AGENTRT_FREE(entitlements->signature);
+    AIRY_FREE(entitlements->raw_content);
+    AIRY_FREE(entitlements->signature);
 
-    AGENTRT_FREE(entitlements->info.agent_id);
-    AGENTRT_FREE(entitlements->info.version);
+    AIRY_FREE(entitlements->info.agent_id);
+    AIRY_FREE(entitlements->info.version);
 
     for (size_t i = 0; i < entitlements->info.fs_count; i++) {
-        AGENTRT_FREE(entitlements->info.fs_permissions[i].path);
+        AIRY_FREE(entitlements->info.fs_permissions[i].path);
         cupolas_free_string_array(entitlements->info.fs_permissions[i].permissions,
                                   entitlements->info.fs_permissions[i].perm_count);
     }
-    AGENTRT_FREE(entitlements->info.fs_permissions);
+    AIRY_FREE(entitlements->info.fs_permissions);
 
     for (size_t i = 0; i < entitlements->info.net_count; i++) {
-        AGENTRT_FREE(entitlements->info.net_permissions[i].host);
-        AGENTRT_FREE(entitlements->info.net_permissions[i].protocol);
-        AGENTRT_FREE(entitlements->info.net_permissions[i].direction);
+        AIRY_FREE(entitlements->info.net_permissions[i].host);
+        AIRY_FREE(entitlements->info.net_permissions[i].protocol);
+        AIRY_FREE(entitlements->info.net_permissions[i].direction);
     }
-    AGENTRT_FREE(entitlements->info.net_permissions);
+    AIRY_FREE(entitlements->info.net_permissions);
 
     for (size_t i = 0; i < entitlements->info.ipc_count; i++) {
-        AGENTRT_FREE(entitlements->info.ipc_permissions[i].target);
+        AIRY_FREE(entitlements->info.ipc_permissions[i].target);
         cupolas_free_string_array(entitlements->info.ipc_permissions[i].permissions,
                                   entitlements->info.ipc_permissions[i].perm_count);
     }
-    AGENTRT_FREE(entitlements->info.ipc_permissions);
+    AIRY_FREE(entitlements->info.ipc_permissions);
 
     for (size_t i = 0; i < entitlements->info.vault_count; i++) {
-        AGENTRT_FREE(entitlements->info.vault_permissions[i].cred_id);
+        AIRY_FREE(entitlements->info.vault_permissions[i].cred_id);
         cupolas_free_string_array(entitlements->info.vault_permissions[i].permissions,
                                   entitlements->info.vault_permissions[i].perm_count);
     }
-    AGENTRT_FREE(entitlements->info.vault_permissions);
+    AIRY_FREE(entitlements->info.vault_permissions);
 
     cupolas_free_string_array(entitlements->info.allowed_syscalls,
                               entitlements->info.syscall_count);
@@ -474,7 +474,7 @@ void cupolas_entitlements_free(cupolas_entitlements_t *entitlements)
 
     cupolas_mutex_destroy(&entitlements->lock);
 
-    AGENTRT_FREE(entitlements);
+    AIRY_FREE(entitlements);
 }
 
 int cupolas_entitlements_verify(cupolas_entitlements_t *entitlements, const char *public_key)
@@ -553,8 +553,8 @@ int cupolas_entitlements_sign(cupolas_entitlements_t *entitlements, const char *
                                    (unsigned char *)entitlements->raw_content, content_len) == 1) {
                     result = CUPOLAS_ENT_OK;
 
-                    AGENTRT_FREE(entitlements->signature);
-                    entitlements->signature = (char *)AGENTRT_MALLOC(*sig_len);
+                    AIRY_FREE(entitlements->signature);
+                    entitlements->signature = (char *)AIRY_MALLOC(*sig_len);
                     if (entitlements->signature) {
                         __builtin_memcpy(entitlements->signature, signature_out, *sig_len);
                         entitlements->sig_len = *sig_len;
