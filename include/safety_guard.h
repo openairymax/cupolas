@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
-/** @note This API is planned for next release. Enable with AGENTRT_ENABLE_V2_API to access. */
+/** @note This API is planned for next release. Enable with AIRY_ENABLE_V2_API to access. */
 /**
  * @file safety_guard.h
  * @brief SafetyGuard - AgentRT细粒度安全守卫框架
@@ -21,8 +21,8 @@
  * @see cupolas
  */
 
-#ifndef AGENTRT_SAFETY_GUARD_H
-#define AGENTRT_SAFETY_GUARD_H
+#ifndef AIRY_RT_SAFETY_GUARD_H
+#define AIRY_RT_SAFETY_GUARD_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -178,7 +178,7 @@ typedef void (*safety_violation_callback_t)(const safety_event_t *event,
 typedef void (*safety_policy_change_callback_t)(const char *policy_id, const char *change_type,
                                                 void *user_data);
 
-#ifdef AGENTRT_ENABLE_V2_API
+#ifdef AIRY_ENABLE_V2_API
 
 safety_guard_context_t *safety_guard_create(void);
 void safety_guard_destroy(safety_guard_context_t *ctx);
@@ -247,10 +247,10 @@ int safety_guard_check_permission(safety_guard_context_t *ctx,
                                   safety_guard_type_t guard_type,
                                   const char *agent_id, bool *allowed);
 
-#endif /* AGENTRT_ENABLE_V2_API */
+#endif /* AIRY_ENABLE_V2_API */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* AGENTRT_SAFETY_GUARD_H */
+#endif /* AIRY_RT_SAFETY_GUARD_H */

@@ -10,11 +10,11 @@
  *   - 全局 partial 链（CPU 间负载均衡）
  *
  * 典型用法：
- *   agentrt_slab_t *slab = agentrt_slab_create(sizeof(my_struct), 64, NULL, NULL);
- *   my_struct *obj = (my_struct *)agentrt_slab_alloc(slab);
+ *   airy_slab_t *slab = airy_slab_create(sizeof(my_struct), 64, NULL, NULL);
+ *   my_struct *obj = (my_struct *)airy_slab_alloc(slab);
  *   // ... 使用 obj ...
- *   agentrt_slab_free(slab, obj);
- *   agentrt_slab_destroy(slab);
+ *   airy_slab_free(slab, obj);
+ *   airy_slab_destroy(slab);
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
@@ -36,13 +36,13 @@ extern "C" {
  * ================================================================ */
 
 /** Slab 句柄（不透明） */
-typedef struct agentrt_slab agentrt_slab_t;
+typedef struct airy_slab airy_slab_t;
 
 /** 构造回调：在对象分配后调用 */
-typedef void (*agentrt_slab_ctor_t)(void *obj, void *user_data);
+typedef void (*airy_slab_ctor_t)(void *obj, void *user_data);
 
 /** 析构回调：在对象释放前调用 */
-typedef void (*agentrt_slab_dtor_t)(void *obj, void *user_data);
+typedef void (*airy_slab_dtor_t)(void *obj, void *user_data);
 
 /** Slab 统计信息 */
 typedef struct {
@@ -56,7 +56,7 @@ typedef struct {
     size_t total_frees;         /**< 总释放次数 */
     size_t active_objects;      /**< 当前活跃对象数 */
     size_t cpu_steals;          /**< CPU 间偷取次数 */
-} agentrt_slab_stats_t;
+} airy_slab_stats_t;
 
 /* ================================================================
  * 生命周期 API
@@ -72,13 +72,13 @@ typedef struct {
  * @param user_data       传递给构造/析构回调的用户数据
  * @return Slab 句柄，失败返回 NULL
  *
- * @ownership 返回的句柄由调用者管理，需通过 agentrt_slab_destroy() 释放
+ * @ownership 返回的句柄由调用者管理，需通过 airy_slab_destroy() 释放
  * @threadsafe 是（per-CPU freelist + 全局锁）
  */
-agentrt_slab_t *agentrt_slab_create(size_t obj_size,
+airy_slab_t *airy_slab_create(size_t obj_size,
                                      size_t objs_per_slab,
-                                     agentrt_slab_ctor_t ctor,
-                                     agentrt_slab_dtor_t dtor,
+                                     airy_slab_ctor_t ctor,
+                                     airy_slab_dtor_t dtor,
                                      void *user_data);
 
 /**
@@ -92,7 +92,7 @@ agentrt_slab_t *agentrt_slab_create(size_t obj_size,
  * @ownership slab: TRANSFER
  * @threadsafe 否（调用者需确保无并发访问）
  */
-void agentrt_slab_destroy(agentrt_slab_t *slab);
+void airy_slab_destroy(airy_slab_t *slab);
 
 /* ================================================================
  * 分配/释放 API
@@ -107,10 +107,10 @@ void agentrt_slab_destroy(agentrt_slab_t *slab);
  * @param slab Slab 句柄
  * @return 对象指针，失败返回 NULL
  *
- * @ownership 返回的对象由调用者管理，需通过 agentrt_slab_free() 归还
+ * @ownership 返回的对象由调用者管理，需通过 airy_slab_free() 归还
  * @threadsafe 是
  */
-void *agentrt_slab_alloc(agentrt_slab_t *slab);
+void *airy_slab_alloc(airy_slab_t *slab);
 
 /**
  * @brief 释放对象回 Slab
@@ -124,7 +124,7 @@ void *agentrt_slab_alloc(agentrt_slab_t *slab);
  * @ownership obj: TRANSFER
  * @threadsafe 是
  */
-void agentrt_slab_free(agentrt_slab_t *slab, void *obj);
+void airy_slab_free(airy_slab_t *slab, void *obj);
 
 /* ================================================================
  * 统计与诊断 API
@@ -137,7 +137,7 @@ void agentrt_slab_free(agentrt_slab_t *slab, void *obj);
  * @param stats 输出统计信息
  * @return 0 成功，非0失败
  */
-int agentrt_slab_get_stats(agentrt_slab_t *slab, agentrt_slab_stats_t *stats);
+int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats);
 
 /**
  * @brief 收缩 Slab：释放所有空 slab 页
@@ -145,7 +145,7 @@ int agentrt_slab_get_stats(agentrt_slab_t *slab, agentrt_slab_stats_t *stats);
  * @param slab Slab 句柄
  * @return 释放的 slab 页数
  */
-size_t agentrt_slab_shrink(agentrt_slab_t *slab);
+size_t airy_slab_shrink(airy_slab_t *slab);
 
 /**
  * @brief 验证 Slab 内部一致性
@@ -153,7 +153,7 @@ size_t agentrt_slab_shrink(agentrt_slab_t *slab);
  * @param slab Slab 句柄
  * @return true 一致，false 损坏
  */
-bool agentrt_slab_validate(agentrt_slab_t *slab);
+bool airy_slab_validate(airy_slab_t *slab);
 
 #ifdef __cplusplus
 }

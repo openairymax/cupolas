@@ -29,7 +29,7 @@
  *     CUPOLAS_MUTEX_INIT(&lock);
  *
  *     my_data_t* data = CUPOLAS_ALLOC_STRUCT(my_data_t);
- *     if (!data) return AGENTRT_ERR_OUT_OF_MEMORY;  BAN-073
+ *     if (!data) return AIRY_ERR_OUT_OF_MEMORY;  BAN-073
  *
  *     CUPOLAS_MUTEX_LOCK(&lock);
  *     // Critical section...
@@ -106,7 +106,7 @@ extern "C" {
  * int* numbers = CUPOLAS_ALLOC(int, 100); // 100 ints, all zeroed
  * @endcode
  */
-#define CUPOLAS_ALLOC(type, count) ((type *)AGENTRT_CALLOC(count, sizeof(type)))
+#define CUPOLAS_ALLOC(type, count) ((type *)AIRY_CALLOC(count, sizeof(type)))
 
 /**
  * @brief Allocate single zero-initialized structure
@@ -117,7 +117,7 @@ extern "C" {
  * my_config_t* cfg = CUPOLAS_ALLOC_STRUCT(my_config_t);
  * @endcode
  */
-#define CUPOLAS_ALLOC_STRUCT(type) ((type *)AGENTRT_CALLOC(1, sizeof(type)))
+#define CUPOLAS_ALLOC_STRUCT(type) ((type *)AIRY_CALLOC(1, sizeof(type)))
 
 /**
  * @brief Allocate uninitialized array (faster than CUPOLAS_ALLOC)
@@ -128,10 +128,10 @@ extern "C" {
  *
  * @code
  * char* buffer = CUPOLAS_ALLOC_ARRAY(char, 4096);
- * AGENTRT_MEMSET(buffer, 0, 4096); // Manual init if needed
+ * AIRY_MEMSET(buffer, 0, 4096); // Manual init if needed
  * @endcode
  */
-#define CUPOLAS_ALLOC_ARRAY(type, count) ((type *)AGENTRT_MALLOC((count) * sizeof(type)))
+#define CUPOLAS_ALLOC_ARRAY(type, count) ((type *)AIRY_MALLOC((count) * sizeof(type)))
 
 /**
  * @brief Reallocate memory block with type safety
@@ -145,7 +145,7 @@ extern "C" {
  * arr = CUPOLAS_REALLOC(arr, int, 200); // Expand to 200 ints
  * @endcode
  */
-#define CUPOLAS_REALLOC(ptr, type, count) ((type *)AGENTRT_REALLOC(ptr, (count) * sizeof(type)))
+#define CUPOLAS_REALLOC(ptr, type, count) ((type *)AIRY_REALLOC(ptr, (count) * sizeof(type)))
 
 /**
  * @brief Free memory and set pointer to NULL (dangling pointer prevention)
@@ -160,7 +160,7 @@ extern "C" {
  */
 #define CUPOLAS_FREE(ptr) \
     do {                  \
-        AGENTRT_FREE(ptr);        \
+        AIRY_FREE(ptr);        \
         ptr = NULL;       \
     } while (0)
 
@@ -173,7 +173,7 @@ extern "C" {
 #define CUPOLAS_FREE_ARRAY(ptr) \
     do {                        \
         if (ptr) {              \
-            AGENTRT_FREE(ptr);          \
+            AIRY_FREE(ptr);          \
             ptr = NULL;         \
         }                       \
     } while (0)
@@ -186,14 +186,14 @@ extern "C" {
  * All macros perform early return on failure condition.
  *
  * @note Return value conventions:
- *   - Default: returns AGENTRT_EINVAL on error
+ *   - Default: returns AIRY_EINVAL on error
  *   - _RET variants: allow custom return value
  */
 
 /**
- * @brief Check for NULL pointer, return AGENTRT_EINVAL if true
+ * @brief Check for NULL pointer, return AIRY_EINVAL if true
  * @param ptr Pointer to check
- * @return AGENTRT_EINVAL if ptr is NULL, otherwise continues execution
+ * @return AIRY_EINVAL if ptr is NULL, otherwise continues execution
  *
  * @code
  * int process(config_t* cfg) {
@@ -205,7 +205,7 @@ extern "C" {
 #define CUPOLAS_CHECK_NULL(ptr) \
     do {                        \
         if ((ptr) == NULL)      \
-            return AGENTRT_EINVAL;          \
+            return AIRY_EINVAL;          \
     } while (0)
 
 /**
@@ -221,9 +221,9 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check expression result, return AGENTRT_EINVAL if nonzero (error)
+ * @brief Check expression result, return AIRY_EINVAL if nonzero (error)
  * @param expr Expression to evaluate (should return 0 on success)
- * @return AGENTRT_EINVAL if expr != 0
+ * @return AIRY_EINVAL if expr != 0
  *
  * @code
  * CUPOLAS_CHECK_RESULT(initialize());
@@ -232,7 +232,7 @@ extern "C" {
 #define CUPOLAS_CHECK_RESULT(expr) \
     do {                           \
         if ((expr) != 0)           \
-            return AGENTRT_EINVAL;             \
+            return AIRY_EINVAL;             \
     } while (0)
 
 /**
@@ -247,14 +247,14 @@ extern "C" {
     } while (0)
 
 /**
- * @brief Check condition is true, return AGENTRT_EINVAL if false
+ * @brief Check condition is true, return AIRY_EINVAL if false
  * @param cond Boolean condition to test
- * @return AGENTRT_EINVAL if condition is false
+ * @return AIRY_EINVAL if condition is false
  */
 #define CUPOLAS_CHECK_TRUE(cond) \
     do {                         \
         if (!(cond))             \
-            return AGENTRT_EINVAL;           \
+            return AIRY_EINVAL;           \
     } while (0)
 
 /**

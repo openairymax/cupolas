@@ -59,11 +59,11 @@ typedef struct mempool_alloc {
     struct mempool_alloc *next;   /**< 链表 */
     void *ptr;                    /**< 分配的内存指针 */
     size_t size;                  /**< 分配大小 */
-    agentrt_mempool_priority_t priority; /**< 分配优先级 */
+    airy_mempool_priority_t priority; /**< 分配优先级 */
 } mempool_alloc_t;
 
 /** 内存池 */
-struct agentrt_mempool {
+struct airy_mempool {
     /* 紧急预留池 */
     void *reserve_base;           /**< 预留内存基址 */
     size_t reserve_size;          /**< 预留大小 */
@@ -98,7 +98,7 @@ struct agentrt_mempool {
  * 平台抽象
  * ================================================================ */
 
-static int mempool_mutex_init(agentrt_mempool_t *pool)
+static int mempool_mutex_init(airy_mempool_t *pool)
 {
 #ifdef __linux__
     return pthread_mutex_init(&pool->lock, NULL);
@@ -111,7 +111,7 @@ static int mempool_mutex_init(agentrt_mempool_t *pool)
 #endif
 }
 
-static void mempool_mutex_lock(agentrt_mempool_t *pool)
+static void mempool_mutex_lock(airy_mempool_t *pool)
 {
 #ifdef __linux__
     pthread_mutex_lock(&pool->lock);
@@ -122,7 +122,7 @@ static void mempool_mutex_lock(agentrt_mempool_t *pool)
 #endif
 }
 
-static void mempool_mutex_unlock(agentrt_mempool_t *pool)
+static void mempool_mutex_unlock(airy_mempool_t *pool)
 {
 #ifdef __linux__
     pthread_mutex_unlock(&pool->lock);
@@ -133,7 +133,7 @@ static void mempool_mutex_unlock(agentrt_mempool_t *pool)
 #endif
 }
 
-static void mempool_mutex_destroy(agentrt_mempool_t *pool)
+static void mempool_mutex_destroy(airy_mempool_t *pool)
 {
 #ifdef __linux__
     pthread_mutex_destroy(&pool->lock);
@@ -151,7 +151,7 @@ static void mempool_mutex_destroy(agentrt_mempool_t *pool)
 /**
  * @brief 计算当前水位线
  */
-static agentrt_mempool_watermark_t mempool_calc_watermark(agentrt_mempool_t *pool)
+static airy_mempool_watermark_t mempool_calc_watermark(airy_mempool_t *pool)
 {
     if (pool->reserve_size == 0) return MEMPOOL_WATERMARK_NORMAL;
 
@@ -166,10 +166,10 @@ static agentrt_mempool_watermark_t mempool_calc_watermark(agentrt_mempool_t *poo
 /**
  * @brief 从预留池分配
  */
-static void *mempool_reserve_alloc(agentrt_mempool_t *pool, size_t size,
-                                    agentrt_mempool_priority_t priority)
+static void *mempool_reserve_alloc(airy_mempool_t *pool, size_t size,
+                                    airy_mempool_priority_t priority)
 {
-    agentrt_mempool_watermark_t wm = mempool_calc_watermark(pool);
+    airy_mempool_watermark_t wm = mempool_calc_watermark(pool);
 
     /* 低优先级在水位线 HIGH 时被拒绝 */
     if (priority <= MEMPOOL_PRIORITY_LOW && wm >= MEMPOOL_WATERMARK_HIGH) {
@@ -217,7 +217,7 @@ static void *mempool_reserve_alloc(agentrt_mempool_t *pool, size_t size,
 /**
  * @brief 从对象池分配
  */
-static void *mempool_block_alloc(agentrt_mempool_t *pool)
+static void *mempool_block_alloc(airy_mempool_t *pool)
 {
     if (!pool->free_list) return NULL;
 
@@ -231,7 +231,7 @@ static void *mempool_block_alloc(agentrt_mempool_t *pool)
 /**
  * @brief 释放对象池块
  */
-static void mempool_block_free(agentrt_mempool_t *pool, void *ptr)
+static void mempool_block_free(airy_mempool_t *pool, void *ptr)
 {
     if (!ptr) return;
 
@@ -246,7 +246,7 @@ static void mempool_block_free(agentrt_mempool_t *pool, void *ptr)
 /**
  * @brief 判断一个指针是否来自对象池
  */
-static bool mempool_is_block_ptr(agentrt_mempool_t *pool, void *ptr)
+static bool mempool_is_block_ptr(airy_mempool_t *pool, void *ptr)
 {
     /* 对象池块在 reserve_base 之前分配，不在预留池范围内 */
     if (!pool->reserve_base) return false;
@@ -261,13 +261,13 @@ static bool mempool_is_block_ptr(agentrt_mempool_t *pool, void *ptr)
 /**
  * @brief 初始化对象池
  */
-static int mempool_init_blocks(agentrt_mempool_t *pool)
+static int mempool_init_blocks(airy_mempool_t *pool)
 {
     size_t total_alloc_size = (sizeof(mempool_block_t) + pool->block_size) *
                                pool->block_count;
 
     char *raw = (char *)calloc(1, total_alloc_size);
-    if (!raw) return AGENTRT_ERR_OUT_OF_MEMORY;
+    if (!raw) return AIRY_ERR_OUT_OF_MEMORY;
 
     pool->free_list = NULL;
     pool->free_blocks = 0;
@@ -288,13 +288,13 @@ static int mempool_init_blocks(agentrt_mempool_t *pool)
  * 公共 API
  * ================================================================ */
 
-agentrt_mempool_t *agentrt_mempool_create(size_t reserve_size,
+airy_mempool_t *airy_mempool_create(size_t reserve_size,
                                            size_t block_size,
                                            size_t block_count)
 {
-    agentrt_mempool_t *pool = (agentrt_mempool_t *)AGENTRT_CALLOC(1, sizeof(*pool));
+    airy_mempool_t *pool = (airy_mempool_t *)AIRY_CALLOC(1, sizeof(*pool));
     if (!pool) {
-        AGENTRT_LOG_ERROR("Mempool: OOM allocating pool struct");
+        AIRY_LOG_ERROR("Mempool: OOM allocating pool struct");
         return NULL;
     }
 
@@ -303,50 +303,50 @@ agentrt_mempool_t *agentrt_mempool_create(size_t reserve_size,
     pool->block_size   = MEMPOOL_ALIGN(block_size > 0 ? block_size : MEMPOOL_DEFAULT_BLOCK_SIZE);
     pool->block_count  = block_count > 0 ? block_count : MEMPOOL_DEFAULT_BLOCK_COUNT;
 
-    AGENTRT_LOG_INFO("Mempool: creating (reserve=%zuMB, block_size=%zu, block_count=%zu)",
+    AIRY_LOG_INFO("Mempool: creating (reserve=%zuMB, block_size=%zu, block_count=%zu)",
                      pool->reserve_size / (1024 * 1024),
                      pool->block_size, pool->block_count);
 
     /* 分配紧急预留池 */
-    pool->reserve_base = AGENTRT_CALLOC(1, pool->reserve_size);
+    pool->reserve_base = AIRY_CALLOC(1, pool->reserve_size);
     if (!pool->reserve_base) {
-        AGENTRT_LOG_ERROR("Mempool: OOM allocating reserve pool (%zuMB)",
+        AIRY_LOG_ERROR("Mempool: OOM allocating reserve pool (%zuMB)",
                           pool->reserve_size / (1024 * 1024));
-        AGENTRT_FREE(pool);
+        AIRY_FREE(pool);
         return NULL;
     }
 
-    AGENTRT_LOG_INFO("Mempool: reserve pool allocated at %p (%zuMB)",
+    AIRY_LOG_INFO("Mempool: reserve pool allocated at %p (%zuMB)",
                      pool->reserve_base, pool->reserve_size / (1024 * 1024));
 
     /* 初始化对象池 */
     if (mempool_init_blocks(pool) != 0) {
-        AGENTRT_LOG_ERROR("Mempool: failed to init object pool blocks");
-        AGENTRT_FREE(pool->reserve_base);
-        AGENTRT_FREE(pool);
+        AIRY_LOG_ERROR("Mempool: failed to init object pool blocks");
+        AIRY_FREE(pool->reserve_base);
+        AIRY_FREE(pool);
         return NULL;
     }
 
-    AGENTRT_LOG_INFO("Mempool: object pool initialized (%zu blocks of %zu bytes)",
+    AIRY_LOG_INFO("Mempool: object pool initialized (%zu blocks of %zu bytes)",
                      pool->block_count, pool->block_size);
 
     /* 初始化互斥锁 */
     if (mempool_mutex_init(pool) != 0) {
-        AGENTRT_LOG_ERROR("Mempool: mutex init failed");
-        AGENTRT_FREE(pool->reserve_base);
-        AGENTRT_FREE(pool);
+        AIRY_LOG_ERROR("Mempool: mutex init failed");
+        AIRY_FREE(pool->reserve_base);
+        AIRY_FREE(pool);
         return NULL;
     }
 
-    AGENTRT_LOG_INFO("Mempool: created successfully");
+    AIRY_LOG_INFO("Mempool: created successfully");
     return pool;
 }
 
-void agentrt_mempool_destroy(agentrt_mempool_t *pool)
+void airy_mempool_destroy(airy_mempool_t *pool)
 {
     if (!pool) return;
 
-    AGENTRT_LOG_INFO("Mempool: destroying (total_allocs=%zu, total_frees=%zu, "
+    AIRY_LOG_INFO("Mempool: destroying (total_allocs=%zu, total_frees=%zu, "
                      "oom_rejections=%zu, emergency_allocs=%zu, "
                      "reserve_used=%zu/%zu, blocks_used=%zu/%zu)",
                      pool->total_allocs, pool->total_frees,
@@ -362,31 +362,31 @@ void agentrt_mempool_destroy(agentrt_mempool_t *pool)
     size_t alloc_records = 0;
     while (alloc) {
         mempool_alloc_t *next = alloc->next;
-        AGENTRT_FREE(alloc);
+        AIRY_FREE(alloc);
         alloc = next;
         alloc_records++;
     }
 
     /* 释放预留池 */
     if (pool->reserve_base) {
-        AGENTRT_FREE(pool->reserve_base);
+        AIRY_FREE(pool->reserve_base);
         pool->reserve_base = NULL;
     }
 
     mempool_mutex_unlock(pool);
     mempool_mutex_destroy(pool);
 
-    AGENTRT_FREE(pool);
+    AIRY_FREE(pool);
 
-    AGENTRT_LOG_INFO("Mempool: destroyed (%zu alloc records freed)", alloc_records);
+    AIRY_LOG_INFO("Mempool: destroyed (%zu alloc records freed)", alloc_records);
 }
 
-void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
+void *airy_mempool_alloc(airy_mempool_t *pool,
                               size_t size,
-                              agentrt_mempool_priority_t priority)
+                              airy_mempool_priority_t priority)
 {
     if (!pool || size == 0) {
-        AGENTRT_LOG_DEBUG("Mempool: alloc called with NULL pool or size=0");
+        AIRY_LOG_DEBUG("Mempool: alloc called with NULL pool or size=0");
         return NULL;
     }
 
@@ -398,14 +398,14 @@ void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
     mempool_mutex_lock(pool);
 
     void *ptr = NULL;
-    agentrt_mempool_watermark_t wm = mempool_calc_watermark(pool);
+    airy_mempool_watermark_t wm = mempool_calc_watermark(pool);
 
     /* 等于 block_size 的分配：优先从对象池获取 */
     if (aligned_size == pool->block_size && pool->free_blocks > 0) {
         ptr = mempool_block_alloc(pool);
         if (ptr) {
             pool->total_allocs++;
-            AGENTRT_LOG_DEBUG("Mempool: alloc from object pool (size=%zu, "
+            AIRY_LOG_DEBUG("Mempool: alloc from object pool (size=%zu, "
                               "priority=%d, free_blocks=%zu)",
                               aligned_size, priority, pool->free_blocks);
             mempool_mutex_unlock(pool);
@@ -419,7 +419,7 @@ void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
         pool->total_allocs++;
 
         /* 记录分配 */
-        mempool_alloc_t *record = (mempool_alloc_t *)AGENTRT_MALLOC(sizeof(*record));
+        mempool_alloc_t *record = (mempool_alloc_t *)AIRY_MALLOC(sizeof(*record));
         if (record) {
             record->ptr = ptr;
             record->size = aligned_size;
@@ -428,19 +428,19 @@ void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
             pool->alloc_list = record;
         }
 
-        AGENTRT_LOG_DEBUG("Mempool: alloc from reserve pool (size=%zu, "
+        AIRY_LOG_DEBUG("Mempool: alloc from reserve pool (size=%zu, "
                           "priority=%d, watermark=%d, reserve_used=%zu/%zu)",
                           aligned_size, priority, wm,
                           pool->reserve_used, pool->reserve_size);
 
         if (priority == MEMPOOL_PRIORITY_CRITICAL) {
-            AGENTRT_LOG_WARN("Mempool: emergency allocation (size=%zu, "
+            AIRY_LOG_WARN("Mempool: emergency allocation (size=%zu, "
                              "watermark=%d, reserve_used=%zu/%zu)",
                              aligned_size, wm,
                              pool->reserve_used, pool->reserve_size);
         }
     } else {
-        AGENTRT_LOG_WARN("Mempool: alloc rejected (size=%zu, priority=%d, "
+        AIRY_LOG_WARN("Mempool: alloc rejected (size=%zu, priority=%d, "
                          "watermark=%d, reserve_used=%zu/%zu, oom_rejections=%zu)",
                          aligned_size, priority, wm,
                          pool->reserve_used, pool->reserve_size,
@@ -451,7 +451,7 @@ void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
     return ptr;
 }
 
-void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr)
+void airy_mempool_free(airy_mempool_t *pool, void *ptr)
 {
     if (!pool || !ptr) return;
 
@@ -461,7 +461,7 @@ void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr)
     if (mempool_is_block_ptr(pool, ptr)) {
         mempool_block_free(pool, ptr);
         pool->total_frees++;
-        AGENTRT_LOG_DEBUG("Mempool: free to object pool (free_blocks=%zu)",
+        AIRY_LOG_DEBUG("Mempool: free to object pool (free_blocks=%zu)",
                           pool->free_blocks);
         mempool_mutex_unlock(pool);
         return;
@@ -482,16 +482,16 @@ void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr)
             if ((*prev)->ptr == ptr) {
                 mempool_alloc_t *to_free = *prev;
                 *prev = to_free->next;
-                AGENTRT_FREE(to_free);
+                AIRY_FREE(to_free);
                 break;
             }
             prev = &(*prev)->next;
         }
 
-        AGENTRT_LOG_DEBUG("Mempool: free from reserve pool (reserve_used=%zu)",
+        AIRY_LOG_DEBUG("Mempool: free from reserve pool (reserve_used=%zu)",
                           pool->reserve_used);
     } else {
-        AGENTRT_LOG_WARN("Mempool: free called with ptr not owned by pool %p", ptr);
+        AIRY_LOG_WARN("Mempool: free called with ptr not owned by pool %p", ptr);
     }
 
     mempool_mutex_unlock(pool);
@@ -501,10 +501,10 @@ void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr)
  * 统计与诊断
  * ================================================================ */
 
-int agentrt_mempool_get_stats(agentrt_mempool_t *pool,
-                               agentrt_mempool_stats_t *stats)
+int airy_mempool_get_stats(airy_mempool_t *pool,
+                               airy_mempool_stats_t *stats)
 {
-    if (!pool || !stats) return AGENTRT_ERR_INVALID_PARAM;
+    if (!pool || !stats) return AIRY_ERR_INVALID_PARAM;
 
     mempool_mutex_lock(pool);
 
@@ -525,17 +525,17 @@ int agentrt_mempool_get_stats(agentrt_mempool_t *pool,
     return 0;
 }
 
-agentrt_mempool_watermark_t agentrt_mempool_get_watermark(agentrt_mempool_t *pool)
+airy_mempool_watermark_t airy_mempool_get_watermark(airy_mempool_t *pool)
 {
     if (!pool) return MEMPOOL_WATERMARK_NORMAL;
 
     mempool_mutex_lock(pool);
-    agentrt_mempool_watermark_t wm = mempool_calc_watermark(pool);
+    airy_mempool_watermark_t wm = mempool_calc_watermark(pool);
     mempool_mutex_unlock(pool);
     return wm;
 }
 
-size_t agentrt_mempool_shrink(agentrt_mempool_t *pool)
+size_t airy_mempool_shrink(airy_mempool_t *pool)
 {
     if (!pool) return 0;
 
@@ -544,7 +544,7 @@ size_t agentrt_mempool_shrink(agentrt_mempool_t *pool)
     return 0;
 }
 
-bool agentrt_mempool_validate(agentrt_mempool_t *pool)
+bool airy_mempool_validate(airy_mempool_t *pool)
 {
     if (!pool) return false;
 

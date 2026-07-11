@@ -18,7 +18,7 @@
 #include "cupolas_network_security.h"
 
 #include "../platform/platform.h"
-#include <platform.h> /* agentrt_process_run_capture (BAN-211/235 安全子进程) */
+#include <platform.h> /* airy_process_run_capture (BAN-211/235 安全子进程) */
 #include "memory_compat.h"
 #include "utils/cupolas_utils.h"
 
@@ -78,12 +78,12 @@ static void cupolas_free_filter_rule(cupolas_net_filter_rule_t *rule)
 {
     if (!rule)
         return;
-    AGENTRT_FREE(rule->rule_id);
-    AGENTRT_FREE(rule->description);
-    AGENTRT_FREE(rule->src_ip_pattern);
-    AGENTRT_FREE(rule->dst_ip_pattern);
-    AGENTRT_FREE(rule->host_pattern);
-    AGENTRT_FREE(rule->url_pattern);
+    AIRY_FREE(rule->rule_id);
+    AIRY_FREE(rule->description);
+    AIRY_FREE(rule->src_ip_pattern);
+    AIRY_FREE(rule->dst_ip_pattern);
+    AIRY_FREE(rule->host_pattern);
+    AIRY_FREE(rule->url_pattern);
     __builtin_memset(rule, 0, sizeof(*rule));
 }
 
@@ -93,10 +93,10 @@ static void cupolas_free_connection_info(cupolas_connection_info_t *info)
         return;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wfree-nonheap-object"
-    AGENTRT_FREE(info->local_ip);
-    AGENTRT_FREE(info->remote_ip);
-    AGENTRT_FREE(info->hostname);
-    AGENTRT_FREE(info->cipher_suite);
+    AIRY_FREE(info->local_ip);
+    AIRY_FREE(info->remote_ip);
+    AIRY_FREE(info->hostname);
+    AIRY_FREE(info->cipher_suite);
 #pragma GCC diagnostic pop
     __builtin_memset(info, 0, sizeof(*info));
 }
@@ -120,7 +120,7 @@ int cupolas_net_security_init(const cupolas_tls_config_t *manager)
 
     g_net_security.ssl_ctx = SSL_CTX_new(TLS_client_method());
     if (!g_net_security.ssl_ctx) {
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     if (manager) {
@@ -175,7 +175,7 @@ void cupolas_net_security_cleanup(void)
 int cupolas_net_security_get_config(cupolas_tls_config_t *manager)
 {
     if (!manager)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     *manager = g_net_security.manager;
     return 0;
 }
@@ -183,7 +183,7 @@ int cupolas_net_security_get_config(cupolas_tls_config_t *manager)
 int cupolas_tls_configure(const cupolas_tls_config_t *manager)
 {
     if (!manager)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     g_net_security.manager = *manager;
 
@@ -237,14 +237,14 @@ int cupolas_tls_verify_cert(const char *cert_path, const char *hostname,
                             cupolas_cert_mode_t *result)
 {
     if (!cert_path || !result)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     *result = CUPOLAS_CERT_NONE;
 
     FILE *f = fopen(cert_path, "r");
     if (!f) {
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     X509 *cert = PEM_read_X509(f, NULL, NULL, NULL);
@@ -252,7 +252,7 @@ int cupolas_tls_verify_cert(const char *cert_path, const char *hostname,
 
     if (!cert) {
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     const ASN1_TIME *not_before = X509_get0_notBefore(cert);
@@ -277,7 +277,7 @@ int cupolas_tls_verify_cert(const char *cert_path, const char *hostname,
     if (hostname) {
         char *hostname_dup = cupolas_strdup(hostname);
         int match = X509_check_host(cert, hostname_dup, strlen(hostname_dup), 0, NULL);
-        AGENTRT_FREE(hostname_dup);
+        AIRY_FREE(hostname_dup);
 
         if (match != 1) {
             *result = CUPOLAS_CERT_REQUIRED;
@@ -294,14 +294,14 @@ int cupolas_tls_verify_cert_chain(const char *cert_chain, size_t chain_len,
                                   cupolas_cert_mode_t *result)
 {
     if (!cert_chain || !result)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     *result = CUPOLAS_CERT_NONE;
 
     BIO *bio = BIO_new_mem_buf(cert_chain, (int)chain_len);
     if (!bio) {
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     X509_STORE *store = X509_STORE_new();
@@ -321,7 +321,7 @@ int cupolas_tls_verify_cert_chain(const char *cert_chain, size_t chain_len,
         sk_X509_free(certs);
         X509_STORE_CTX_free(ctx);
         X509_STORE_free(store);
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     X509_STORE_CTX_init(ctx, store, sk_X509_value(certs, 0), certs);
@@ -356,20 +356,20 @@ int cupolas_tls_verify_cert_chain(const char *cert_chain, size_t chain_len,
 int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_mode_t *result)
 {
     if (!hostname || !result)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     *result = CUPOLAS_CERT_NONE;
 
     struct hostent *host = gethostbyname(hostname);
     if (!host) {
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     struct sockaddr_in addr;
@@ -386,7 +386,7 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
         close(sock);
 #endif
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     SSL *ssl = SSL_new(g_net_security.ssl_ctx);
@@ -397,7 +397,7 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
         close(sock);
 #endif
         *result = CUPOLAS_CERT_REQUIRED;
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     SSL_set_fd(ssl, sock);
@@ -458,7 +458,7 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
 int cupolas_tls_get_cipher_suites(char ***suites, size_t *count)
 {
     if (!suites || !count)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     static const char *default_suites[] = {"TLS_AES_256_GCM_SHA384",
                                            "TLS_CHACHA20_POLY1305_SHA256",
@@ -471,7 +471,7 @@ int cupolas_tls_get_cipher_suites(char ***suites, size_t *count)
     *count = sizeof(default_suites) / sizeof(default_suites[0]);
     SAFE_MALLOC_ARRAY(*suites, *count, sizeof(char *));
     if (!*suites)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < *count; i++) {
         (*suites)[i] = cupolas_strdup(default_suites[i]);
@@ -507,9 +507,9 @@ int cupolas_tls_is_cipher_secure(const char *suite)
 int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
 {
     if (!rule)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     if (g_net_security.filter_rule_count >= cupolas_MAX_FILTER_RULES)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     filter_rule_entry_t *entry = &g_net_security.filter_rules[g_net_security.filter_rule_count];
     __builtin_memset(entry, 0, sizeof(*entry));
@@ -539,7 +539,7 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
 int cupolas_net_remove_rule(const char *rule_id)
 {
     if (!rule_id)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -554,13 +554,13 @@ int cupolas_net_remove_rule(const char *rule_id)
         }
     }
 
-    return AGENTRT_ERR_UNKNOWN;
+    return AIRY_ERR_UNKNOWN;
 }
 
 int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t *rule)
 {
     if (!rule_id || !rule)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -590,13 +590,13 @@ int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t
         }
     }
 
-    return AGENTRT_ERR_UNKNOWN;
+    return AIRY_ERR_UNKNOWN;
 }
 
 int cupolas_net_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule)
 {
     if (!rule_id || !rule)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -606,18 +606,18 @@ int cupolas_net_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule)
         }
     }
 
-    return AGENTRT_ERR_UNKNOWN;
+    return AIRY_ERR_UNKNOWN;
 }
 
 int cupolas_net_list_rules(cupolas_net_filter_rule_t **rules, size_t *count)
 {
     if (!rules || !count)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     *count = g_net_security.filter_rule_count;
     SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
     if (!*rules)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < *count; i++) {
         (*rules)[i] = g_net_security.filter_rules[i].rule;
@@ -753,7 +753,7 @@ int cupolas_net_check_url(const char *url, const char *method)
 int cupolas_http_configure(const cupolas_http_security_config_t *manager)
 {
     if (!manager)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     g_net_security.manager.http.enforce_https = manager->enforce_https;
     g_net_security.manager.http.max_url_length = manager->max_url_length;
     g_net_security.manager.http.max_body_size = manager->max_body_size;
@@ -768,17 +768,17 @@ int cupolas_http_validate_request(const char *method, const char *url, const cha
                                   size_t header_count, size_t body_size)
 {
     if (!method || !url)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     if (g_net_security.manager.http.max_url_length > 0) {
         if (strlen(url) > g_net_security.manager.http.max_url_length) {
-            return AGENTRT_ERR_UNKNOWN;
+            return AIRY_ERR_UNKNOWN;
         }
     }
 
     if (g_net_security.manager.http.max_body_size > 0) {
         if (body_size > g_net_security.manager.http.max_body_size) {
-            return AGENTRT_ERR_UNKNOWN;
+            return AIRY_ERR_UNKNOWN;
         }
     }
 
@@ -791,7 +791,7 @@ int cupolas_http_validate_request(const char *method, const char *url, const cha
             }
         }
         if (!method_allowed)
-            return AGENTRT_ERR_UNKNOWN;
+            return AIRY_ERR_UNKNOWN;
     }
 
     if (g_net_security.manager.http.forbidden_headers && headers) {
@@ -799,7 +799,7 @@ int cupolas_http_validate_request(const char *method, const char *url, const cha
             for (size_t j = 0; j < g_net_security.manager.http.forbidden_count; j++) {
                 if (strncmp(headers[i], g_net_security.manager.http.forbidden_headers[j],
                             strlen(g_net_security.manager.http.forbidden_headers[j])) == 0) {
-                    return AGENTRT_ERR_UNKNOWN;
+                    return AIRY_ERR_UNKNOWN;
                 }
             }
         }
@@ -811,7 +811,7 @@ int cupolas_http_validate_request(const char *method, const char *url, const cha
 int cupolas_http_add_security_headers(const char **headers, size_t header_count, size_t max_headers)
 {
     if (!headers)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     static const char *security_headers[] = {
         "Strict-Transport-Security: max-age=31536000; includeSubDomains",
@@ -822,7 +822,7 @@ int cupolas_http_add_security_headers(const char **headers, size_t header_count,
     size_t total = header_count + num_sec_headers;
 
     if (total > max_headers) {
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     for (size_t i = 0; i < num_sec_headers; i++) {
@@ -852,16 +852,16 @@ int cupolas_http_is_url_safe(const char *url)
 int cupolas_dns_configure(const cupolas_dns_security_config_t *manager)
 {
     if (!manager)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     g_net_security.manager.dns.enable_dnssec = manager->enable_dnssec;
-    AGENTRT_STRNCPY_TERM(g_net_security.manager.dns.upstream_server, manager->upstream_server, sizeof(g_net_security.manager.dns.upstream_server));
+    AIRY_STRNCPY_TERM(g_net_security.manager.dns.upstream_server, manager->upstream_server, sizeof(g_net_security.manager.dns.upstream_server));
     return 0;
 }
 
 int cupolas_dns_resolve(const char *hostname, char *ip_out, size_t ip_len)
 {
     if (!hostname || !ip_out || ip_len == 0)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     g_net_security.stats.dns_queries++;
 
@@ -869,20 +869,20 @@ int cupolas_dns_resolve(const char *hostname, char *ip_out, size_t ip_len)
         for (size_t i = 0; i < g_net_security.manager.dns.blocked_count; i++) {
             if (strstr(hostname, g_net_security.manager.dns.blocked_domains[i]) != NULL) {
                 g_net_security.stats.dns_blocked++;
-                return AGENTRT_ERR_UNKNOWN;
+                return AIRY_ERR_UNKNOWN;
             }
         }
     }
 
     struct hostent *host = gethostbyname(hostname);
     if (!host)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     const char *ip = inet_ntoa(*(struct in_addr *)host->h_addr);
     if (!ip)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
-    AGENTRT_STRNCPY_TERM(ip_out, ip, ip_len);
+    AIRY_STRNCPY_TERM(ip_out, ip, ip_len);
 
     return 0;
 }
@@ -938,7 +938,7 @@ int cupolas_dns_verify_dnssec(const char *domain)
      * domain 已通过上面的白名单校验，仅含 alnum/-/./_ 。 */
     const char *const argv[] = {"dig", "+dnssec", "+short", domain, "DNSKEY", NULL};
     char output[4096];
-    int exit_code = agentrt_process_run_capture("dig", (char *const *)argv, NULL, 5000,
+    int exit_code = airy_process_run_capture("dig", (char *const *)argv, NULL, 5000,
                                                 output, sizeof(output));
     if (exit_code == 0 && (strstr(output, "DNSKEY") || strstr(output, "RRSIG"))) {
         return 1;
@@ -952,12 +952,12 @@ int cupolas_dns_verify_dnssec(const char *domain)
 int cupolas_net_get_connections(cupolas_connection_info_t **connections, size_t *count)
 {
     if (!connections || !count)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     *count = g_net_security.connection_count;
     SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
     if (!*connections)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < *count; i++) {
         (*connections)[i] = g_net_security.connections[i];
@@ -970,7 +970,7 @@ int cupolas_net_close_connection(const char *local_ip, uint16_t local_port, cons
                                  uint16_t remote_port)
 {
     if (!local_ip || !remote_ip)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < g_net_security.connection_count; i++) {
         cupolas_connection_info_t *conn = &g_net_security.connections[i];
@@ -988,13 +988,13 @@ int cupolas_net_close_connection(const char *local_ip, uint16_t local_port, cons
         }
     }
 
-    return AGENTRT_ERR_UNKNOWN;
+    return AIRY_ERR_UNKNOWN;
 }
 
 int cupolas_net_get_stats(cupolas_net_stats_t *stats)
 {
     if (!stats)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     *stats = g_net_security.stats;
     return 0;
 }
@@ -1092,14 +1092,14 @@ const char *cupolas_cert_result_string(cupolas_cert_mode_t result)
 int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *port, char *path)
 {
     if (!url)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     const char *p = url;
 
     const char *colon = strstr(p, "://");
     if (colon && scheme) {
         size_t scheme_len = colon - p;
-        AGENTRT_STRNCPY_TERM(scheme, p, scheme_len);
+        AIRY_STRNCPY_TERM(scheme, p, scheme_len);
         p = colon + 3;
     }
 
@@ -1156,7 +1156,7 @@ int cupolas_net_ip_in_cidr(const char *ip, const char *cidr)
         return 0;
 
     char cidr_copy[64];
-    AGENTRT_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
+    AIRY_STRNCPY_TERM(cidr_copy, cidr, sizeof(cidr_copy));
 
     char *slash = strchr(cidr_copy, '/');
     if (!slash)

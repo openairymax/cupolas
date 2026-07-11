@@ -16,7 +16,7 @@ static void test_overflow_handler_create_destroy(void)
 {
     printf("Test: overflow_handler_create_destroy... ");
 
-    overflow_handler_t *handler = overflow_handler_create(AGENTRT_TMP_DIR "/cupolas_test", 1, 100);
+    overflow_handler_t *handler = overflow_handler_create(AIRY_TMP_DIR "/cupolas_test", 1, 100);
     assert(handler != NULL);
 
     overflow_handler_destroy(handler);
@@ -48,7 +48,7 @@ static void test_overflow_write_and_stats(void)
 {
     printf("Test: overflow_write_and_stats... ");
 
-    overflow_handler_t *handler = overflow_handler_create(AGENTRT_TMP_DIR "/cupolas_test", 10, 0);
+    overflow_handler_t *handler = overflow_handler_create(AIRY_TMP_DIR "/cupolas_test", 10, 0);
     assert(handler != NULL);
 
     audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_PERMISSION, "test_agent", "test_action",
@@ -116,7 +116,7 @@ static void test_queue_ex_create_destroy(void)
 {
     printf("Test: queue_ex_create_destroy... ");
 
-    audit_queue_ex_t *queue = audit_queue_ex_create(100, AGENTRT_TMP_DIR "/cupolas_test", 5);
+    audit_queue_ex_t *queue = audit_queue_ex_create(100, AIRY_TMP_DIR "/cupolas_test", 5);
     assert(queue != NULL);
 
     assert(audit_queue_ex_size(queue) == 0);
@@ -129,7 +129,7 @@ static void test_queue_ex_push_pop(void)
 {
     printf("Test: queue_ex_push_pop... ");
 
-    audit_queue_ex_t *queue = audit_queue_ex_create(10, AGENTRT_TMP_DIR "/cupolas_test", 5);
+    audit_queue_ex_t *queue = audit_queue_ex_create(10, AIRY_TMP_DIR "/cupolas_test", 5);
     assert(queue != NULL);
 
     audit_entry_t *entry =
@@ -171,7 +171,7 @@ static void test_queue_ex_overflow_callback_called(int call_count)
 
     printf("Test: queue_ex_overflow_callback... ");
 
-    audit_queue_ex_t *queue = audit_queue_ex_create(3, AGENTRT_TMP_DIR "/cupolas_test", 5);
+    audit_queue_ex_t *queue = audit_queue_ex_create(3, AIRY_TMP_DIR "/cupolas_test", 5);
     assert(queue != NULL);
 
     callback_invoked = 0;
@@ -202,7 +202,7 @@ static void test_queue_ex_stats(void)
 {
     printf("Test: queue_ex_stats... ");
 
-    audit_queue_ex_t *queue = audit_queue_ex_create(10, AGENTRT_TMP_DIR "/cupolas_test", 5);
+    audit_queue_ex_t *queue = audit_queue_ex_create(10, AIRY_TMP_DIR "/cupolas_test", 5);
     assert(queue != NULL);
 
     uint64_t pushed, popped, spilled, dropped;

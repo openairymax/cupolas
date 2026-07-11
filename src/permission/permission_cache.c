@@ -19,8 +19,6 @@
 
 #include "error_compat.h"
 
-#define CUP_RET_ERR(c) \
-    do { agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentrt_error_str(c)); return (c); } while(0)
 
 #define DEFAULT_BUCKET_COUNT 64
 #define MAX_BUCKET_COUNT 4096
@@ -220,11 +218,11 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
                       const char *resource, const char *context)
 {
     if (!cm)
-        CUP_RET_ERR(AGENTRT_EINVAL);
+        AIRY_RET_ERR(AIRY_EINVAL);
 
     char *key = build_cache_key(agent_id, action, resource, context);
     if (!key)
-        CUP_RET_ERR(AGENTRT_EINVAL);
+        AIRY_RET_ERR(AIRY_EINVAL);
 
     uint32_t hash = hash_string(key);
 
@@ -240,7 +238,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
                 cupolas_atomic_add64(&cm->miss_count, 1);
                 cupolas_mutex_unlock(&cm->lock);
                 cupolas_mem_free(key);
-                CUP_RET_ERR(AGENTRT_EINVAL);
+                AIRY_RET_ERR(AIRY_EINVAL);
             }
         }
 
@@ -255,7 +253,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
     cupolas_atomic_add64(&cm->miss_count, 1);
     cupolas_mutex_unlock(&cm->lock);
     cupolas_mem_free(key);
-    CUP_RET_ERR(AGENTRT_EINVAL);
+    AIRY_RET_ERR(AIRY_EINVAL);
 }
 
 void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *action,

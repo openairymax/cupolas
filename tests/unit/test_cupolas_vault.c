@@ -228,11 +228,11 @@ TEST(test_vault_export_import)
     cupolas_vault_store(g_vault, "export_test", CUPOLAS_VAULT_CRED_PASSWORD, secret,
                         strlen((const char *)secret), NULL);
 
-    int export_result = cupolas_vault_export(g_vault, AGENTRT_TMP_DIR "/cupolas_export.enc",
+    int export_result = cupolas_vault_export(g_vault, AIRY_TMP_DIR "/cupolas_export.enc",
                                              "export_pass", "test_agent");
     if (export_result == 0) {
         printf("Export succeeded");
-        int import_result = cupolas_vault_import(g_vault, AGENTRT_TMP_DIR "/cupolas_export.enc",
+        int import_result = cupolas_vault_import(g_vault, AIRY_TMP_DIR "/cupolas_export.enc",
                                                  "export_pass", "test_agent");
         if (import_result == 0) {
             printf("Import succeeded");

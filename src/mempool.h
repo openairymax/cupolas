@@ -10,11 +10,11 @@
  *   - 分级水位线（正常/警告/紧急）
  *
  * 典型用法：
- *   agentrt_mempool_t *pool = agentrt_mempool_create(32 * 1024 * 1024, 256, 1024);
- *   void *buf = agentrt_mempool_alloc(pool, 512, MEMPOOL_PRIORITY_CRITICAL);
+ *   airy_mempool_t *pool = airy_mempool_create(32 * 1024 * 1024, 256, 1024);
+ *   void *buf = airy_mempool_alloc(pool, 512, MEMPOOL_PRIORITY_CRITICAL);
  *   // ... 使用 buf ...
- *   agentrt_mempool_free(pool, buf);
- *   agentrt_mempool_destroy(pool);
+ *   airy_mempool_free(pool, buf);
+ *   airy_mempool_destroy(pool);
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
@@ -47,7 +47,7 @@ extern "C" {
  * ================================================================ */
 
 /** 内存池句柄（不透明） */
-typedef struct agentrt_mempool agentrt_mempool_t;
+typedef struct airy_mempool airy_mempool_t;
 
 /** 分配优先级 */
 typedef enum {
@@ -55,7 +55,7 @@ typedef enum {
     MEMPOOL_PRIORITY_NORMAL    = 1,  /**< 普通优先级 */
     MEMPOOL_PRIORITY_HIGH      = 2,  /**< 高优先级（关键路径） */
     MEMPOOL_PRIORITY_CRITICAL  = 3,  /**< 紧急优先级（OOM 时仍保证分配） */
-} agentrt_mempool_priority_t;
+} airy_mempool_priority_t;
 
 /** 内存池水位线状态 */
 typedef enum {
@@ -63,7 +63,7 @@ typedef enum {
     MEMPOOL_WATERMARK_WARN     = 1,  /**< 警告：使用率 50-75% */
     MEMPOOL_WATERMARK_HIGH     = 2,  /**< 高：使用率 75-90% */
     MEMPOOL_WATERMARK_CRITICAL = 3,  /**< 紧急：使用率 > 90% */
-} agentrt_mempool_watermark_t;
+} airy_mempool_watermark_t;
 
 /** 内存池统计信息 */
 typedef struct {
@@ -77,8 +77,8 @@ typedef struct {
     size_t total_frees;          /**< 总释放次数 */
     size_t oom_rejections;       /**< OOM 拒绝次数 */
     size_t emergency_allocs;     /**< 紧急分配次数 */
-    agentrt_mempool_watermark_t watermark; /**< 当前水位线 */
-} agentrt_mempool_stats_t;
+    airy_mempool_watermark_t watermark; /**< 当前水位线 */
+} airy_mempool_stats_t;
 
 /* ================================================================
  * 生命周期 API
@@ -92,10 +92,10 @@ typedef struct {
  * @param block_count    对象池块数量，0 使用默认 4096
  * @return 内存池句柄，失败返回 NULL
  *
- * @ownership 返回的句柄由调用者管理，需通过 agentrt_mempool_destroy() 释放
+ * @ownership 返回的句柄由调用者管理，需通过 airy_mempool_destroy() 释放
  * @threadsafe 是
  */
-agentrt_mempool_t *agentrt_mempool_create(size_t reserve_size,
+airy_mempool_t *airy_mempool_create(size_t reserve_size,
                                            size_t block_size,
                                            size_t block_count);
 
@@ -109,7 +109,7 @@ agentrt_mempool_t *agentrt_mempool_create(size_t reserve_size,
  * @ownership pool: TRANSFER
  * @threadsafe 否
  */
-void agentrt_mempool_destroy(agentrt_mempool_t *pool);
+void airy_mempool_destroy(airy_mempool_t *pool);
 
 /* ================================================================
  * 分配/释放 API
@@ -129,12 +129,12 @@ void agentrt_mempool_destroy(agentrt_mempool_t *pool);
  * @param priority 分配优先级
  * @return 内存指针，失败返回 NULL
  *
- * @ownership 返回的内存由调用者管理，需通过 agentrt_mempool_free() 归还
+ * @ownership 返回的内存由调用者管理，需通过 airy_mempool_free() 归还
  * @threadsafe 是
  */
-void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
+void *airy_mempool_alloc(airy_mempool_t *pool,
                               size_t size,
-                              agentrt_mempool_priority_t priority);
+                              airy_mempool_priority_t priority);
 
 /**
  * @brief 释放内存回内存池
@@ -145,7 +145,7 @@ void *agentrt_mempool_alloc(agentrt_mempool_t *pool,
  * @ownership ptr: TRANSFER
  * @threadsafe 是
  */
-void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr);
+void airy_mempool_free(airy_mempool_t *pool, void *ptr);
 
 /* ================================================================
  * 统计与诊断 API
@@ -158,8 +158,8 @@ void agentrt_mempool_free(agentrt_mempool_t *pool, void *ptr);
  * @param stats 输出统计信息
  * @return 0 成功，非0失败
  */
-int agentrt_mempool_get_stats(agentrt_mempool_t *pool,
-                               agentrt_mempool_stats_t *stats);
+int airy_mempool_get_stats(airy_mempool_t *pool,
+                               airy_mempool_stats_t *stats);
 
 /**
  * @brief 获取当前水位线
@@ -167,7 +167,7 @@ int agentrt_mempool_get_stats(agentrt_mempool_t *pool,
  * @param pool 内存池句柄
  * @return 当前水位线状态
  */
-agentrt_mempool_watermark_t agentrt_mempool_get_watermark(agentrt_mempool_t *pool);
+airy_mempool_watermark_t airy_mempool_get_watermark(airy_mempool_t *pool);
 
 /**
  * @brief 收缩内存池：释放空闲对象池块
@@ -175,7 +175,7 @@ agentrt_mempool_watermark_t agentrt_mempool_get_watermark(agentrt_mempool_t *poo
  * @param pool 内存池句柄
  * @return 释放的块数
  */
-size_t agentrt_mempool_shrink(agentrt_mempool_t *pool);
+size_t airy_mempool_shrink(airy_mempool_t *pool);
 
 /**
  * @brief 验证内存池内部一致性
@@ -183,7 +183,7 @@ size_t agentrt_mempool_shrink(agentrt_mempool_t *pool);
  * @param pool 内存池句柄
  * @return true 一致，false 损坏
  */
-bool agentrt_mempool_validate(agentrt_mempool_t *pool);
+bool airy_mempool_validate(airy_mempool_t *pool);
 
 #ifdef __cplusplus
 }

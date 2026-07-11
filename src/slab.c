@@ -70,13 +70,13 @@ typedef struct {
 } slab_cpu_cache_t;
 
 /** Slab 分配器 */
-struct agentrt_slab {
+struct airy_slab {
     size_t obj_size;              /**< 对象大小（对齐后） */
     size_t objs_per_page;         /**< 每页对象数 */
     size_t page_size;             /**< 每页总大小 */
 
-    agentrt_slab_ctor_t ctor;     /**< 构造回调 */
-    agentrt_slab_dtor_t dtor;     /**< 析构回调 */
+    airy_slab_ctor_t ctor;     /**< 构造回调 */
+    airy_slab_dtor_t dtor;     /**< 析构回调 */
     void *ctor_user_data;         /**< 构造/析构回调用户数据 */
 
     /* 全局 partial 链 */
@@ -105,7 +105,7 @@ struct agentrt_slab {
  * 平台抽象
  * ================================================================ */
 
-static int slab_mutex_init(struct agentrt_slab *slab)
+static int slab_mutex_init(struct airy_slab *slab)
 {
 #ifdef __linux__
     return pthread_mutex_init(&slab->lock, NULL);
@@ -118,7 +118,7 @@ static int slab_mutex_init(struct agentrt_slab *slab)
 #endif
 }
 
-static void slab_mutex_lock(struct agentrt_slab *slab)
+static void slab_mutex_lock(struct airy_slab *slab)
 {
 #ifdef __linux__
     pthread_mutex_lock(&slab->lock);
@@ -129,7 +129,7 @@ static void slab_mutex_lock(struct agentrt_slab *slab)
 #endif
 }
 
-static void slab_mutex_unlock(struct agentrt_slab *slab)
+static void slab_mutex_unlock(struct airy_slab *slab)
 {
 #ifdef __linux__
     pthread_mutex_unlock(&slab->lock);
@@ -140,7 +140,7 @@ static void slab_mutex_unlock(struct agentrt_slab *slab)
 #endif
 }
 
-static void slab_mutex_destroy(struct agentrt_slab *slab)
+static void slab_mutex_destroy(struct airy_slab *slab)
 {
 #ifdef __linux__
     pthread_mutex_destroy(&slab->lock);
@@ -169,14 +169,14 @@ static int slab_get_cpu_id(void)
 /**
  * @brief 分配一个新的 slab 页
  */
-static slab_page_t *slab_page_create(agentrt_slab_t *slab)
+static slab_page_t *slab_page_create(airy_slab_t *slab)
 {
     size_t data_size = slab->obj_size * slab->objs_per_page;
     size_t total_size = sizeof(slab_page_t) + data_size;
 
-    slab_page_t *page = (slab_page_t *)AGENTRT_CALLOC(1, total_size);
+    slab_page_t *page = (slab_page_t *)AIRY_CALLOC(1, total_size);
     if (!page) {
-        AGENTRT_LOG_ERROR("Slab: OOM creating page (obj_size=%zu, objs_per_page=%zu, "
+        AIRY_LOG_ERROR("Slab: OOM creating page (obj_size=%zu, objs_per_page=%zu, "
                           "total_size=%zu)",
                           slab->obj_size, slab->objs_per_page, total_size);
         return NULL;
@@ -197,7 +197,7 @@ static slab_page_t *slab_page_create(agentrt_slab_t *slab)
     void **last_ptr = (void **)(obj + (slab->objs_per_page - 1) * slab->obj_size);
     *last_ptr = NULL;
 
-    AGENTRT_LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)",
+    AIRY_LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)",
                       slab->obj_size, slab->objs_per_page, slab->total_pages + 1);
 
     return page;
@@ -208,7 +208,7 @@ static slab_page_t *slab_page_create(agentrt_slab_t *slab)
  */
 static void slab_page_destroy(slab_page_t *page)
 {
-    AGENTRT_FREE(page);
+    AIRY_FREE(page);
 }
 
 /**
@@ -254,7 +254,7 @@ static void slab_page_push(slab_page_t *page, void *obj)
 /**
  * @brief 从全局 partial 链获取一个页（或 steal）
  */
-static slab_page_t *slab_get_partial_page(agentrt_slab_t *slab)
+static slab_page_t *slab_get_partial_page(airy_slab_t *slab)
 {
     slab_mutex_lock(slab);
 
@@ -275,7 +275,7 @@ static slab_page_t *slab_get_partial_page(agentrt_slab_t *slab)
 /**
  * @brief 将页归还到全局 partial 链
  */
-static void slab_return_partial_page(agentrt_slab_t *slab, slab_page_t *page)
+static void slab_return_partial_page(airy_slab_t *slab, slab_page_t *page)
 {
     if (!page) return;
 
@@ -290,20 +290,20 @@ static void slab_return_partial_page(agentrt_slab_t *slab, slab_page_t *page)
  * 公共 API
  * ================================================================ */
 
-agentrt_slab_t *agentrt_slab_create(size_t obj_size,
+airy_slab_t *airy_slab_create(size_t obj_size,
                                      size_t objs_per_slab,
-                                     agentrt_slab_ctor_t ctor,
-                                     agentrt_slab_dtor_t dtor,
+                                     airy_slab_ctor_t ctor,
+                                     airy_slab_dtor_t dtor,
                                      void *user_data)
 {
     if (obj_size == 0) {
-        AGENTRT_LOG_ERROR("Slab: create called with obj_size=0");
+        AIRY_LOG_ERROR("Slab: create called with obj_size=0");
         return NULL;
     }
 
-    agentrt_slab_t *slab = (agentrt_slab_t *)AGENTRT_CALLOC(1, sizeof(*slab));
+    airy_slab_t *slab = (airy_slab_t *)AIRY_CALLOC(1, sizeof(*slab));
     if (!slab) {
-        AGENTRT_LOG_ERROR("Slab: OOM allocating slab struct");
+        AIRY_LOG_ERROR("Slab: OOM allocating slab struct");
         return NULL;
     }
 
@@ -323,12 +323,12 @@ agentrt_slab_t *agentrt_slab_create(size_t obj_size,
     slab->cpu_count = SLAB_MAX_CPUS;
 
     if (slab_mutex_init(slab) != 0) {
-        AGENTRT_LOG_ERROR("Slab: mutex init failed");
-        AGENTRT_FREE(slab);
+        AIRY_LOG_ERROR("Slab: mutex init failed");
+        AIRY_FREE(slab);
         return NULL;
     }
 
-    AGENTRT_LOG_INFO("Slab: created (obj_size=%zu, aligned=%zu, objs_per_page=%zu, "
+    AIRY_LOG_INFO("Slab: created (obj_size=%zu, aligned=%zu, objs_per_page=%zu, "
                      "page_size=%zu, ctor=%s, dtor=%s)",
                      obj_size, slab->obj_size, slab->objs_per_page,
                      slab->page_size,
@@ -337,11 +337,11 @@ agentrt_slab_t *agentrt_slab_create(size_t obj_size,
     return slab;
 }
 
-void agentrt_slab_destroy(agentrt_slab_t *slab)
+void airy_slab_destroy(airy_slab_t *slab)
 {
     if (!slab) return;
 
-    AGENTRT_LOG_INFO("Slab: destroying (total_pages=%zu, total_allocs=%zu, "
+    AIRY_LOG_INFO("Slab: destroying (total_pages=%zu, total_allocs=%zu, "
                      "total_frees=%zu, active=%zu, steals=%zu)",
                      slab->total_pages, slab->total_allocs, slab->total_frees,
                      slab->total_allocs - slab->total_frees, slab->cpu_steals);
@@ -365,12 +365,12 @@ void agentrt_slab_destroy(agentrt_slab_t *slab)
     }
 
     slab_mutex_destroy(slab);
-    AGENTRT_FREE(slab);
+    AIRY_FREE(slab);
 
-    AGENTRT_LOG_INFO("Slab: destroyed (%zu pages freed)", freed_pages);
+    AIRY_LOG_INFO("Slab: destroyed (%zu pages freed)", freed_pages);
 }
 
-void *agentrt_slab_alloc(agentrt_slab_t *slab)
+void *airy_slab_alloc(airy_slab_t *slab)
 {
     if (!slab) return NULL;
 
@@ -386,12 +386,12 @@ void *agentrt_slab_alloc(agentrt_slab_t *slab)
             cache->alloc_count++;
             slab->total_allocs++;
             if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-            AGENTRT_LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)",
+            AIRY_LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)",
                               cpu, slab->total_allocs);
             return obj;
         }
         /* 当前 partial 页已满，归还到全局链 */
-        AGENTRT_LOG_DEBUG("Slab: CPU%d partial page full, returning to global chain", cpu);
+        AIRY_LOG_DEBUG("Slab: CPU%d partial page full, returning to global chain", cpu);
         slab_return_partial_page(slab, cache->partial);
         cache->partial = NULL;
     }
@@ -404,7 +404,7 @@ void *agentrt_slab_alloc(agentrt_slab_t *slab)
             cache->alloc_count++;
             slab->total_allocs++;
             if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-            AGENTRT_LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)",
+            AIRY_LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)",
                               cpu, slab->cpu_steals);
             return obj;
         }
@@ -413,7 +413,7 @@ void *agentrt_slab_alloc(agentrt_slab_t *slab)
     /* 3. 分配新页 */
     slab_page_t *new_page = slab_page_create(slab);
     if (!new_page) {
-        AGENTRT_LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)",
+        AIRY_LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)",
                          slab->total_pages);
         return NULL;
     }
@@ -428,19 +428,19 @@ void *agentrt_slab_alloc(agentrt_slab_t *slab)
         cache->alloc_count++;
         slab->total_allocs++;
         if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-        AGENTRT_LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)",
+        AIRY_LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)",
                           cpu, slab->total_pages);
         return obj;
     }
 
     /* 不应该到达这里 */
-    AGENTRT_LOG_ERROR("Slab: new page created but pop returned NULL");
+    AIRY_LOG_ERROR("Slab: new page created but pop returned NULL");
     slab_page_destroy(new_page);
     slab->total_pages--;
     return NULL;
 }
 
-void agentrt_slab_free(agentrt_slab_t *slab, void *obj)
+void airy_slab_free(airy_slab_t *slab, void *obj)
 {
     if (!slab || !obj) return;
 
@@ -460,7 +460,7 @@ void agentrt_slab_free(agentrt_slab_t *slab, void *obj)
 
         /* 如果页变为全空，归还到全局链 */
         if (cache->partial->state == SLAB_PAGE_EMPTY) {
-            AGENTRT_LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain",
+            AIRY_LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain",
                               cpu);
             slab_return_partial_page(slab, cache->partial);
             cache->partial = NULL;
@@ -490,7 +490,7 @@ void agentrt_slab_free(agentrt_slab_t *slab, void *obj)
     }
 
     /* 无法分配新页，对象丢失（内存泄漏） */
-    AGENTRT_LOG_ERROR("Slab: cannot allocate new page for free, object leaked! "
+    AIRY_LOG_ERROR("Slab: cannot allocate new page for free, object leaked! "
                       "(total_frees=%zu, total_allocs=%zu)",
                       slab->total_frees, slab->total_allocs);
 }
@@ -499,11 +499,11 @@ void agentrt_slab_free(agentrt_slab_t *slab, void *obj)
  * 统计与诊断
  * ================================================================ */
 
-int agentrt_slab_get_stats(agentrt_slab_t *slab, agentrt_slab_stats_t *stats)
+int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats)
 {
-    if (!slab || !stats) return AGENTRT_ERR_INVALID_PARAM;
+    if (!slab || !stats) return AIRY_ERR_INVALID_PARAM;
 
-    AGENTRT_MEMSET(stats, 0, sizeof(*stats));
+    AIRY_MEMSET(stats, 0, sizeof(*stats));
 
     stats->obj_size = slab->obj_size;
     stats->objs_per_slab = slab->objs_per_page;
@@ -530,7 +530,7 @@ int agentrt_slab_get_stats(agentrt_slab_t *slab, agentrt_slab_stats_t *stats)
     return 0;
 }
 
-size_t agentrt_slab_shrink(agentrt_slab_t *slab)
+size_t airy_slab_shrink(airy_slab_t *slab)
 {
     if (!slab) return 0;
 
@@ -556,17 +556,17 @@ size_t agentrt_slab_shrink(agentrt_slab_t *slab)
     slab_mutex_unlock(slab);
 
     if (freed > 0) {
-        AGENTRT_LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)",
+        AIRY_LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)",
                          freed, slab->total_pages);
     } else {
-        AGENTRT_LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)",
+        AIRY_LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)",
                           slab->total_pages);
     }
 
     return freed;
 }
 
-bool agentrt_slab_validate(agentrt_slab_t *slab)
+bool airy_slab_validate(airy_slab_t *slab)
 {
     if (!slab) return false;
 

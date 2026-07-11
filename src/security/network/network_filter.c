@@ -50,20 +50,20 @@ void network_filter_cleanup(void)
 
     for (size_t i = 0; i < g_filter.filter_rule_count; i++) {
         cupolas_net_filter_rule_t *rule = &g_filter.filter_rules[i].rule;
-        AGENTRT_FREE(rule->rule_id);
-        AGENTRT_FREE(rule->description);
-        AGENTRT_FREE(rule->src_ip_pattern);
-        AGENTRT_FREE(rule->dst_ip_pattern);
-        AGENTRT_FREE(rule->host_pattern);
-        AGENTRT_FREE(rule->url_pattern);
+        AIRY_FREE(rule->rule_id);
+        AIRY_FREE(rule->description);
+        AIRY_FREE(rule->src_ip_pattern);
+        AIRY_FREE(rule->dst_ip_pattern);
+        AIRY_FREE(rule->host_pattern);
+        AIRY_FREE(rule->url_pattern);
     }
 
     for (size_t i = 0; i < g_filter.connection_count; i++) {
         cupolas_connection_info_t *conn = &g_filter.connections[i];
-        AGENTRT_FREE(conn->local_ip);
-        AGENTRT_FREE(conn->remote_ip);
-        AGENTRT_FREE(conn->hostname);
-        AGENTRT_FREE(conn->cipher_suite);
+        AIRY_FREE(conn->local_ip);
+        AIRY_FREE(conn->remote_ip);
+        AIRY_FREE(conn->hostname);
+        AIRY_FREE(conn->cipher_suite);
     }
 
     __builtin_memset(&g_filter, 0, sizeof(g_filter));
@@ -134,7 +134,7 @@ static int is_private_ip(const char *ip_addr)
     {
         unsigned int a, b, c, d;
         char ip_copy[64];
-        AGENTRT_STRNCPY_TERM(ip_copy, ip_addr, sizeof(ip_copy));
+        AIRY_STRNCPY_TERM(ip_copy, ip_addr, sizeof(ip_copy));
         ip_copy[sizeof(ip_copy) - 1] = '\0';
         char *saveptr = NULL;
         char *tok_a = strtok_r(ip_copy, ".", &saveptr);
@@ -193,9 +193,9 @@ static int is_private_ip(const char *ip_addr)
 int network_filter_add_rule(const cupolas_net_filter_rule_t *rule)
 {
     if (!rule)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     if (g_filter.filter_rule_count >= MAX_FILTER_RULES)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     filter_rule_entry_t *entry = &g_filter.filter_rules[g_filter.filter_rule_count];
     __builtin_memset(entry, 0, sizeof(*entry));
@@ -225,18 +225,18 @@ int network_filter_add_rule(const cupolas_net_filter_rule_t *rule)
 int network_filter_remove_rule(const char *rule_id)
 {
     if (!rule_id)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < g_filter.filter_rule_count; i++) {
         if (g_filter.filter_rules[i].rule.rule_id &&
             strcmp(g_filter.filter_rules[i].rule.rule_id, rule_id) == 0) {
             cupolas_net_filter_rule_t *rule = &g_filter.filter_rules[i].rule;
-            AGENTRT_FREE(rule->rule_id);
-            AGENTRT_FREE(rule->description);
-            AGENTRT_FREE(rule->src_ip_pattern);
-            AGENTRT_FREE(rule->dst_ip_pattern);
-            AGENTRT_FREE(rule->host_pattern);
-            AGENTRT_FREE(rule->url_pattern);
+            AIRY_FREE(rule->rule_id);
+            AIRY_FREE(rule->description);
+            AIRY_FREE(rule->src_ip_pattern);
+            AIRY_FREE(rule->dst_ip_pattern);
+            AIRY_FREE(rule->host_pattern);
+            AIRY_FREE(rule->url_pattern);
 
             for (size_t j = i; j < g_filter.filter_rule_count - 1; j++) {
                 g_filter.filter_rules[j] = g_filter.filter_rules[j + 1];
@@ -246,24 +246,24 @@ int network_filter_remove_rule(const char *rule_id)
         }
     }
 
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 }
 
 int network_filter_update_rule(const char *rule_id, const cupolas_net_filter_rule_t *rule)
 {
     if (!rule_id || !rule)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < g_filter.filter_rule_count; i++) {
         if (g_filter.filter_rules[i].rule.rule_id &&
             strcmp(g_filter.filter_rules[i].rule.rule_id, rule_id) == 0) {
             cupolas_net_filter_rule_t *old_rule = &g_filter.filter_rules[i].rule;
-            AGENTRT_FREE(old_rule->rule_id);
-            AGENTRT_FREE(old_rule->description);
-            AGENTRT_FREE(old_rule->src_ip_pattern);
-            AGENTRT_FREE(old_rule->dst_ip_pattern);
-            AGENTRT_FREE(old_rule->host_pattern);
-            AGENTRT_FREE(old_rule->url_pattern);
+            AIRY_FREE(old_rule->rule_id);
+            AIRY_FREE(old_rule->description);
+            AIRY_FREE(old_rule->src_ip_pattern);
+            AIRY_FREE(old_rule->dst_ip_pattern);
+            AIRY_FREE(old_rule->host_pattern);
+            AIRY_FREE(old_rule->url_pattern);
 
             old_rule->rule_id = cupolas_strdup(rule->rule_id);
             old_rule->description = cupolas_strdup(rule->description);
@@ -286,13 +286,13 @@ int network_filter_update_rule(const char *rule_id, const cupolas_net_filter_rul
         }
     }
 
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 }
 
 int network_filter_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule)
 {
     if (!rule_id || !rule)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < g_filter.filter_rule_count; i++) {
         if (g_filter.filter_rules[i].rule.rule_id &&
@@ -302,18 +302,18 @@ int network_filter_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule
         }
     }
 
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 }
 
 int network_filter_list_rules(cupolas_net_filter_rule_t **rules, size_t *count)
 {
     if (!rules || !count)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     *count = g_filter.filter_rule_count;
     SAFE_MALLOC_ARRAY(*rules, *count, sizeof(cupolas_net_filter_rule_t));
     if (!*rules)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < *count; i++) {
         (*rules)[i] = g_filter.filter_rules[i].rule;
@@ -405,12 +405,12 @@ int network_filter_check_url(const char *url, const char *method)
 int network_filter_get_connections(cupolas_connection_info_t **connections, size_t *count)
 {
     if (!connections || !count)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     *count = g_filter.connection_count;
     SAFE_MALLOC_ARRAY(*connections, *count, sizeof(cupolas_connection_info_t));
     if (!*connections)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < *count; i++) {
         (*connections)[i] = g_filter.connections[i];
@@ -423,17 +423,17 @@ int network_filter_close_connection(const char *local_ip, uint16_t local_port,
                                     const char *remote_ip, uint16_t remote_port)
 {
     if (!local_ip || !remote_ip)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     for (size_t i = 0; i < g_filter.connection_count; i++) {
         cupolas_connection_info_t *conn = &g_filter.connections[i];
 
         if (conn->local_port == local_port && conn->remote_port == remote_port &&
             strcmp(conn->local_ip, local_ip) == 0 && strcmp(conn->remote_ip, remote_ip) == 0) {
-            AGENTRT_FREE(conn->local_ip);
-            AGENTRT_FREE(conn->remote_ip);
-            AGENTRT_FREE(conn->hostname);
-            AGENTRT_FREE(conn->cipher_suite);
+            AIRY_FREE(conn->local_ip);
+            AIRY_FREE(conn->remote_ip);
+            AIRY_FREE(conn->hostname);
+            AIRY_FREE(conn->cipher_suite);
             __builtin_memset(conn, 0, sizeof(*conn));
 
             for (size_t j = i; j < g_filter.connection_count - 1; j++) {
@@ -445,13 +445,13 @@ int network_filter_close_connection(const char *local_ip, uint16_t local_port,
         }
     }
 
-    return AGENTRT_EINVAL;
+    return AIRY_EINVAL;
 }
 
 int network_filter_get_stats(cupolas_net_stats_t *stats)
 {
     if (!stats)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     *stats = g_filter.stats;
     return 0;
 }

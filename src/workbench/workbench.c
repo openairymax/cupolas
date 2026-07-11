@@ -422,13 +422,13 @@ workbench_state_t workbench_get_state(workbench_t *wb)
 int64_t workbench_get_pid(workbench_t *wb)
 {
     if (!wb)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
 
     cupolas_mutex_lock(&wb->lock);
 
     if (wb->state != WORKBENCH_STATE_RUNNING) {
         cupolas_mutex_unlock(&wb->lock);
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     }
 
     cupolas_pid_t pid = cupolas_process_getpid(wb->process);

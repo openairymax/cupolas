@@ -294,13 +294,13 @@ static int handle_metrics_endpoint(const cupolas_endpoint_request_t *req,
     if (len > 0) {
         resp->status_code = 200;
         resp->content_type = "text/plain; version=0.1.0; charset=utf-8";
-        resp->body = AGENTRT_STRNDUP(buf, len);
+        resp->body = AIRY_STRNDUP(buf, len);
         resp->body_len = len;
     } else {
         const char *no_metrics = "# No metrics available\n";
         resp->status_code = 200;
         resp->content_type = "text/plain; version=0.1.0; charset=utf-8";
-        resp->body = AGENTRT_STRDUP(no_metrics);
+        resp->body = AIRY_STRDUP(no_metrics);
         resp->body_len = strlen(no_metrics);
     }
 
@@ -332,7 +332,7 @@ static int handle_health_endpoint(const cupolas_endpoint_request_t *req,
 
     resp->status_code = all_healthy ? 200 : 503;
     resp->content_type = "application/json";
-    resp->body = AGENTRT_STRNDUP(buf, off);
+    resp->body = AIRY_STRNDUP(buf, off);
     resp->body_len = off;
 
     return 0;
@@ -349,7 +349,7 @@ static int handle_index_endpoint(const cupolas_endpoint_request_t *req __attribu
                        "</ul></body></html>";
     resp->status_code = 200;
     resp->content_type = "text/html";
-    resp->body = AGENTRT_STRDUP(body);
+    resp->body = AIRY_STRDUP(body);
     resp->body_len = strlen(body);
 
     return 0;
@@ -366,7 +366,7 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
     __builtin_memset(mgr, 0, sizeof(cupolas_monitoring_t));
 
     if (manager) {
-        AGENTRT_MEMCPY_SAFE(&mgr->manager, manager, sizeof(monitoring_config_t), sizeof(monitoring_config_t));
+        AIRY_MEMCPY_SAFE(&mgr->manager, manager, sizeof(monitoring_config_t), sizeof(monitoring_config_t));
     } else {
         __builtin_memset(&mgr->manager, 0, sizeof(monitoring_config_t));
         mgr->manager.backend = MONITORING_BACKEND_PROMETHEUS;
@@ -402,7 +402,7 @@ void cupolas_monitoring_destroy(cupolas_monitoring_t *mgr)
 int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
 {
     if (!mgr)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
@@ -510,7 +510,7 @@ monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t *mgr)
 int cupolas_monitoring_report(cupolas_monitoring_t *mgr)
 {
     if (!mgr)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
@@ -533,7 +533,7 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t
 
     size_t copied = 0;
     if (mgr->metrics_buffer_size > 0 && size > mgr->metrics_buffer_size) {
-        AGENTRT_MEMCPY_SAFE(buffer, mgr->metrics_buffer, mgr->metrics_buffer_size, size);
+        AIRY_MEMCPY_SAFE(buffer, mgr->metrics_buffer, mgr->metrics_buffer_size, size);
         copied = mgr->metrics_buffer_size;
     }
 
@@ -613,7 +613,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
             size_t line_len = (size_t)(metric_data - line_start);
             if (line_len > 0 && line_len < 256) {
                 char line[256];
-                AGENTRT_STRNCPY_TERM(line, line_start, sizeof(line));
+                AIRY_STRNCPY_TERM(line, line_start, sizeof(line));
 
                 if (strncmp(line, "# HELP ", 7) == 0 || strncmp(line, "# TYPE ", 7) == 0) {
                     line_start = metric_data + 1;
@@ -630,8 +630,8 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                     if (space_pos) {
                         size_t name_len = (size_t)(space_pos - line);
                         if (name_len < sizeof(metric_name)) {
-                            AGENTRT_STRNCPY_TERM(metric_name, line, sizeof(metric_name));
-                            AGENTRT_STRNCPY_TERM(metric_value, space_pos + 1, sizeof(metric_value));
+                            AIRY_STRNCPY_TERM(metric_name, line, sizeof(metric_name));
+                            AIRY_STRNCPY_TERM(metric_value, space_pos + 1, sizeof(metric_value));
 
                             if (!first_metric) {
                                 written += snprintf(buffer + written, size - written, ",\n");
@@ -686,13 +686,13 @@ int cupolas_monitoring_register_health_check(cupolas_monitoring_t *mgr, const ch
                                              health_check_fn_t callback)
 {
     if (!mgr || !name || !callback)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
     if (mgr->health_check_count >= MAX_HEALTH_CHECKS) {
         cupolas_rwlock_unlock(&mgr->lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     health_check_entry_t *entry = &mgr->health_checks[mgr->health_check_count++];
@@ -748,14 +748,14 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
                                   const char **exclude_patterns)
 {
     if (!mgr)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     cupolas_rwlock_wrlock(&mgr->lock);
 
     mgr->include_count = 0;
     if (include_patterns) {
         for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
-            AGENTRT_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN);
+            AIRY_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN);
             mgr->include_count++;
         }
     }
@@ -763,7 +763,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     mgr->exclude_count = 0;
     if (exclude_patterns) {
         for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
-            AGENTRT_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN);
+            AIRY_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN);
             mgr->exclude_count++;
         }
     }
@@ -874,7 +874,7 @@ int cupolas_monitoring_init_instance(const monitoring_config_t *manager)
     g_monitoring = cupolas_monitoring_create(manager);
     if (!g_monitoring) {
         cupolas_rwlock_unlock(&g_monitoring_lock);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     cupolas_rwlock_unlock(&g_monitoring_lock);
@@ -900,26 +900,26 @@ int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr,
                                            cupolas_endpoint_register_fn_t register_fn)
 {
     if (!mgr || !server_handle || !register_fn)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
-    agentrt_error_t err;
+    airy_err_t err;
 
     err = register_fn(server_handle, "GET", "/metrics", handle_metrics_endpoint, mgr);
-    if (err != AGENTRT_SUCCESS) {
+    if (err != AIRY_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /metrics endpoint");
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     err = register_fn(server_handle, "GET", "/health", handle_health_endpoint, mgr);
-    if (err != AGENTRT_SUCCESS) {
+    if (err != AIRY_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /health endpoint");
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     err = register_fn(server_handle, "GET", "/monitoring", handle_index_endpoint, mgr);
-    if (err != AGENTRT_SUCCESS) {
+    if (err != AIRY_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /monitoring endpoint");
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     CUPOLAS_LOG("monitoring: endpoints registered via callback");

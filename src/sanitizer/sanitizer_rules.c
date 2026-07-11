@@ -116,7 +116,7 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
 
     cupolas_mutex_lock(&rules->lock);
 
-    AGENTRT_STRNCPY_TERM(output, input, output_size);
+    AIRY_STRNCPY_TERM(output, input, output_size);
 
     struct sanitize_rule *rule = rules->head;
     while (rule) {

@@ -53,7 +53,7 @@ int tls_security_init(const cupolas_tls_config_t *config)
 
     g_tls.ssl_ctx = SSL_CTX_new(TLS_client_method());
     if (!g_tls.ssl_ctx) {
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     if (config) {
@@ -91,7 +91,7 @@ void tls_security_cleanup(void)
 int tls_configure(const cupolas_tls_config_t *config)
 {
     if (!config)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     g_tls.config = *config;
 
@@ -152,14 +152,14 @@ int tls_configure(const cupolas_tls_config_t *config)
 int tls_verify_cert(const char *cert_path, const char *hostname, cupolas_cert_result_t *result)
 {
     if (!cert_path || !result)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     *result = CUPOLAS_CERT_OK;
 
     FILE *f = fopen(cert_path, "r");
     if (!f) {
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     X509 *cert = PEM_read_X509(f, NULL, NULL, NULL);
@@ -167,7 +167,7 @@ int tls_verify_cert(const char *cert_path, const char *hostname, cupolas_cert_re
 
     if (!cert) {
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     const ASN1_TIME *not_before = X509_get0_notBefore(cert);
@@ -192,7 +192,7 @@ int tls_verify_cert(const char *cert_path, const char *hostname, cupolas_cert_re
     if (hostname) {
         char *hostname_dup = cupolas_strdup(hostname);
         int match = X509_check_host(cert, hostname_dup, strlen(hostname_dup), 0, NULL);
-        AGENTRT_FREE(hostname_dup);
+        AIRY_FREE(hostname_dup);
 
         if (match != 1) {
             *result = CUPOLAS_CERT_HOST_MISMATCH;
@@ -208,14 +208,14 @@ int tls_verify_cert(const char *cert_path, const char *hostname, cupolas_cert_re
 int tls_verify_cert_chain(const char *cert_chain, size_t chain_len, cupolas_cert_result_t *result)
 {
     if (!cert_chain || !result)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     *result = CUPOLAS_CERT_OK;
 
     BIO *bio = BIO_new_mem_buf(cert_chain, (int)chain_len);
     if (!bio) {
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     X509_STORE *store = X509_STORE_new();
@@ -235,7 +235,7 @@ int tls_verify_cert_chain(const char *cert_chain, size_t chain_len, cupolas_cert
         sk_X509_free(certs);
         X509_STORE_CTX_free(ctx);
         X509_STORE_free(store);
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     X509_STORE_CTX_init(ctx, store, sk_X509_value(certs, 0), certs);
@@ -270,20 +270,20 @@ int tls_verify_cert_chain(const char *cert_chain, size_t chain_len, cupolas_cert
 int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_result_t *result)
 {
     if (!hostname || !result)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     *result = CUPOLAS_CERT_OK;
 
     struct hostent *host = gethostbyname(hostname);
     if (!host) {
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     struct sockaddr_in addr;
@@ -300,7 +300,7 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
         close(sock);
 #endif
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     SSL *ssl = SSL_new(g_tls.ssl_ctx);
@@ -311,7 +311,7 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
         close(sock);
 #endif
         *result = CUPOLAS_CERT_INVALID;
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     }
 
     SSL_set_fd(ssl, sock);
@@ -372,7 +372,7 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
 int tls_get_cipher_suites(char ***suites, size_t *count)
 {
     if (!suites || !count)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     static const char *default_suites[] = {"TLS_AES_256_GCM_SHA384",
                                            "TLS_CHACHA20_POLY1305_SHA256",

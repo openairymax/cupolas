@@ -57,23 +57,23 @@ void dns_security_cleanup(void)
 
     if (g_dns.config.allowed_domains) {
         for (size_t i = 0; i < g_dns.config.domain_count; i++) {
-            AGENTRT_FREE(g_dns.config.allowed_domains[i]);
+            AIRY_FREE(g_dns.config.allowed_domains[i]);
         }
-        AGENTRT_FREE(g_dns.config.allowed_domains);
+        AIRY_FREE(g_dns.config.allowed_domains);
     }
 
     if (g_dns.config.blocked_domains) {
         for (size_t i = 0; i < g_dns.config.blocked_count; i++) {
-            AGENTRT_FREE(g_dns.config.blocked_domains[i]);
+            AIRY_FREE(g_dns.config.blocked_domains[i]);
         }
-        AGENTRT_FREE(g_dns.config.blocked_domains);
+        AIRY_FREE(g_dns.config.blocked_domains);
     }
 
     if (g_dns.config.dns_servers) {
         for (size_t i = 0; i < g_dns.config.dns_server_count; i++) {
-            AGENTRT_FREE(g_dns.config.dns_servers[i]);
+            AIRY_FREE(g_dns.config.dns_servers[i]);
         }
-        AGENTRT_FREE(g_dns.config.dns_servers);
+        AIRY_FREE(g_dns.config.dns_servers);
     }
 
     __builtin_memset(&g_dns, 0, sizeof(g_dns));
@@ -82,7 +82,7 @@ void dns_security_cleanup(void)
 int dns_configure(const cupolas_dns_security_config_t *config)
 {
     if (!config)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
     g_dns.config = *config;
     return 0;
 }
@@ -90,25 +90,25 @@ int dns_configure(const cupolas_dns_security_config_t *config)
 int dns_resolve(const char *hostname, char *ip_out, size_t ip_len)
 {
     if (!hostname || !ip_out || ip_len == 0)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     if (g_dns.config.blocked_domains) {
         for (size_t i = 0; i < g_dns.config.blocked_count; i++) {
             if (strstr(hostname, g_dns.config.blocked_domains[i]) != NULL) {
-                return AGENTRT_EINVAL;
+                return AIRY_EINVAL;
             }
         }
     }
 
     struct hostent *host = gethostbyname(hostname);
     if (!host)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
     const char *ip = inet_ntoa(*(struct in_addr *)host->h_addr);
     if (!ip)
-        return AGENTRT_EINVAL;
+        return AIRY_EINVAL;
 
-    AGENTRT_STRNCPY_TERM(ip_out, ip, ip_len);
+    AIRY_STRNCPY_TERM(ip_out, ip, ip_len);
 
     return 0;
 }

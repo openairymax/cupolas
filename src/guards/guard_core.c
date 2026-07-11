@@ -111,7 +111,7 @@ static int compare_guard_priority(const void *a, const void *b)
 
     // 按优先级降序排列（优先级高的先检测）
     if (guard_a->priority > guard_b->priority)
-        return AGENTRT_ERR_UNKNOWN;
+        return AIRY_ERR_UNKNOWN;
     if (guard_a->priority < guard_b->priority)
         return 1;
     return 0;
@@ -135,30 +135,30 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
     if (!src)
         return NULL;
 
-    guard_context_t *dst = (guard_context_t *)AGENTRT_CALLOC(1, sizeof(guard_context_t));
+    guard_context_t *dst = (guard_context_t *)AIRY_CALLOC(1, sizeof(guard_context_t));
     if (!dst)
         return NULL;
 
     // 复制字符串字段（如果非NULL）
     if (src->operation)
-        dst->operation = AGENTRT_STRDUP(src->operation);
+        dst->operation = AIRY_STRDUP(src->operation);
     if (src->resource)
-        dst->resource = AGENTRT_STRDUP(src->resource);
+        dst->resource = AIRY_STRDUP(src->resource);
     if (src->agent_id)
-        dst->agent_id = AGENTRT_STRDUP(src->agent_id);
+        dst->agent_id = AIRY_STRDUP(src->agent_id);
     if (src->session_id)
-        dst->session_id = AGENTRT_STRDUP(src->session_id);
+        dst->session_id = AIRY_STRDUP(src->session_id);
 
     // 复制输入数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (src->input_data && src->input_size > 0) {
         if (src->input_size > GUARD_MAX_INPUT_SIZE) {
-            agentrt_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+            airy_err_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
                                   "copy_guard_context: input_size %zu exceeds max %zu",
                                   src->input_size, (size_t)GUARD_MAX_INPUT_SIZE);
             free_guard_context(dst);
             return NULL;
         }
-        dst->input_data = AGENTRT_MALLOC(src->input_size);
+        dst->input_data = AIRY_MALLOC(src->input_size);
         if (dst->input_data) {
             __builtin_memcpy(dst->input_data, src->input_data, src->input_size);
             dst->input_size = src->input_size;
@@ -179,17 +179,17 @@ static void free_guard_context(guard_context_t *context)
         return;
 
     if (context->operation)
-        AGENTRT_FREE((void *)context->operation);
+        AIRY_FREE((void *)context->operation);
     if (context->resource)
-        AGENTRT_FREE((void *)context->resource);
+        AIRY_FREE((void *)context->resource);
     if (context->agent_id)
-        AGENTRT_FREE((void *)context->agent_id);
+        AIRY_FREE((void *)context->agent_id);
     if (context->session_id)
-        AGENTRT_FREE((void *)context->session_id);
+        AIRY_FREE((void *)context->session_id);
     if (context->input_data)
-        AGENTRT_FREE(context->input_data);
+        AIRY_FREE(context->input_data);
 
-    AGENTRT_FREE(context);
+    AIRY_FREE(context);
 }
 
 // ============================================================================
@@ -203,7 +203,7 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
 
     // 分配管理器内存
     guard_manager_private_t *manager =
-        (guard_manager_private_t *)AGENTRT_CALLOC(1, sizeof(guard_manager_private_t));
+        (guard_manager_private_t *)AIRY_CALLOC(1, sizeof(guard_manager_private_t));
     if (!manager)
         return NULL;
 
@@ -220,23 +220,23 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
 
     // 分配守卫数组
     manager->guard_capacity = manager->config.max_guards;
-    manager->guards = (guard_t **)AGENTRT_CALLOC(manager->guard_capacity, sizeof(guard_t *));
+    manager->guards = (guard_t **)AIRY_CALLOC(manager->guard_capacity, sizeof(guard_t *));
     if (!manager->guards) {
-        AGENTRT_FREE(manager);
+        AIRY_FREE(manager);
         return NULL;
     }
 
     // 初始化锁和条件变量
     if (cupolas_mutex_init(&manager->lock) != CUPOLAS_OK) {
-        AGENTRT_FREE(manager->guards);
-        AGENTRT_FREE(manager);
+        AIRY_FREE(manager->guards);
+        AIRY_FREE(manager);
         return NULL;
     }
 
     if (cupolas_cond_init(&manager->cond) != CUPOLAS_OK) {
         cupolas_mutex_destroy(&manager->lock);
-        AGENTRT_FREE(manager->guards);
-        AGENTRT_FREE(manager);
+        AIRY_FREE(manager->guards);
+        AIRY_FREE(manager);
         return NULL;
     }
 
@@ -274,8 +274,8 @@ void guard_manager_destroy(guard_manager_t *manager)
     cupolas_cond_destroy(&priv->cond);
 
     // 释放内存
-    AGENTRT_FREE(priv->guards);
-    AGENTRT_FREE(priv);
+    AIRY_FREE(priv->guards);
+    AIRY_FREE(priv);
 }
 
 int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard)
@@ -439,7 +439,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
             priv->stats.timeout_checks++;
             size_t remaining = priv->guard_count - i - 1;
             if (remaining > 0) {
-                AGENTRT_LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
+                AIRY_LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
                            priv->guard_count, (unsigned long long)(elapsed / 1000000ULL));
             }
             break;
@@ -476,15 +476,15 @@ uint64_t guard_manager_check_async(guard_manager_t *manager, const guard_context
     static atomic_uint64_t next_request_id = 1;
     uint64_t request_id = atomic_fetch_add_explicit(&next_request_id, 1, memory_order_relaxed);
 
-    async_request_t *req = (async_request_t *)AGENTRT_CALLOC(1, sizeof(async_request_t));
+    async_request_t *req = (async_request_t *)AIRY_CALLOC(1, sizeof(async_request_t));
     if (!req)
         return 0;
 
     req->request_id = request_id;
     req->manager = priv;
-    req->results = (guard_result_t *)AGENTRT_CALLOC(16, sizeof(guard_result_t));
+    req->results = (guard_result_t *)AIRY_CALLOC(16, sizeof(guard_result_t));
     if (!req->results) {
-        AGENTRT_FREE(req);
+        AIRY_FREE(req);
         return 0;
     }
     req->max_results = 16;
@@ -496,7 +496,7 @@ uint64_t guard_manager_check_async(guard_manager_t *manager, const guard_context
     guard_context_t *ctx_copy = copy_guard_context(context);
     if (ctx_copy) {
         req->context = *ctx_copy;
-        AGENTRT_FREE(ctx_copy);
+        AIRY_FREE(ctx_copy);
     }
 
     cupolas_mutex_lock(&priv->lock);
@@ -548,8 +548,8 @@ static void *guard_async_worker(void *arg)
         }
 
         free_guard_context(&req->context);
-        AGENTRT_FREE(req->results);
-        AGENTRT_FREE(req);
+        AIRY_FREE(req->results);
+        AIRY_FREE(req);
 
         cupolas_mutex_lock(&priv->lock);
     }
@@ -597,14 +597,14 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
         return NULL;
 
     // 分配守卫内存
-    guard_t *guard = (guard_t *)AGENTRT_CALLOC(1, sizeof(guard_t));
+    guard_t *guard = (guard_t *)AIRY_CALLOC(1, sizeof(guard_t));
     if (!guard)
         return NULL;
 
     // 复制名称和描述
-    AGENTRT_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
+    AIRY_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
     if (description) {
-        AGENTRT_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
+        AIRY_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
     }
 
     // 设置基本属性
@@ -613,9 +613,9 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
     guard->priority = GUARD_PRIORITY_NORMAL;
 
     // 复制操作函数表
-    guard->ops = (guard_ops_t *)AGENTRT_MALLOC(sizeof(guard_ops_t));
+    guard->ops = (guard_ops_t *)AIRY_MALLOC(sizeof(guard_ops_t));
     if (!guard->ops) {
-        AGENTRT_FREE(guard);
+        AIRY_FREE(guard);
         return NULL;
     }
     __builtin_memcpy(guard->ops, ops, sizeof(guard_ops_t));
@@ -640,17 +640,17 @@ void guard_destroy(guard_t *guard)
 
     // 清理操作函数表
     if (guard->ops)
-        AGENTRT_FREE(guard->ops);
+        AIRY_FREE(guard->ops);
 
     // 清理私有数据
     if (guard->priv_data)
-        AGENTRT_FREE(guard->priv_data);
+        AIRY_FREE(guard->priv_data);
 
     // 清理配置中的自定义数据
     if (guard->config.custom_config)
-        AGENTRT_FREE(guard->config.custom_config);
+        AIRY_FREE(guard->config.custom_config);
 
-    AGENTRT_FREE(guard);
+    AIRY_FREE(guard);
 }
 
 int guard_init(guard_t *guard, const guard_config_t *config)
@@ -664,12 +664,12 @@ int guard_init(guard_t *guard, const guard_config_t *config)
     // 复制自定义配置数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (config->custom_config && config->custom_config_size > 0) {
         if (config->custom_config_size > GUARD_MAX_CUSTOM_CONFIG_SIZE) {
-            agentrt_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+            airy_err_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
                                   "guard_init: custom_config_size %zu exceeds max %zu",
                                   config->custom_config_size, (size_t)GUARD_MAX_CUSTOM_CONFIG_SIZE);
             return cupolas_ERROR_INVALID_ARG;
         }
-        guard->config.custom_config = AGENTRT_MALLOC(config->custom_config_size);
+        guard->config.custom_config = AIRY_MALLOC(config->custom_config_size);
         if (!guard->config.custom_config)
             return cupolas_ERROR_NO_MEMORY;
         __builtin_memcpy(guard->config.custom_config, config->custom_config, config->custom_config_size);
@@ -679,7 +679,7 @@ int guard_init(guard_t *guard, const guard_config_t *config)
     if (guard->ops->init) {
         int result = guard->ops->init(guard->priv_data, config);
         if (result != CUPOLAS_OK) {
-            AGENTRT_FREE(guard->config.custom_config);
+            AIRY_FREE(guard->config.custom_config);
             guard->config.custom_config = NULL;
             return result;
         }

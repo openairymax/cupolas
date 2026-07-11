@@ -55,10 +55,10 @@ static int str_contains(const char *haystack, const char *needle)
 TEST(protection_chain_xss_sanitization)
 {
     /* Initialize cupolas module */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
-    assert(init_err == AGENTRT_OK);
+    assert(init_err == AIRY_OK);
 
     /* Test XSS payload: <script>alert('xss')</script> */
     {
@@ -197,7 +197,7 @@ TEST(protection_chain_xss_sanitization)
 TEST(purification_pipeline_regex_stage)
 {
     /* Stage 1: Regex-based pattern matching and removal */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -251,7 +251,7 @@ TEST(purification_pipeline_regex_stage)
 TEST(purification_pipeline_type_stage)
 {
     /* Stage 2: Type validation and coercion */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -303,7 +303,7 @@ TEST(purification_pipeline_type_stage)
 TEST(purification_pipeline_length_stage)
 {
     /* Stage 3: Length validation and truncation */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -360,7 +360,7 @@ TEST(purification_pipeline_length_stage)
 TEST(purification_pipeline_encoding_stage)
 {
     /* Stage 4: Encoding validation and normalization */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -415,7 +415,7 @@ TEST(purification_pipeline_encoding_stage)
 TEST(purification_pipeline_combined)
 {
     /* Test the full 4-stage pipeline working together */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -473,7 +473,7 @@ TEST(purification_pipeline_combined)
 TEST(permission_engine_admin_access)
 {
     /* Add admin permission rule and verify admin has access */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -501,7 +501,7 @@ TEST(permission_engine_admin_access)
 TEST(permission_engine_user_denied)
 {
     /* Check that a user without permission is denied */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -529,7 +529,7 @@ TEST(permission_engine_user_denied)
 TEST(permission_engine_guest_isolation)
 {
     /* Check guest role isolation */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -569,7 +569,7 @@ TEST(permission_engine_guest_isolation)
 TEST(permission_engine_undefined_defaults_to_deny)
 {
     /* Check undefined permission defaults to deny */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -595,7 +595,7 @@ TEST(permission_engine_undefined_defaults_to_deny)
 TEST(permission_engine_priority_ordering)
 {
     /* Check priority-based rule ordering */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -629,7 +629,7 @@ TEST(permission_engine_priority_ordering)
 TEST(permission_engine_cache_clear)
 {
     /* Clear permission cache and verify rules still work */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -660,7 +660,7 @@ TEST(permission_engine_cache_clear)
 TEST(permission_engine_wildcards)
 {
     /* Test wildcard matching */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
@@ -690,7 +690,7 @@ TEST(permission_engine_wildcards)
 TEST(permission_engine_context)
 {
     /* Test permission check with context */
-    agentrt_error_t init_err = AGENTRT_OK;
+    airy_err_t init_err = AIRY_OK;
     int            rc       = cupolas_init(NULL, &init_err);
     assert(rc == 0);
 
