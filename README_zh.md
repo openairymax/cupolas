@@ -24,7 +24,7 @@
 3. **输入净化** —— 每个输入在触达执行器前都被清洗以防御 XSS、SQL 注入、命令注入和路径穿越。
 4. **审计追踪** —— 每个安全事件都写入异步、HMAC 签名、轮转的审计日志，用于取证可追溯。
 
-cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于身份与上下文授权、完全可审计、最小权限、动态可扩展的 guard 框架。它构建单一静态库 `agentrt_cupolas`，聚合所有安全子系统，OpenSSL 条件的 iOS 级模块（签名、密钥库、entitlements、运行时保护、网络/TLS 安全）由 `AGENTRT_HAS_OPENSSL` 门控。
+cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于身份与上下文授权、完全可审计、最小权限、动态可扩展的 guard 框架。它构建单一静态库 `airy_cupolas`，聚合所有安全子系统，OpenSSL 条件的 iOS 级模块（签名、密钥库、entitlements、运行时保护、网络/TLS 安全）由 `AIRY_HAS_OPENSSL` 门控。
 
 在 Airymax 0.1.1 发行版中，工作区被拆分为 **38 个仓库**（1 umbrella + 5 management + 29 leaf + 3 top-level）；`cupolas` 是 [agentrt](../) 管理仓聚合的 7 个叶子仓之一，在循环分层架构中位于内核层（`atoms`）与服务/组合层（`gateway`、`daemons`）之间。
 
@@ -38,7 +38,7 @@ cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于
 
 ```
 cupolas/
-├── CMakeLists.txt                        # CMake 构建配置（单一静态库 agentrt_cupolas）
+├── CMakeLists.txt                        # CMake 构建配置（单一静态库 airy_cupolas）
 ├── README.md                             # 英文版
 ├── README_zh.md                          # 本文件（中文）
 ├── LICENSE                               # 双许可证文本（AGPL-3.0 + Apache-2.0）
@@ -117,7 +117,7 @@ cupolas/
 
 ### OpenSSL 条件模块
 
-当定义 `AGENTRT_HAS_OPENSSL` 时，启用以下 iOS 级安全模块：
+当定义 `AIRY_HAS_OPENSSL` 时，启用以下 iOS 级安全模块：
 
 | 模块 | 源文件 | 职责 |
 |------|--------|------|
@@ -146,7 +146,7 @@ cupolas/
 |  |  Guards   |  |CircuitBrkr|  |YAMLParser |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +----------------------------------------------------------------+   |
-|  |        OpenSSL 条件（AGENTRT_HAS_OPENSSL）                      |   |
+|  |        OpenSSL 条件（AIRY_HAS_OPENSSL）                      |   |
 |  | Signature | Vault | Entitlements | RuntimeProt | NetSec | TLS  |   |
 |  +----------------------------------------------------------------+   |
 +-----------------------------------------------------------------------+
@@ -166,13 +166,13 @@ cupolas/
 
 | 依赖 | 是否必需 | 用途 |
 |------|----------|------|
-| **commons** | 是 | 同步原语、错误框架、类型定义（`agentrt_types.h`）、内存管理宏（`AGENTRT_MALLOC`/`FREE`）、security/resource 工具——直接消费基础层 |
+| **commons** | 是 | 同步原语、错误框架、类型定义（`airy_types.h`）、内存管理宏（`AIRY_MALLOC`/`FREE`）、security/resource 工具——直接消费基础层 |
 | **atoms** | 是 | 提供 cupolas 强制执行的 Syscall 接口（沙箱、seccomp、capability、4 级保护环），以及用于审计队列和 workbench IPC 的 CoreKern IPC 原语（`are_ipc.h`） |
-| OpenSSL | 否 | 数字签名、密钥库、entitlements、运行时保护、TLS——由 `AGENTRT_HAS_OPENSSL` 门控 |
+| OpenSSL | 否 | 数字签名、密钥库、entitlements、运行时保护、TLS——由 `AIRY_HAS_OPENSSL` 门控 |
 | libyaml | 否 | 完整 YAML 支持；内置 `yaml_minimal.c` 为回退 |
 | cJSON | 否 | JSON 配置解析 |
 
-> **BAN-12**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AGENTRT_HAS_OPENSSL`、`AGENTRT_HAS_YAML`、`AGENTRT_HAS_CJSON`）。
+> **BAN-12**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AIRY_HAS_OPENSSL`、`AIRY_HAS_YAML`、`AIRY_HAS_CJSON`）。
 
 ## 下游消费者
 
@@ -203,15 +203,15 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 | `BUILD_TESTS` | `ON` | 构建测试套件（单元/集成/压力/fuzz/基准） |
 | `BUILD_WITH_SANITIZERS` | `OFF` | 启用 ASAN / MSAN / TSAN |
 | `BUILD_WITH_LOGGING` | `ON` | 启用详细日志 |
-| `AGENTRT_HAS_OPENSSL` | 自动 | 由伞仓 CMake 自动探测；门控 OpenSSL 条件模块 |
-| `AGENTRT_HAS_YAML` | 自动 | 由伞仓 CMake 自动探测 |
-| `AGENTRT_HAS_CJSON` | 自动 | 由伞仓 CMake 自动探测 |
+| `AIRY_HAS_OPENSSL` | 自动 | 由伞仓 CMake 自动探测；门控 OpenSSL 条件模块 |
+| `AIRY_HAS_YAML` | 自动 | 由伞仓 CMake 自动探测 |
+| `AIRY_HAS_CJSON` | 自动 | 由伞仓 CMake 自动探测 |
 
 **强化构建标志（Linux）：** `-fstack-protector-strong`、`-D_FORTIFY_SOURCE=2`、`-fvisibility=hidden`、`-Wl,-z,relro,-z,now`、`-Wl,-z,noexecstack`。
 
 **构建产物：**
 
-- `agentrt_cupolas` —— 聚合所有安全子系统的静态库
+- `airy_cupolas` —— 聚合所有安全子系统的静态库
 - 公共头文件安装到 `include/agentrt/cupolas`
 
 ## API
