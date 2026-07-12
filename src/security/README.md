@@ -5,7 +5,7 @@
 
 ## 概述
 
-Security 模块是 Cupolas 安全穹顶的核心引擎，提供统一错误处理、数字签名验证、密钥保险库、权利管理、运行时保护和网络安全等纵深防御能力。其中签名、保险库、权利和运行时保护模块需要 OpenSSL 支持（通过 `AGENTRT_HAS_OPENSSL` 条件编译启用）。
+Security 模块是 Cupolas 安全穹顶的核心引擎，提供统一错误处理、数字签名验证、密钥保险库、权利管理、运行时保护和网络安全等纵深防御能力。其中签名、保险库、权利和运行时保护模块需要 OpenSSL 支持（通过 `AIRY_HAS_OPENSSL` 条件编译启用）。
 
 ## 设计目标
 
@@ -242,7 +242,7 @@ printf("Error: %s\n", msg);
 ```
 
 ```c
-#ifdef AGENTRT_HAS_OPENSSL
+#ifdef AIRY_HAS_OPENSSL
 #include "cupolas_vault.h"
 
 cupolas_vault_config_t config = {
@@ -277,10 +277,10 @@ cupolas_vault_cleanup();
 
 | 宏 | 说明 |
 |------|------|
-| `AGENTRT_HAS_OPENSSL` | 启用签名、保险库、权利、运行时保护、TLS 模块 |
-| `AGENTRT_HAS_LIBYAML` | 启用完整 YAML 支持（否则使用内置 `yaml_minimal`） |
+| `AIRY_HAS_OPENSSL` | 启用签名、保险库、权利、运行时保护、TLS 模块 |
+| `AIRY_HAS_LIBYAML` | 启用完整 YAML 支持（否则使用内置 `yaml_minimal`） |
 
-未定义 `AGENTRT_HAS_OPENSSL` 时，相关函数返回 `cupolas_ERR_NOT_SUPPORTED`。
+未定义 `AIRY_HAS_OPENSSL` 时，相关函数返回 `cupolas_ERR_NOT_SUPPORTED`。
 
 ## 依赖关系
 

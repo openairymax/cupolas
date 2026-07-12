@@ -24,7 +24,7 @@
 3. **Input sanitization** — every input is scrubbed for XSS, SQL injection, command injection, and path traversal before it touches an executor.
 4. **Audit tracing** — every security event is written to an asynchronous, HMAC-signed, rotating audit log for forensic traceability.
 
-cupolas follows defense-in-depth and zero-trust principles: default-deny, identity-and-context-based authorization per call, full auditability, least privilege, and a dynamically-extensible guard framework. It builds a single static library `agentrt_cupolas` aggregating all security subsystems, with OpenSSL-conditional iOS-grade modules (signature, vault, entitlements, runtime protection, network/TLS security) gated by `AGENTRT_HAS_OPENSSL`.
+cupolas follows defense-in-depth and zero-trust principles: default-deny, identity-and-context-based authorization per call, full auditability, least privilege, and a dynamically-extensible guard framework. It builds a single static library `airy_cupolas` aggregating all security subsystems, with OpenSSL-conditional iOS-grade modules (signature, vault, entitlements, runtime protection, network/TLS security) gated by `AIRY_HAS_OPENSSL`.
 
 Within the Airymax 0.1.1 release, the workspace is partitioned into **38 repositories** (1 umbrella + 5 management + 29 leaf + 3 top-level); `cupolas` is one of the 7 leaf repositories aggregated by the [agentrt](../) management repo, sitting between the kernel layer (`atoms`) and the service/composition layer (`gateway`, `daemons`) in the cyclic layered architecture.
 
@@ -38,7 +38,7 @@ Unlike Class-A foundational modules (atoms, commons), cupolas is a behavioral mo
 
 ```
 cupolas/
-├── CMakeLists.txt                        # CMake build configuration (single static lib agentrt_cupolas)
+├── CMakeLists.txt                        # CMake build configuration (single static lib airy_cupolas)
 ├── README.md                             # This file (English)
 ├── README_zh.md                          # Chinese version
 ├── LICENSE                               # Dual license texts (AGPL-3.0 + Apache-2.0)
@@ -117,7 +117,7 @@ cupolas/
 
 ### OpenSSL-conditional modules
 
-When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules are enabled:
+When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are enabled:
 
 | Module | Source | Responsibility |
 |--------|--------|----------------|
@@ -146,7 +146,7 @@ When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules 
 |  |  Guards   |  |CircuitBrkr|  |YAMLParser |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +----------------------------------------------------------------+   |
-|  |        OpenSSL-conditional (AGENTRT_HAS_OPENSSL)               |   |
+|  |        OpenSSL-conditional (AIRY_HAS_OPENSSL)               |   |
 |  | Signature | Vault | Entitlements | RuntimeProt | NetSec | TLS  |   |
 |  +----------------------------------------------------------------+   |
 +-----------------------------------------------------------------------+
@@ -166,13 +166,13 @@ When `AGENTRT_HAS_OPENSSL` is defined, the following iOS-grade security modules 
 
 | Dependency | Required | Purpose |
 |------------|----------|---------|
-| **commons** | Yes | Sync primitives, error framework, type definitions (`agentrt_types.h`), memory management macros (`AGENTRT_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
+| **commons** | Yes | Sync primitives, error framework, type definitions (`airy_types.h`), memory management macros (`AIRY_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
 | **atoms** | Yes | Provides the Syscall surface that cupolas enforces (sandbox, seccomp, capability, 4 protection rings), and the CoreKern IPC primitives (`are_ipc.h`) for the audit queue and workbench IPC |
-| OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AGENTRT_HAS_OPENSSL` |
+| OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AIRY_HAS_OPENSSL` |
 | libyaml | No | Full YAML support; built-in `yaml_minimal.c` is the fallback |
 | cJSON | No | JSON config parsing |
 
-> **BAN-12**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AGENTRT_HAS_OPENSSL`, `AGENTRT_HAS_YAML`, `AGENTRT_HAS_CJSON`).
+> **BAN-12**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_YAML`, `AIRY_HAS_CJSON`).
 
 ## Downstream Consumers
 
@@ -203,15 +203,15 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 | `BUILD_TESTS` | `ON` | Build the test suite (unit / integration / stress / fuzz / benchmark) |
 | `BUILD_WITH_SANITIZERS` | `OFF` | Enable ASAN / MSAN / TSAN |
 | `BUILD_WITH_LOGGING` | `ON` | Enable verbose logging |
-| `AGENTRT_HAS_OPENSSL` | auto | Auto-detected by umbrella CMake; gates OpenSSL-conditional modules |
-| `AGENTRT_HAS_YAML` | auto | Auto-detected by umbrella CMake |
-| `AGENTRT_HAS_CJSON` | auto | Auto-detected by umbrella CMake |
+| `AIRY_HAS_OPENSSL` | auto | Auto-detected by umbrella CMake; gates OpenSSL-conditional modules |
+| `AIRY_HAS_YAML` | auto | Auto-detected by umbrella CMake |
+| `AIRY_HAS_CJSON` | auto | Auto-detected by umbrella CMake |
 
 **Hardened build flags (Linux):** `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=2`, `-fvisibility=hidden`, `-Wl,-z,relro,-z,now`, `-Wl,-z,noexecstack`.
 
 **Build artifacts:**
 
-- `agentrt_cupolas` — static library aggregating all security subsystems
+- `airy_cupolas` — static library aggregating all security subsystems
 - Public headers installed under `include/agentrt/cupolas`
 
 ## API

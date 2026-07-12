@@ -50,17 +50,17 @@ utils/
 | `CUPOLAS_FREE(ptr)` | 释放内存并将指针置 NULL |
 | `CUPOLAS_FREE_ARRAY(ptr)` | NULL 检查后释放并置 NULL |
 
-> 底层使用 Commons 的 `AGENTRT_CALLOC`/`AGENTRT_MALLOC`/`AGENTRT_FREE` 宏。
+> 底层使用 Commons 的 `AIRY_CALLOC`/`AIRY_MALLOC`/`AIRY_FREE` 宏。
 
 ### 错误检查宏
 
 | 宏 | 说明 |
 |------|------|
-| `CUPOLAS_CHECK_NULL(ptr)` | NULL 检查，为空则返回 `AGENTRT_EINVAL` |
+| `CUPOLAS_CHECK_NULL(ptr)` | NULL 检查，为空则返回 `AIRY_EINVAL` |
 | `CUPOLAS_CHECK_NULL_RET(ptr, ret)` | NULL 检查，自定义返回值 |
-| `CUPOLAS_CHECK_RESULT(expr)` | 表达式非零则返回 `AGENTRT_EINVAL` |
+| `CUPOLAS_CHECK_RESULT(expr)` | 表达式非零则返回 `AIRY_EINVAL` |
 | `CUPOLAS_CHECK_RESULT_RET(expr, ret)` | 表达式非零则返回自定义值 |
-| `CUPOLAS_CHECK_TRUE(cond)` | 条件为假则返回 `AGENTRT_EINVAL` |
+| `CUPOLAS_CHECK_TRUE(cond)` | 条件为假则返回 `AIRY_EINVAL` |
 | `CUPOLAS_CHECK_TRUE_RET(cond, ret)` | 条件为假则返回自定义值 |
 
 ### 编译器提示
