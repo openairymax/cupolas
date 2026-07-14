@@ -51,7 +51,7 @@ static int g_failed = 0;
  *
  * 设计意图：cupolas_error.h 已 #include "error.h"，cupolas enum 核心数值应与
  * commons 权威宏一致。若数值偏离，则 cupolas 公共 API 返回的错误码会被
- * 调用方误判（如 cupolas_ERR_OUT_OF_MEMORY=-4 必须等于 AIRY_ERR_OUT_OF_MEMORY=-4）。
+ * 调用方误判（如 cupolas_ERR_OUT_OF_MEMORY=-49 必须等于 AIRY_ERR_OUT_OF_MEMORY=-49）。
  *
  * 注意：cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
  * （已知差异，留待 1.0.1+ 统一），本测试不检查此项。
@@ -63,7 +63,7 @@ static void test_cupolas_enum_matches_commons(void)
     if (cupolas_ERR_OK != AIRY_OK)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OK != AIRY_OK");
 
-    /* 通用错误码（-1 到 -14）— cupolas enum 与 commons 宏数值对齐 */
+    /* 通用错误码（-3 到 -50）— cupolas enum 与 commons 宏数值对齐 */
     if ((int)cupolas_ERR_UNKNOWN != (int)AIRY_ERR_UNKNOWN)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_UNKNOWN mismatch");
     if ((int)cupolas_ERR_INVALID_PARAM != (int)AIRY_ERR_INVALID_PARAM)
@@ -273,8 +273,8 @@ static void test_error_segments_disjoint(void)
  * 对核心错误码返回非空字符串，确保 P0.25 错误码统一未破坏现有 API。
  *
  * 注意：cupolas_ERROR_IS_FATAL(e) 定义为 (e) < cupolas_ERR_OUT_OF_MEMORY
- * （即 e < -4），所以 cupolas_ERR_OUT_OF_MEMORY=-4 本身不是 fatal
- * （可恢复 OOM），只有更严重的错误（如 -5 BUFFER_TOO_SMALL）才是 fatal。
+ * （即 e < -49），所以 cupolas_ERR_OUT_OF_MEMORY=-49 本身不是 fatal
+ * （可恢复 OOM），只有更严重的错误（如 -50 OVERFLOW、-99 UNKNOWN）才是 fatal。
  * ============================================================================ */
 
 static void test_cupolas_error_string_api(void)
@@ -308,13 +308,19 @@ static void test_cupolas_error_string_api(void)
         TEST_FAIL("cupolas_error_string_api", "IS_SUCCESS(OK) should be true");
     if (cupolas_ERROR_IS_SUCCESS(cupolas_ERR_OUT_OF_MEMORY))
         TEST_FAIL("cupolas_error_string_api", "IS_SUCCESS(OOM) should be false");
-    /* IS_FATAL(e) = (e) < cupolas_ERR_OUT_OF_MEMORY，即 e < -4
-     * cupolas_ERR_OUT_OF_MEMORY=-4 不是 fatal（可恢复 OOM）
-     * cupolas_ERR_BUFFER_TOO_SMALL=-5 是 fatal（严重错误） */
+    /* IS_FATAL(e) = (e) < cupolas_ERR_OUT_OF_MEMORY，即 e < -49
+     * cupolas_ERR_OUT_OF_MEMORY=-49 不是 fatal（可恢复 OOM）
+     * cupolas_ERR_BUFFER_TOO_SMALL=-41 不是 fatal（可恢复，提供更大缓冲区即可）
+     * cupolas_ERR_OVERFLOW=-50 是 fatal（数据损坏不可恢复）
+     * cupolas_ERR_UNKNOWN=-99 是 fatal（未知错误不可恢复） */
     if (cupolas_ERROR_IS_FATAL(cupolas_ERR_OUT_OF_MEMORY))
         TEST_FAIL("cupolas_error_string_api", "IS_FATAL(OOM) should be false (recoverable)");
-    if (!cupolas_ERROR_IS_FATAL(cupolas_ERR_BUFFER_TOO_SMALL))
-        TEST_FAIL("cupolas_error_string_api", "IS_FATAL(BUFFER_TOO_SMALL) should be true");
+    if (cupolas_ERROR_IS_FATAL(cupolas_ERR_BUFFER_TOO_SMALL))
+        TEST_FAIL("cupolas_error_string_api", "IS_FATAL(BUFFER_TOO_SMALL) should be false (recoverable)");
+    if (!cupolas_ERROR_IS_FATAL(cupolas_ERR_OVERFLOW))
+        TEST_FAIL("cupolas_error_string_api", "IS_FATAL(OVERFLOW) should be true (unrecoverable)");
+    if (!cupolas_ERROR_IS_FATAL(cupolas_ERR_UNKNOWN))
+        TEST_FAIL("cupolas_error_string_api", "IS_FATAL(UNKNOWN) should be true (unrecoverable)");
     if (!cupolas_ERROR_IS_PARAM(cupolas_ERR_INVALID_PARAM))
         TEST_FAIL("cupolas_error_string_api", "IS_PARAM(INVALID_PARAM) should be true");
 
