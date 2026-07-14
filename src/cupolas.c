@@ -73,18 +73,68 @@ static struct {
     cupolas_mutex_t lock;
 } g_cupolas = {0};
 
+/* N3 修复：DCLP 守护 cupolas_init() 并发入口。
+ * 状态机：0 = 未初始化，2 = 初始化中，1 = 就绪。
+ * 使用 cupolas 原子操作（CAS）确保只有一个线程执行初始化，
+ * 其他线程自旋等待状态变为 1。参照 core_init.c 的 DCLP 模式。 */
+static cupolas_atomic32_t g_cupolas_init_state = 0;
+
+/* N3 修复：自旋等待最大重试次数，超过后返回错误避免永久挂起。 */
+#define CUPOLAS_INIT_SPIN_MAX_RETRIES 10000000UL
+
 int cupolas_init(const char *config_path, airy_err_t *error)
 {
-    if (g_cupolas.initialized) {
+    /* N3 修复：DCLP 守护并发入口。
+     * 原实现在锁外检查 g_cupolas.initialized 并 __builtin_memset 整个结构（含 mutex），
+     * 两线程可同时通过检查导致数据竞争。改用原子 CAS 状态机确保单线程初始化。 */
+    if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
         return CUPOLAS_OK;
     }
 
+    /* CAS 0→2：仅一个线程能成功进入初始化路径 */
+    if (!cupolas_atomic_cas32(&g_cupolas_init_state, 0, 2)) {
+        /* CAS 失败：其他线程正在初始化（state==2）或已完成（state==1） */
+        if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
+            return CUPOLAS_OK;
+        }
+        /* state==2：自旋等待初始化完成，让出 CPU 避免空转 */
+        unsigned long spin_count = 0;
+        while (cupolas_atomic_load32(&g_cupolas_init_state) == 2) {
+            cupolas_sleep_us(1);
+            if (++spin_count >= CUPOLAS_INIT_SPIN_MAX_RETRIES) {
+                /* V4.0-S3 修复：超时后不执行 CAS 2→0 重置，仅返回错误。
+                 * V3.0-N2 的 CAS 2→0 重置引入新竞态：超时线程重置 state=0 后，
+                 * 第三线程可 CAS 0→2 进入并行初始化，导致重复初始化。
+                 * 现保持 state=2 不变，阻止新线程进入初始化路径；
+                 * state 最终由初始化线程的完成（store 1）或失败（store 0）决定。 */
+                if (error)
+                    *error = AIRY_ERR_TIMEOUT;
+                CUPOLAS_LOG_ERROR("cupolas_init: init spin-wait timed out after %lu retries",
+                                  spin_count);
+                return cupolas_ERR_STATE_ERROR;
+            }
+        }
+        /* V3.0-N1 修复：自旋退出后必须验证 state == 1。
+         * 若 state == 0，表示初始化线程失败（错误路径中 store 0），
+         * 等待线程不应返回 CUPOLAS_OK，否则调用方将在未初始化的安全穹顶上操作。 */
+        if (cupolas_atomic_load32(&g_cupolas_init_state) != 1) {
+            if (error)
+                *error = AIRY_ERR_SYS_NOT_INIT;
+            CUPOLAS_LOG_ERROR("cupolas_init: initialization failed by other thread (state=0)");
+            return cupolas_ERR_STATE_ERROR;
+        }
+        return CUPOLAS_OK;
+    }
+
+    /* 仅获胜线程执行：此时 state==2，可安全清零 g_cupolas（无其他线程并发访问） */
     __builtin_memset(&g_cupolas, 0, sizeof(g_cupolas));
 
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
             *error = AIRY_ERR_IO;
         CUPOLAS_LOG_ERROR("cupolas_init: mutex init failed");
+        /* N3 修复：重置 init state 允许后续重试 */
+        cupolas_atomic_store32(&g_cupolas_init_state, 0);
         return cupolas_ERR_UNKNOWN;
     }
 
@@ -101,7 +151,11 @@ int cupolas_init(const char *config_path, airy_err_t *error)
                     *error = AIRY_ERR_IO;
                 cupolas_config_destroy(g_cupolas.config_mgr);
                 g_cupolas.config_mgr = NULL;
+                /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
                 cupolas_mutex_unlock(&g_cupolas.lock);
+                cupolas_mutex_destroy(&g_cupolas.lock);
+                /* N3 修复：重置 init state 允许后续重试 */
+                cupolas_atomic_store32(&g_cupolas_init_state, 0);
                 return result;
             }
         }
@@ -116,7 +170,11 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
+        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
         cupolas_mutex_unlock(&g_cupolas.lock);
+        cupolas_mutex_destroy(&g_cupolas.lock);
+        /* N3 修复：重置 init state 允许后续重试 */
+        cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -131,7 +189,11 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
+        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
         cupolas_mutex_unlock(&g_cupolas.lock);
+        cupolas_mutex_destroy(&g_cupolas.lock);
+        /* N3 修复：重置 init state 允许后续重试 */
+        cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc sanitizer failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -152,13 +214,21 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
+        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
         cupolas_mutex_unlock(&g_cupolas.lock);
+        cupolas_mutex_destroy(&g_cupolas.lock);
+        /* N3 修复：重置 init state 允许后续重试 */
+        cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc audit_logger failed");
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     g_cupolas.initialized = 1;
     cupolas_mutex_unlock(&g_cupolas.lock);
+
+    /* N3 修复：发布就绪状态（state 2→1），唤醒自旋等待的线程。
+     * 必须在 unlock 后发布，确保等待线程看到 initialized=1 与 state=1 一致。 */
+    cupolas_atomic_store32(&g_cupolas_init_state, 1);
 
     return CUPOLAS_OK;
 }
@@ -203,6 +273,9 @@ void cupolas_cleanup(void)
     cupolas_mutex_unlock(&g_cupolas.lock);
 
     cupolas_mutex_destroy(&g_cupolas.lock);
+
+    /* N3 修复：重置 init state（1→0），允许后续 cupolas_init() 重新初始化 */
+    cupolas_atomic_store32(&g_cupolas_init_state, 0);
 }
 
 const char *cupolas_version(void)

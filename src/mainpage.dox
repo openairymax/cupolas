@@ -107,10 +107,10 @@
  *     cupolas_config_t config;
  *     cupolas_config_init_defaults(&config);
  *
- *     agentrt_error_t error;
+ *     airy_err_t error;
     if (cupolas_init(&config, &error) != CUPOLAS_OK) {
         fprintf(stderr, "Failed to initialize cupolas: %s\n",
-                agentrt_error_get_message(error));
+                airy_err_str(error));
  *         return 1;
  *     }
  *

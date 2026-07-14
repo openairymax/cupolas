@@ -38,20 +38,28 @@ extern "C" {
  */
 typedef enum {
     cupolas_ERR_OK = 0,
-    cupolas_ERR_UNKNOWN = -1,
-    cupolas_ERR_INVALID_PARAM = -2,
-    cupolas_ERR_NULL_POINTER = -3,
-    cupolas_ERR_OUT_OF_MEMORY = -4,
-    cupolas_ERR_BUFFER_TOO_SMALL = -5,
-    cupolas_ERR_NOT_FOUND = -6,
-    cupolas_ERR_ALREADY_EXISTS = -7,
-    cupolas_ERR_TIMEOUT = -8,
-    cupolas_ERR_NOT_SUPPORTED = -9,
-    cupolas_ERR_PERMISSION_DENIED = -10,
-    cupolas_ERR_IO = -11,
-    cupolas_ERR_STATE_ERROR = -13,
-    cupolas_ERR_OVERFLOW = -14,
-    cupolas_ERR_TRY_AGAIN = -15,
+    /* v4.0-P0-2: 与 v3.0/v4.0 迁移后的 AIRY_ERR_* 扩展码对齐，避免与 airy_types.h
+     * POSIX 码数值碰撞。迁移的 9 个值改为引用 commons 宏（本文件已 include error.h）。
+     * v4.0 追加修复：OUT_OF_MEMORY(-4→-49) 和 OVERFLOW(-14→-50) 原遗留为字面量
+     * 且注释谎称"一致"，实际与 AIRY_EINTR(-4)/AIRY_EFAULT(-14) 碰撞。现已统一引用宏。 */
+    cupolas_ERR_UNKNOWN = AIRY_ERR_UNKNOWN,              /* -99 */
+    cupolas_ERR_INVALID_PARAM = AIRY_ERR_INVALID_PARAM,  /* -40 */
+    cupolas_ERR_NULL_POINTER = -3,                       /* 与 AIRY_ERR_NULL_POINTER 一致 */
+    cupolas_ERR_OUT_OF_MEMORY = AIRY_ERR_OUT_OF_MEMORY,  /* -49（原 -4，迁移避让 AIRY_EINTR） */
+    cupolas_ERR_BUFFER_TOO_SMALL = AIRY_ERR_BUFFER_TOO_SMALL, /* -41 */
+    cupolas_ERR_NOT_FOUND = -6,                          /* 与 AIRY_ERR_NOT_FOUND 一致 */
+    cupolas_ERR_ALREADY_EXISTS = AIRY_ERR_ALREADY_EXISTS, /* -42 */
+    cupolas_ERR_TIMEOUT = -8,                            /* 与 AIRY_ERR_TIMEOUT 一致 */
+    cupolas_ERR_NOT_SUPPORTED = -9,                      /* 与 AIRY_ERR_NOT_SUPPORTED 一致 */
+    cupolas_ERR_PERMISSION_DENIED = AIRY_ERR_PERMISSION_DENIED, /* -43 */
+    cupolas_ERR_IO = AIRY_ERR_IO,                        /* -44 */
+    cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR,      /* -46 */
+    cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,            /* -50（原 -14，迁移避让 AIRY_EFAULT） */
+    cupolas_ERR_TRY_AGAIN = -15,                         /* cupolas 专属 */
+    /* AUTH_FAILED/CERT_INVALID 为 cupolas 安全专属概念，commons 无对应宏。
+     * 注：-16 与 AIRY_EBUSY、-17 与 AIRY_EEXIST 数值碰撞，因 cupolas_error_t
+     * 为独立类型且仅在 cupolas 上下文使用，暂保留；后续 M1 阶段可迁移至
+     * -712~-799 cupolas 专属段消除碰撞。 */
     cupolas_ERR_AUTH_FAILED = -16,
     cupolas_ERR_CERT_INVALID = -17,
     cupolas_ERR_CERT_EXPIRED = -18,
