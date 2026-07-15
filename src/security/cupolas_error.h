@@ -56,15 +56,18 @@ typedef enum {
     cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR,      /* -46 */
     cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,            /* -50（原 -14，迁移避让 AIRY_EFAULT） */
     cupolas_ERR_TRY_AGAIN = -15,                         /* cupolas 专属 */
-    /* AUTH_FAILED/CERT_INVALID 为 cupolas 安全专属概念，commons 无对应宏。
-     * 注：-16 与 AIRY_EBUSY、-17 与 AIRY_EEXIST 数值碰撞，因 cupolas_error_t
-     * 为独立类型且仅在 cupolas 上下文使用，暂保留；后续 M1 阶段可迁移至
-     * -712~-799 cupolas 专属段消除碰撞。 */
-    cupolas_ERR_AUTH_FAILED = -16,
-    cupolas_ERR_CERT_INVALID = -17,
-    cupolas_ERR_CERT_EXPIRED = -18,
-    cupolas_ERR_SIGNATURE_INVALID = -19,
-    cupolas_ERR_TAMPERED = -20
+    /* v5.0 修复：5 个安全专属错误码从 -16~-20 迁移至 -718~-726 cupolas 专属段，
+     * 消除与 airy_types.h POSIX 码的数值碰撞：
+     *   -16（与 AIRY_EBUSY 碰撞）→ -724 AIRY_ERR_CUPOLAS_AUTH_FAILED
+     *   -17（与 AIRY_EEXIST 碰撞）→ -725 AIRY_ERR_CUPOLAS_CERT_INVALID
+     *   -18 → -726 AIRY_ERR_CUPOLAS_CERT_EXPIRED
+     *   -19 → -719 AIRY_ERR_CUPOLAS_SIGNATURE
+     *   -20 → -718 AIRY_ERR_CUPOLAS_TAMPERED */
+    cupolas_ERR_AUTH_FAILED = AIRY_ERR_CUPOLAS_AUTH_FAILED,       /* -724（原 -16，迁移避让 AIRY_EBUSY） */
+    cupolas_ERR_CERT_INVALID = AIRY_ERR_CUPOLAS_CERT_INVALID,     /* -725（原 -17，迁移避让 AIRY_EEXIST） */
+    cupolas_ERR_CERT_EXPIRED = AIRY_ERR_CUPOLAS_CERT_EXPIRED,     /* -726（原 -18） */
+    cupolas_ERR_SIGNATURE_INVALID = AIRY_ERR_CUPOLAS_SIGNATURE,   /* -719（原 -19） */
+    cupolas_ERR_TAMPERED = AIRY_ERR_CUPOLAS_TAMPERED              /* -718（原 -20） */
 } cupolas_error_t;
 
 /* ============================================================================

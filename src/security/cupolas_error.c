@@ -20,26 +20,9 @@
  * Error Code String Mapping Table
  * ============================================================================ */
 
-static const char *g_error_strings[] = {[0 - cupolas_ERR_OK] = "Success",
-                                        [0 - cupolas_ERR_UNKNOWN] = "Unknown error",
-                                        [0 - cupolas_ERR_INVALID_PARAM] = "Invalid parameter",
-                                        [0 - cupolas_ERR_NULL_POINTER] = "Null pointer",
-                                        [0 - cupolas_ERR_OUT_OF_MEMORY] = "Out of memory",
-                                        [0 - cupolas_ERR_BUFFER_TOO_SMALL] = "Buffer too small",
-                                        [0 - cupolas_ERR_NOT_FOUND] = "Not found",
-                                        [0 - cupolas_ERR_ALREADY_EXISTS] = "Already exists",
-                                        [0 - cupolas_ERR_TIMEOUT] = "Timeout",
-                                        [0 - cupolas_ERR_NOT_SUPPORTED] = "Not supported",
-                                        [0 - cupolas_ERR_PERMISSION_DENIED] = "Permission denied",
-                                        [0 - cupolas_ERR_IO] = "I/O error",
-                                        [0 - cupolas_ERR_STATE_ERROR] = "State error",
-                                        [0 - cupolas_ERR_OVERFLOW] = "Overflow",
-                                        [0 - cupolas_ERR_TRY_AGAIN] = "Try again",
-                                        [0 - cupolas_ERR_AUTH_FAILED] = "Authentication failed",
-                                        [0 - cupolas_ERR_CERT_INVALID] = "Certificate invalid",
-                                        [0 - cupolas_ERR_CERT_EXPIRED] = "Certificate expired",
-                                        [0 - cupolas_ERR_SIGNATURE_INVALID] = "Signature invalid",
-                                        [0 - cupolas_ERR_TAMPERED] = "Data tampered"};
+/* v5.0 修复：安全专属错误码迁移至 -718~-726 段后，值域跨度从 0~-99 扩展至
+ * 0~-726，数组索引方式不再可行（会产生 727 元素稀疏数组）。改用 switch
+ * 查找，保持 O(1) 时间复杂度且无内存浪费。 */
 
 /**
  * @brief Convert error code to human-readable string
@@ -48,14 +31,29 @@ static const char *g_error_strings[] = {[0 - cupolas_ERR_OK] = "Success",
  */
 const char *cupolas_error_string(cupolas_error_t error)
 {
-    int index = 0 - error;
-    if (index < 0 || (size_t)index >= sizeof(g_error_strings) / sizeof(g_error_strings[0])) {
-        return "Unknown error";
+    switch (error) {
+    case cupolas_ERR_OK:               return "Success";
+    case cupolas_ERR_UNKNOWN:          return "Unknown error";
+    case cupolas_ERR_INVALID_PARAM:    return "Invalid parameter";
+    case cupolas_ERR_NULL_POINTER:     return "Null pointer";
+    case cupolas_ERR_OUT_OF_MEMORY:    return "Out of memory";
+    case cupolas_ERR_BUFFER_TOO_SMALL: return "Buffer too small";
+    case cupolas_ERR_NOT_FOUND:        return "Not found";
+    case cupolas_ERR_ALREADY_EXISTS:   return "Already exists";
+    case cupolas_ERR_TIMEOUT:          return "Timeout";
+    case cupolas_ERR_NOT_SUPPORTED:    return "Not supported";
+    case cupolas_ERR_PERMISSION_DENIED: return "Permission denied";
+    case cupolas_ERR_IO:               return "I/O error";
+    case cupolas_ERR_STATE_ERROR:      return "State error";
+    case cupolas_ERR_OVERFLOW:         return "Overflow";
+    case cupolas_ERR_TRY_AGAIN:        return "Try again";
+    case cupolas_ERR_AUTH_FAILED:      return "Authentication failed";
+    case cupolas_ERR_CERT_INVALID:     return "Certificate invalid";
+    case cupolas_ERR_CERT_EXPIRED:     return "Certificate expired";
+    case cupolas_ERR_SIGNATURE_INVALID: return "Signature invalid";
+    case cupolas_ERR_TAMPERED:         return "Data tampered";
+    default:                           return "Unknown error";
     }
-    if (g_error_strings[index] == NULL) {
-        return "Unknown error";
-    }
-    return g_error_strings[index];
 }
 
 /* ============================================================================
