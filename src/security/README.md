@@ -68,11 +68,13 @@ security/
 | `cupolas_ERR_IO` | -11 | I/O 错误 |
 | `cupolas_ERR_STATE_ERROR` | -13 | 状态错误 |
 | `cupolas_ERR_OVERFLOW` | -14 | 溢出 |
-| `cupolas_ERR_AUTH_FAILED` | -16 | 认证失败 |
-| `cupolas_ERR_CERT_INVALID` | -17 | 证书无效 |
-| `cupolas_ERR_CERT_EXPIRED` | -18 | 证书过期 |
-| `cupolas_ERR_SIGNATURE_INVALID` | -19 | 签名无效 |
-| `cupolas_ERR_TAMPERED` | -20 | 数据被篡改 |
+| `cupolas_ERR_AUTH_FAILED` | -724 | 认证失败 |
+| `cupolas_ERR_CERT_INVALID` | -725 | 证书无效 |
+| `cupolas_ERR_CERT_EXPIRED` | -726 | 证书过期 |
+| `cupolas_ERR_SIGNATURE_INVALID` | -719 | 签名无效 |
+| `cupolas_ERR_TAMPERED` | -718 | 数据被篡改 |
+
+> 注：安全相关错误码（`-718` ~ `-726`）已从原通用错误码段（`-16` ~ `-20`）迁移至独立的 `-7xx` 安全错误码段，以避免与通用错误码冲突。
 
 **模块特定错误码**：`cupolas_sig_error_t`（签名）、`cupolas_ent_error_t`（权利）、`cupolas_vault_error_t`（保险库）、`cupolas_net_error_t`（网络）、`cupolas_runtime_error_t`（运行时保护）。
 
