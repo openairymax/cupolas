@@ -84,9 +84,10 @@ static cupolas_atomic32_t g_cupolas_init_state = 0;
 
 int cupolas_init(const char *config_path, airy_err_t *error)
 {
-    /* N3 修复：DCLP 守护并发入口。
-     * 原实现在锁外检查 g_cupolas.initialized 并 __builtin_memset 整个结构（含 mutex），
-     * 两线程可同时通过检查导致数据竞争。改用原子 CAS 状态机确保单线程初始化。 */
+    CUPOLAS_LOG_INFO("cupolas_init: initializing security dome (config=%s)",
+                     config_path ? config_path : "default");
+
+    /* N3 修复：DCLP 守护并发入口。 */
     if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
         return CUPOLAS_OK;
     }
@@ -230,6 +231,7 @@ int cupolas_init(const char *config_path, airy_err_t *error)
      * 必须在 unlock 后发布，确保等待线程看到 initialized=1 与 state=1 一致。 */
     cupolas_atomic_store32(&g_cupolas_init_state, 1);
 
+    CUPOLAS_LOG_INFO("cupolas_init: security dome initialized (4 layers: permission+sanitizer+workbench+audit)");
     return CUPOLAS_OK;
 }
 
@@ -239,27 +241,32 @@ void cupolas_cleanup(void)
         return;
     }
 
+    CUPOLAS_LOG_INFO("cupolas_cleanup: shutting down security dome...");
     cupolas_mutex_lock(&g_cupolas.lock);
 
     if (g_cupolas.audit) {
         audit_logger_flush(g_cupolas.audit);
         audit_logger_destroy(g_cupolas.audit);
         g_cupolas.audit = NULL;
+        CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] audit logger destroyed");
     }
 
     if (g_cupolas.wb) {
         workbench_destroy(g_cupolas.wb);
         g_cupolas.wb = NULL;
+        CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] workbench destroyed");
     }
 
     if (g_cupolas.san) {
         sanitizer_destroy(g_cupolas.san);
         g_cupolas.san = NULL;
+        CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] sanitizer destroyed");
     }
 
     if (g_cupolas.perm) {
         permission_engine_destroy(g_cupolas.perm);
         g_cupolas.perm = NULL;
+        CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] permission engine destroyed");
     }
 
     if (g_cupolas.config_mgr) {
@@ -276,6 +283,7 @@ void cupolas_cleanup(void)
 
     /* N3 修复：重置 init state（1→0），允许后续 cupolas_init() 重新初始化 */
     cupolas_atomic_store32(&g_cupolas_init_state, 0);
+    CUPOLAS_LOG_INFO("cupolas_cleanup: security dome shutdown complete");
 }
 
 const char *cupolas_version(void)
