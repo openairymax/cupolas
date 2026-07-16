@@ -120,7 +120,7 @@ const char *monitoring_status_string(monitoring_status_t status)
 
 #if cupolas_PLATFORM_POSIX
 #include <sys/resource.h>
-#include "memory_compat.h"
+#include "airy_memory.h"
 
 static uint64_t get_process_rss_bytes(void)
 {

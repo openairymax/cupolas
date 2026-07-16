@@ -21,7 +21,7 @@
 #include "cupolas_config.h"
 
 #include "cupolas_metrics.h"
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "yaml_minimal.h"

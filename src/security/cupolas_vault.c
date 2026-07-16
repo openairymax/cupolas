@@ -19,8 +19,8 @@
 #include "../platform/platform.h"
 #include "atomic_compat.h"
 #include "cupolas_error.h"
-#include "logging_compat.h"
-#include "memory_compat.h"
+#include "logging.h"
+#include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
@@ -265,7 +265,7 @@ void cupolas_vault_cleanup(void)
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault)
 {
     if (!vault_id || !vault) {
-        AIRY_LOG_ERROR("cupolas_vault_open: NULL parameter - vault_id=%p, vault=%p", (void *)vault_id, (void *)vault);
+        LOG_ERROR("cupolas_vault_open: NULL parameter - vault_id=%p, vault=%p", (void *)vault_id, (void *)vault);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -275,14 +275,14 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
 
     cupolas_vault_t *v = (cupolas_vault_t *)AIRY_CALLOC(1, sizeof(cupolas_vault_t));
     if (!v) {
-        AIRY_LOG_ERROR("cupolas_vault_open: CALLOC vault failed for vault_id=%s", vault_id);
+        LOG_ERROR("cupolas_vault_open: CALLOC vault failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
 
     v->vault_id = AIRY_STRDUP(vault_id);
     if (!v->vault_id) {
         AIRY_FREE(v);
-        AIRY_LOG_ERROR("cupolas_vault_open: STRDUP vault_id failed for vault_id=%s", vault_id);
+        LOG_ERROR("cupolas_vault_open: STRDUP vault_id failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
     v->is_locked = (password == NULL);
@@ -292,7 +292,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     if (!v->entries) {
         AIRY_FREE(v->vault_id);
         AIRY_FREE(v);
-        AIRY_LOG_ERROR("cupolas_vault_open: CALLOC entries failed for vault_id=%s", vault_id);
+        LOG_ERROR("cupolas_vault_open: CALLOC entries failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
     v->entry_count = 0;
@@ -312,7 +312,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
             AIRY_FREE(v->entries);
             AIRY_FREE(v->vault_id);
             AIRY_FREE(v);
-            AIRY_LOG_ERROR("cupolas_vault_open: PBKDF2 key derivation failed for vault_id=%s", vault_id);
+            LOG_ERROR("cupolas_vault_open: PBKDF2 key derivation failed for vault_id=%s", vault_id);
             return AIRY_ERR_UNKNOWN;
         }
 #else
@@ -364,7 +364,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
 int cupolas_vault_lock(cupolas_vault_t *vault)
 {
     if (!vault) {
-        AIRY_LOG_ERROR("cupolas_vault_lock: NULL vault parameter");
+        LOG_ERROR("cupolas_vault_lock: NULL vault parameter");
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -379,7 +379,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
 int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
 {
     if (!vault || !password) {
-        AIRY_LOG_ERROR("cupolas_vault_unlock: NULL parameter - vault=%p, password=%p", (void *)vault, (void *)password);
+        LOG_ERROR("cupolas_vault_unlock: NULL parameter - vault=%p, password=%p", (void *)vault, (void *)password);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -393,12 +393,12 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                           AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);
-        AIRY_LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s", vault->vault_id ? vault->vault_id : "(null)");
+        LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s", vault->vault_id ? vault->vault_id : "(null)");
         return AIRY_ERR_UNKNOWN;
     }
 #else
     cupolas_rwlock_unlock(&vault->lock);
-    AIRY_LOG_ERROR("cupolas_vault_unlock: crypto unavailable for vault_id=%s", vault->vault_id ? vault->vault_id : "(null)");
+    LOG_ERROR("cupolas_vault_unlock: crypto unavailable for vault_id=%s", vault->vault_id ? vault->vault_id : "(null)");
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
@@ -439,7 +439,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
                         const uint8_t *data, size_t data_len, const cupolas_vault_acl_t *acl)
 {
     if (!vault || !cred_id || !data || data_len == 0) {
-        AIRY_LOG_ERROR("cupolas_vault_store: NULL/invalid parameter - vault=%p, cred_id=%p, data=%p, data_len=%zu", (void *)vault, (void *)cred_id, (void *)data, data_len);
+        LOG_ERROR("cupolas_vault_store: NULL/invalid parameter - vault=%p, cred_id=%p, data=%p, data_len=%zu", (void *)vault, (void *)cred_id, (void *)data, data_len);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -482,7 +482,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
 
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1 || RAND_bytes(entry->salt, SALT_SIZE) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_store: RAND_bytes failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_store: RAND_bytes failed for cred_id=%s", cred_id);
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
@@ -494,7 +494,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        AIRY_LOG_ERROR("cupolas_vault_store: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_store: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
@@ -525,7 +525,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_store: AES-GCM encryption failed for cred_id=%s, data_len=%zu", cred_id, data_len);
+        LOG_ERROR("cupolas_vault_store: AES-GCM encryption failed for cred_id=%s, data_len=%zu", cred_id, data_len);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
@@ -541,7 +541,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_store: GCM tag extraction failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_store: GCM tag extraction failed for cred_id=%s", cred_id);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
@@ -629,7 +629,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
                            uint8_t *data_out, size_t *data_len)
 {
     if (!vault || !cred_id || !data_out || !data_len) {
-        AIRY_LOG_ERROR("cupolas_vault_retrieve: NULL parameter - vault=%p, cred_id=%p, data_out=%p, data_len=%p", (void *)vault, (void *)cred_id, (void *)data_out, (void *)data_len);
+        LOG_ERROR("cupolas_vault_retrieve: NULL parameter - vault=%p, cred_id=%p, data_out=%p, data_len=%p", (void *)vault, (void *)cred_id, (void *)data_out, (void *)data_len);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -646,7 +646,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
     }
 
     if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_READ)) {
-        AIRY_LOG_WARN("cupolas_vault_retrieve: access denied for agent_id=%s, cred_id=%s, operation=READ", agent_id ? agent_id : "(null)", cred_id);
+        LOG_WARN("cupolas_vault_retrieve: access denied for agent_id=%s, cred_id=%s, operation=READ", agent_id ? agent_id : "(null)", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -666,25 +666,25 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
 
     int len = 0;
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptInit failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_retrieve: DecryptInit failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptUpdate(ctx, data_out, &len, entry->encrypted_data, entry->encrypted_len) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptUpdate failed for cred_id=%s, encrypted_len=%zu", cred_id, entry->encrypted_len);
+        LOG_ERROR("cupolas_vault_retrieve: DecryptUpdate failed for cred_id=%s, encrypted_len=%zu", cred_id, entry->encrypted_len);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_retrieve: GCM tag set failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_retrieve: GCM tag set failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptFinal_ex(ctx, data_out + len, &len) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_retrieve: credential decryption failed (tampered/corrupted) for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_retrieve: credential decryption failed (tampered/corrupted) for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
@@ -705,7 +705,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
 int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char *agent_id)
 {
     if (!vault || !cred_id) {
-        AIRY_LOG_ERROR("cupolas_vault_delete: NULL parameter - vault=%p, cred_id=%p", (void *)vault, (void *)cred_id);
+        LOG_ERROR("cupolas_vault_delete: NULL parameter - vault=%p, cred_id=%p", (void *)vault, (void *)cred_id);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -755,12 +755,12 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
                          size_t data_len, const char *agent_id)
 {
     if (!vault || !cred_id || !data) {
-        AIRY_LOG_ERROR("cupolas_vault_update: NULL parameter - vault=%p, cred_id=%p, data=%p", (void *)vault, (void *)cred_id, (void *)data);
+        LOG_ERROR("cupolas_vault_update: NULL parameter - vault=%p, cred_id=%p, data=%p", (void *)vault, (void *)cred_id, (void *)data);
         return AIRY_ERR_UNKNOWN;
     }
 
     if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_WRITE)) {
-        AIRY_LOG_WARN("cupolas_vault_update: access denied for agent_id=%s, cred_id=%s, operation=WRITE", agent_id ? agent_id : "(null)", cred_id);
+        LOG_WARN("cupolas_vault_update: access denied for agent_id=%s, cred_id=%s, operation=WRITE", agent_id ? agent_id : "(null)", cred_id);
         return cupolas_ERR_INVALID_PARAM;
     }
 
@@ -778,14 +778,14 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
 
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_update: RAND_bytes failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_update: RAND_bytes failed for cred_id=%s", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        AIRY_LOG_ERROR("cupolas_vault_update: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_update: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -801,7 +801,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_update: AES-GCM encryption failed for cred_id=%s, data_len=%zu", cred_id, data_len);
+        LOG_ERROR("cupolas_vault_update: AES-GCM encryption failed for cred_id=%s, data_len=%zu", cred_id, data_len);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
@@ -810,7 +810,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        AIRY_LOG_ERROR("cupolas_vault_update: GCM tag extraction failed for cred_id=%s", cred_id);
+        LOG_ERROR("cupolas_vault_update: GCM tag extraction failed for cred_id=%s", cred_id);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
@@ -839,7 +839,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
                                 cupolas_vault_operation_t operation)
 {
     if (!vault || !cred_id || !agent_id) {
-        AIRY_LOG_ERROR("cupolas_vault_check_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
+        LOG_ERROR("cupolas_vault_check_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
         return false;
     }
 
@@ -860,7 +860,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
         cupolas_vault_acl_entry_t *acl = &entry->acl.entries[i];
         if (strcmp(acl->agent_id, agent_id) == 0) {
             if (acl->expires_at > 0 && (uint64_t)time(NULL) > acl->expires_at) {
-                AIRY_LOG_WARN("cupolas_vault_check_access: expired credential detected for agent_id=%s, cred_id=%s, expires_at=%llu", agent_id, cred_id, (unsigned long long)acl->expires_at);
+                LOG_WARN("cupolas_vault_check_access: expired credential detected for agent_id=%s, cred_id=%s, expires_at=%llu", agent_id, cred_id, (unsigned long long)acl->expires_at);
                 cupolas_rwlock_unlock(&vault->lock);
                 return false;
             }
@@ -873,7 +873,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
     }
 
     cupolas_rwlock_unlock(&vault->lock);
-    AIRY_LOG_WARN("cupolas_vault_check_access: access denied for agent_id=%s, cred_id=%s, operation=%d", agent_id, cred_id, (int)operation);
+    LOG_WARN("cupolas_vault_check_access: access denied for agent_id=%s, cred_id=%s, operation=%d", agent_id, cred_id, (int)operation);
     return false;
 }
 
@@ -881,7 +881,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
                                uint32_t operations, uint64_t expires_at)
 {
     if (!vault || !cred_id || !agent_id) {
-        AIRY_LOG_ERROR("cupolas_vault_grant_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
+        LOG_ERROR("cupolas_vault_grant_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -925,7 +925,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
 int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id)
 {
     if (!vault || !cred_id || !agent_id) {
-        AIRY_LOG_ERROR("cupolas_vault_revoke_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
+        LOG_ERROR("cupolas_vault_revoke_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p", (void *)vault, (void *)cred_id, (void *)agent_id);
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -1390,7 +1390,7 @@ int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const 
     fclose(f);
 
     if (vault->config.enable_audit) {
-        AIRY_LOG_INFO("[VAULT] Export completed: %zu credentials to %s", vault->entry_count,
+        LOG_INFO("[VAULT] Export completed: %zu credentials to %s", vault->entry_count,
                          export_path);
     }
 
@@ -1716,7 +1716,7 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
     fclose(f);
 
     if (vault->config.enable_audit) {
-        AIRY_LOG_INFO("[VAULT] Import completed: %zu credentials from %s", imported, import_path);
+        LOG_INFO("[VAULT] Import completed: %zu credentials from %s", imported, import_path);
     }
 
     return (int)imported;

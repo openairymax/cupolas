@@ -175,7 +175,7 @@ int my_function(my_config_t *config) {
 |------|------|
 | `platform.h` | 平台抽象层（互斥锁定义） |
 | `error.h`（Commons） | 统一错误码定义 |
-| `memory_compat.h`（Commons） | 内存管理宏 |
+| `airy_memory.h`（Commons） | 内存管理宏 |
 | `<string.h>` | 字符串操作 |
 | `<stdlib.h>` | 标准库 |
 | `<stdint.h>` | 固定宽度整数类型 |

@@ -53,7 +53,7 @@
 #include <string.h>
 
 #include "../../../commons/utils/error/include/error.h"
-#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/memory/include/airy_memory.h"
 
 #ifdef __cplusplus
 extern "C" {

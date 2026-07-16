@@ -7,7 +7,7 @@
 
 #include "network_filter.h"
 
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>

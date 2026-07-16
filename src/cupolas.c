@@ -23,7 +23,7 @@
 #include "sanitizer/sanitizer.h"
 #include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "workbench/workbench.h"
 
 #include <stdio.h>

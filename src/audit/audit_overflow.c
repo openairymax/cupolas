@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "error_compat.h"
+#include "error.h"
 
 
 #define DEFAULT_OVERFLOW_DIR AIRY_LOG_DIR "/cupolas"

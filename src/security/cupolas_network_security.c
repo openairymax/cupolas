@@ -19,7 +19,7 @@
 
 #include "../platform/platform.h"
 #include <platform.h> /* airy_process_run_capture (BAN-211/235 安全子进程) */
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>

@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <strings.h>
 
-#include "logging_compat.h"
+#include "logging.h"
 
 size_t cupolas_strlcpy(char *dst, const char *src, size_t size)
 {
@@ -125,6 +125,6 @@ void cupolas_log_message(const char *level, const char *format, ...)
 
     va_list args;
     va_start(args, format);
-    airy_log_write_va(log_level, __FILE__, __LINE__, prefixed_fmt, args);
+    log_write_va(log_level, __FILE__, __LINE__, prefixed_fmt, args);
     va_end(args);
 }
