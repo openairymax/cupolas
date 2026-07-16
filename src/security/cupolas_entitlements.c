@@ -17,7 +17,7 @@
 #include "../platform/platform.h"
 #include "atomic_compat.h"
 #include "cupolas_error.h"
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>

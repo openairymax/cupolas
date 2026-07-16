@@ -8,9 +8,9 @@
 #include "guard_core.h"
 
 #include "../platform/platform.h"
-#include "logging_compat.h"
+#include "logging.h"
 #include "atomic_compat.h"
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
@@ -439,7 +439,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
             priv->stats.timeout_checks++;
             size_t remaining = priv->guard_count - i - 1;
             if (remaining > 0) {
-                AIRY_LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
+                LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
                            priv->guard_count, (unsigned long long)(elapsed / 1000000ULL));
             }
             break;

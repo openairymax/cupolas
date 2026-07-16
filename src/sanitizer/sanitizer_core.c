@@ -16,11 +16,11 @@
 #include "sanitizer_cache.h"
 #include "sanitizer_rules.h"
 #include "utils/cupolas_utils.h"
-#include "memory_compat.h"
+#include "airy_memory.h"
 
 /* Ensure logging macros are available */
-#ifndef AIRY_LOG_ERROR
-#include "../../../commons/utils/logging/include/logging_compat.h"
+#ifndef LOG_ERROR
+#include "logging.h"
 #endif
 
 #include <ctype.h>
@@ -344,7 +344,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
                                      size_t output_size, const sanitize_context_t *ctx)
 {
     if (!sanitizer || !input || !output || output_size == 0) {
-        AIRY_LOG_ERROR("sanitizer_sanitize: NULL/invalid parameter - sanitizer=%p, input=%p, output=%p, output_size=%zu", (void *)sanitizer, (void *)input, (void *)output, output_size);
+        LOG_ERROR("sanitizer_sanitize: NULL/invalid parameter - sanitizer=%p, input=%p, output=%p, output_size=%zu", (void *)sanitizer, (void *)input, (void *)output, output_size);
         return SANITIZE_ERROR;
     }
 
@@ -356,7 +356,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
 
     size_t input_len = strlen(input);
     if (ctx->max_length > 0 && input_len > ctx->max_length) {
-        AIRY_LOG_WARN("sanitizer_sanitize: input truncated/rejected - input_len=%zu, max_length=%zu", input_len, ctx->max_length);
+        LOG_WARN("sanitizer_sanitize: input truncated/rejected - input_len=%zu, max_length=%zu", input_len, ctx->max_length);
         cupolas_atomic_add64(&sanitizer->total_rejected, 1);
         return SANITIZE_REJECTED;
     }
@@ -379,14 +379,14 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
     }
 
     if (cupolas_sanitizer_contains_dangerous_chars(input, ctx)) {
-        AIRY_LOG_WARN("sanitizer_sanitize: malicious input detected - input_len=%zu, level=%d", input_len, (int)ctx->level);
+        LOG_WARN("sanitizer_sanitize: malicious input detected - input_len=%zu, level=%d", input_len, (int)ctx->level);
         if (ctx->level == SANITIZE_LEVEL_STRICT) {
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_REJECTED;
         }
 
         if (cupolas_sanitizer_apply_escape_rules(input, output, output_size, ctx) != cupolas_OK) {
-            AIRY_LOG_ERROR("sanitizer_sanitize: escape rules failed for input_len=%zu, output_size=%zu", input_len, output_size);
+            LOG_ERROR("sanitizer_sanitize: escape rules failed for input_len=%zu, output_size=%zu", input_len, output_size);
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_ERROR;
         }
@@ -412,7 +412,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
 bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize_context_t *ctx)
 {
     if (!sanitizer || !input) {
-        AIRY_LOG_ERROR("sanitizer_is_safe: NULL parameter - sanitizer=%p, input=%p", (void *)sanitizer, (void *)input);
+        LOG_ERROR("sanitizer_is_safe: NULL parameter - sanitizer=%p, input=%p", (void *)sanitizer, (void *)input);
         return false;
     }
 
@@ -433,7 +433,7 @@ bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize
 int sanitizer_escape_html(const char *input, char *output, size_t output_size)
 {
     if (!input || !output || output_size == 0) {
-        AIRY_LOG_ERROR("sanitizer_escape_html: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
+        LOG_ERROR("sanitizer_escape_html: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -483,7 +483,7 @@ int sanitizer_escape_html(const char *input, char *output, size_t output_size)
     return cupolas_OK;
 
 overflow:
-    AIRY_LOG_WARN("sanitizer_escape_html: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
+    LOG_WARN("sanitizer_escape_html: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
     output[out_pos] = '\0';
     return cupolas_ERROR_OVERFLOW;
 }
@@ -491,7 +491,7 @@ overflow:
 int sanitizer_escape_sql(const char *input, char *output, size_t output_size)
 {
     if (!input || !output || output_size == 0) {
-        AIRY_LOG_ERROR("sanitizer_escape_sql: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
+        LOG_ERROR("sanitizer_escape_sql: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -541,7 +541,7 @@ int sanitizer_escape_sql(const char *input, char *output, size_t output_size)
     return cupolas_OK;
 
 overflow:
-    AIRY_LOG_WARN("sanitizer_escape_sql: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
+    LOG_WARN("sanitizer_escape_sql: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
     output[out_pos] = '\0';
     return cupolas_ERROR_OVERFLOW;
 }
@@ -549,7 +549,7 @@ overflow:
 int sanitizer_escape_shell(const char *input, char *output, size_t output_size)
 {
     if (!input || !output || output_size == 0) {
-        AIRY_LOG_ERROR("sanitizer_escape_shell: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
+        LOG_ERROR("sanitizer_escape_shell: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -572,7 +572,7 @@ int sanitizer_escape_shell(const char *input, char *output, size_t output_size)
     return cupolas_OK;
 
 overflow:
-    AIRY_LOG_WARN("sanitizer_escape_shell: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
+    LOG_WARN("sanitizer_escape_shell: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
     output[out_pos] = '\0';
     return cupolas_ERROR_OVERFLOW;
 }
@@ -580,7 +580,7 @@ overflow:
 int sanitizer_escape_path(const char *input, char *output, size_t output_size)
 {
     if (!input || !output || output_size == 0) {
-        AIRY_LOG_ERROR("sanitizer_escape_path: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
+        LOG_ERROR("sanitizer_escape_path: NULL/invalid parameter - input=%p, output=%p, output_size=%zu", (void *)input, (void *)output, output_size);
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -604,7 +604,7 @@ int sanitizer_escape_path(const char *input, char *output, size_t output_size)
     return cupolas_OK;
 
 overflow:
-    AIRY_LOG_WARN("sanitizer_escape_path: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
+    LOG_WARN("sanitizer_escape_path: output buffer overflow - input_len=%zu, output_size=%zu", strlen(input), output_size);
     output[out_pos] = '\0';
     return cupolas_ERROR_OVERFLOW;
 }
@@ -612,14 +612,14 @@ overflow:
 int sanitizer_add_rule(sanitizer_t *sanitizer, const char *pattern, const char *replacement)
 {
     if (!sanitizer || !pattern) {
-        AIRY_LOG_ERROR("sanitizer_add_rule: NULL parameter - sanitizer=%p, pattern=%p", (void *)sanitizer, (void *)pattern);
+        LOG_ERROR("sanitizer_add_rule: NULL parameter - sanitizer=%p, pattern=%p", (void *)sanitizer, (void *)pattern);
         return cupolas_ERROR_INVALID_ARG;
     }
 
     cupolas_rwlock_wrlock(&sanitizer->lock);
     int ret = sanitizer_rules_add(sanitizer->rules, pattern, replacement);
     if (ret != cupolas_OK) {
-        AIRY_LOG_ERROR("sanitizer_add_rule: pattern matching error - pattern=%s, ret=%d", pattern, ret);
+        LOG_ERROR("sanitizer_add_rule: pattern matching error - pattern=%s, ret=%d", pattern, ret);
     }
     sanitizer_cache_clear(sanitizer->cache);
     cupolas_rwlock_unlock(&sanitizer->lock);

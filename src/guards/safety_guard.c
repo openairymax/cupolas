@@ -20,7 +20,7 @@
 
 #include "safety_guard.h"
 
-#include "memory_compat.h"
+#include "airy_memory.h"
 #include "string_compat.h"
 #include "config_unified.h"
 

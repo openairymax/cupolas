@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "error_compat.h"
+#include "error.h"
 
 
 #define DEFAULT_BUCKET_COUNT 64

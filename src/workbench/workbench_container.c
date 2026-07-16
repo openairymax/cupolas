@@ -39,7 +39,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "memory_compat.h"
+#include "airy_memory.h"
 #endif
 
 #define CONTAINER_ID_LENGTH 64
