@@ -217,12 +217,14 @@ static cache_entry_t *find_entry(cache_manager_t *cm, uint32_t hash, const char 
 int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *action,
                       const char *resource, const char *context)
 {
+    /* 契约（permission_cache.h L88）：1=allowed, 0=denied, -1=cache miss or error
+     * cache miss/error 一律返回 -1，不使用 AIRY_EINVAL 以匹配文档化 API 契约。 */
     if (!cm)
-        AIRY_RET_ERR(AIRY_EINVAL);
+        return -1;
 
     char *key = build_cache_key(agent_id, action, resource, context);
     if (!key)
-        AIRY_RET_ERR(AIRY_EINVAL);
+        return -1;
 
     uint32_t hash = hash_string(key);
 
@@ -238,7 +240,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
                 cupolas_atomic_add64(&cm->miss_count, 1);
                 cupolas_mutex_unlock(&cm->lock);
                 cupolas_mem_free(key);
-                AIRY_RET_ERR(AIRY_EINVAL);
+                return -1;
             }
         }
 
@@ -253,7 +255,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
     cupolas_atomic_add64(&cm->miss_count, 1);
     cupolas_mutex_unlock(&cm->lock);
     cupolas_mem_free(key);
-    AIRY_RET_ERR(AIRY_EINVAL);
+    return -1;
 }
 
 void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *action,

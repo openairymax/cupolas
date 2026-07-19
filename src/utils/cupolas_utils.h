@@ -338,6 +338,28 @@ extern "C" {
 } while(0)
 
 /**
+ * @brief Log informational message (alias of CUPOLAS_LOG)
+ * @param fmt printf-style format string
+ * @param ... Format arguments
+ */
+#define CUPOLAS_LOG_INFO(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS INFO] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
+
+/**
+ * @brief Log warning message
+ * @param fmt printf-style format string
+ * @param ... Format arguments
+ */
+#define CUPOLAS_LOG_WARN(fmt, ...) do { \
+    char _cup_buf[512]; \
+    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS WARN] " fmt "\n", ##__VA_ARGS__); \
+    fputs(_cup_buf, stderr); \
+} while(0)
+
+/**
  * @brief Log error message
  * @param fmt printf-style format string
  * @param ... Format arguments
@@ -364,6 +386,12 @@ extern "C" {
 
 /** @brief Disabled logging noop (compiles to nothing) */
 #define CUPOLAS_LOG(fmt, ...) ((void)0)
+
+/** @brief Disabled info logging noop */
+#define CUPOLAS_LOG_INFO(fmt, ...) ((void)0)
+
+/** @brief Disabled warn logging noop */
+#define CUPOLAS_LOG_WARN(fmt, ...) ((void)0)
 
 /** @brief Error logging always enabled even in release builds */
 #define CUPOLAS_LOG_ERROR(fmt, ...) do { \
