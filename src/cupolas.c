@@ -288,7 +288,7 @@ void cupolas_cleanup(void)
 
 const char *cupolas_version(void)
 {
-    return "1.0.0";
+    return "0.1.1";
 }
 
 int cupolas_check_permission(const char *agent_id, const char *action, const char *resource,
