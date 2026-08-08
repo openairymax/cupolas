@@ -216,67 +216,6 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc)
 #include <unistd.h>
 
 /**
- * @brief 创建标准输入输出重定向管道 (POSIX)
- */
-static int create_redirect_pipes_posix(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
-                                       const cupolas_process_attr_t *attr)
-{
-
-    if (attr && attr->redirect_stdin) {
-        if (pipe(stdin_pipe) != 0) {
-            return cupolas_ERROR_IO;
-        }
-    }
-
-    if (attr && attr->redirect_stdout) {
-        if (pipe(stdout_pipe) != 0) {
-            if (stdin_pipe[0] >= 0)
-                close(stdin_pipe[0]);
-            if (stdin_pipe[1] >= 0)
-                close(stdin_pipe[1]);
-            return cupolas_ERROR_IO;
-        }
-    }
-
-    if (attr && attr->redirect_stderr) {
-        if (pipe(stderr_pipe) != 0) {
-            if (stdin_pipe[0] >= 0)
-                close(stdin_pipe[0]);
-            if (stdin_pipe[1] >= 0)
-                close(stdin_pipe[1]);
-            if (stdout_pipe[0] >= 0)
-                close(stdout_pipe[0]);
-            if (stdout_pipe[1] >= 0)
-                close(stdout_pipe[1]);
-            return cupolas_ERROR_IO;
-        }
-    }
-
-    return cupolas_OK;
-}
-
-/**
- * @brief 清理管道文件描述符
- */
-static void cleanup_pipes_posix(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
-                                int close_stdin_read, int close_stdout_write,
-                                int close_stderr_write)
-{
-    if (close_stdin_read && stdin_pipe[0] >= 0)
-        close(stdin_pipe[0]);
-    if (stdin_pipe[1] >= 0)
-        close(stdin_pipe[1]);
-    if (close_stdout_write && stdout_pipe[1] >= 0)
-        close(stdout_pipe[1]);
-    if (stdout_pipe[0] >= 0)
-        close(stdout_pipe[0]);
-    if (close_stderr_write && stderr_pipe[1] >= 0)
-        close(stderr_pipe[1]);
-    if (stderr_pipe[0] >= 0)
-        close(stderr_pipe[0]);
-}
-
-/**
  * @brief 子进程设置函数
  */
 static void setup_child_process(int *stdin_pipe, int *stdout_pipe, int *stderr_pipe,
@@ -326,15 +265,24 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
     int stdout_pipe[2] = {-1, -1};
     int stderr_pipe[2] = {-1, -1};
 
-    int err = create_redirect_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, attr);
-    if (err != cupolas_OK) {
-        return err;
+    /* P2-5 (cupolas_d): 复用调用方（workbench）预创建并经 attr 传入的管道，
+     * 使子进程 stdout/stderr 直接流入父进程持有的读端。修复原实现：
+     * 1) 本地创建管道却在父进程侧关闭读端，子进程输出无人读取（丢失/触发
+     *    SIGPIPE）；
+     * 2) 父进程自持 stdout/stderr 写端，阻塞读因永不 EOF 而永久挂起。 */
+    if (attr && attr->redirect_stdin) {
+        __builtin_memcpy(stdin_pipe, attr->stdin_pipe, sizeof(stdin_pipe));
+    }
+    if (attr && attr->redirect_stdout) {
+        __builtin_memcpy(stdout_pipe, attr->stdout_pipe, sizeof(stdout_pipe));
+    }
+    if (attr && attr->redirect_stderr) {
+        __builtin_memcpy(stderr_pipe, attr->stderr_pipe, sizeof(stderr_pipe));
     }
 
     pid_t pid = fork();
 
     if (pid < 0) {
-        cleanup_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, 1, 1, 1);
         return cupolas_ERROR_UNKNOWN;
     }
 
@@ -342,22 +290,9 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
         setup_child_process(stdin_pipe, stdout_pipe, stderr_pipe, attr, path, argv);
     }
 
-    close(stdin_pipe[0]);
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
-
-    if (attr) {
-        if (attr->redirect_stdin && stdin_pipe[1] >= 0) {
-            close(stdin_pipe[1]);
-        }
-        if (attr->redirect_stdout && stdout_pipe[0] >= 0) {
-            close(stdout_pipe[0]);
-        }
-        if (attr->redirect_stderr && stderr_pipe[0] >= 0) {
-            close(stderr_pipe[0]);
-        }
-    }
-
+    /* 父进程侧不在此关闭 stdout/stderr 写端：管道归 workbench 所有，
+     * 由 workbench 在 spawn 返回后统一关闭（关闭写端后子进程退出即可 EOF，
+     * 阻塞读正常返回）。 */
     *proc = pid;
     return cupolas_OK;
 }

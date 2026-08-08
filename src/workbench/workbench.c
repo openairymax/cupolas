@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !cupolas_PLATFORM_WINDOWS
+#include <unistd.h> /* close() — P2-5: 父进程关闭管道写端 */
+#endif
+
 #define DEFAULT_TIMEOUT_MS 30000
 #define DEFAULT_MAX_OUTPUT_SIZE (1024 * 1024)
 #define OUTPUT_CHUNK_SIZE 4096
@@ -276,6 +280,23 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
     wb->state = WORKBENCH_STATE_RUNNING;
     cupolas_mutex_unlock(&wb->lock);
 
+    /* P2-5 (cupolas_d): 关闭父进程持有的 stdout/stderr 写端与 stdin 读端。
+     * 若保留写端，随后 cupolas_workbench_read_output 的阻塞读将因管道永不
+     * EOF 而永久挂起（execute_command 死锁）。子进程已在 exec 时经
+     * FD_CLOEXEC 关闭其继承副本，写端此时仅剩父进程一份。 */
+    if (wb->manager.redirect_stdout) {
+        close(wb->stdout_pipe[1]);
+        wb->stdout_pipe[1] = -1;
+    }
+    if (wb->manager.redirect_stderr) {
+        close(wb->stderr_pipe[1]);
+        wb->stderr_pipe[1] = -1;
+    }
+    if (wb->manager.redirect_stdin) {
+        close(wb->stdin_pipe[0]);
+        wb->stdin_pipe[0] = -1;
+    }
+
     uint32_t timeout_ms = wb->manager.timeout_ms > 0 ? wb->manager.timeout_ms : 0;
 
     cupolas_exit_status_t status;
@@ -343,6 +364,22 @@ int workbench_execute_async(workbench_t *wb, const char *command, char *const ar
 
     wb->state = WORKBENCH_STATE_RUNNING;
     cupolas_mutex_unlock(&wb->lock);
+
+    /* P2-5 (cupolas_d): 异步路径同样关闭父进程持有的 stdout/stderr 写端与
+     * stdin 读端，保证 workbench_wait 的 read_output 可读到 EOF（写端保留
+     * stdin_pipe[1] 供 workbench_write_stdin 继续写入）。 */
+    if (wb->manager.redirect_stdout) {
+        close(wb->stdout_pipe[1]);
+        wb->stdout_pipe[1] = -1;
+    }
+    if (wb->manager.redirect_stderr) {
+        close(wb->stderr_pipe[1]);
+        wb->stderr_pipe[1] = -1;
+    }
+    if (wb->manager.redirect_stdin) {
+        close(wb->stdin_pipe[0]);
+        wb->stdin_pipe[0] = -1;
+    }
 
     return cupolas_OK;
 }
