@@ -9,7 +9,7 @@
  * @file sanitizer_core.c
  * @brief Input Sanitizer Core Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
+ * @date 2026
  */
 
 #include "sanitizer.h"

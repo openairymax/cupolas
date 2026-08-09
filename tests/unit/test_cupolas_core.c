@@ -266,7 +266,7 @@ static void test_workbench_create_destroy(void)
 static void test_cupolas_init_cleanup(void)
 {
     assert(cupolas_init(NULL, NULL) == cupolas_OK);
-    assert(strcmp(cupolas_version(), "1.0.0") == 0);
+    assert(strcmp(cupolas_version(), "0.1.1") == 0);
     cupolas_cleanup();
 
     TEST_PASS("cupolas_init_cleanup");
