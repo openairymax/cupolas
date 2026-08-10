@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -577,10 +578,22 @@ bool cupolas_entitlements_is_signed(cupolas_entitlements_t *entitlements)
     return entitlements->signature != NULL && entitlements->sig_len > 0;
 }
 
+/* 裁决前统一校验（fail-closed）：entitlements 必须已通过签名验证（is_verified==1）
+ * 且仍在有效期内。未验证/被篡改/已过期的 entitlements 一律拒绝——签名校验与
+ * 权限裁决不得解耦，否则加载被篡改的 entitlements 后裁决照常生效（安全缺陷）。 */
+static int entitlements_verified_valid(cupolas_entitlements_t *entitlements)
+{
+    if (!entitlements)
+        return 0;
+    if (!entitlements->is_verified)
+        return 0;
+    return cupolas_entitlements_check_validity(entitlements) == CUPOLAS_ENT_OK;
+}
+
 int cupolas_entitlements_check_fs(cupolas_entitlements_t *entitlements, const char *path,
                                   const char *operation)
 {
-    if (!entitlements || !path || !operation)
+    if (!entitlements_verified_valid(entitlements) || !path || !operation)
         return 0;
 
     for (size_t i = 0; i < entitlements->info.fs_count; i++) {
@@ -601,7 +614,7 @@ int cupolas_entitlements_check_fs(cupolas_entitlements_t *entitlements, const ch
 int cupolas_entitlements_check_net(cupolas_entitlements_t *entitlements, const char *host,
                                    uint16_t port, const char *protocol, const char *direction)
 {
-    if (!entitlements || !host)
+    if (!entitlements_verified_valid(entitlements) || !host)
         return 0;
 
     for (size_t i = 0; i < entitlements->info.net_count; i++) {
@@ -675,7 +688,7 @@ int cupolas_entitlements_check_capability(cupolas_entitlements_t *entitlements,
 int cupolas_entitlements_check_vault(cupolas_entitlements_t *entitlements, const char *cred_id,
                                      const char *operation)
 {
-    if (!entitlements || !cred_id || !operation)
+    if (!entitlements_verified_valid(entitlements) || !cred_id || !operation)
         return 0;
 
     for (size_t i = 0; i < entitlements->info.vault_count; i++) {

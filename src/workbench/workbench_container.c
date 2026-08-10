@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -340,6 +341,16 @@ int container_start(void *mgr, const char *name, container_result_t *result)
     for (size_t i = 0; i < handle->manager.args_count && handle->manager.args; i++) {
         size_t len = strlen(cmd);
         snprintf(cmd + len, MAX_COMMAND_LENGTH * 2 - len, " %s", handle->manager.args[i]);
+    }
+
+    /* 真实执行容器启动（原实现仅拼装命令字符串即置 RUNNING，属桩行为）。
+     * 失败时状态置 ERROR 并返回错误，禁止假成功。 */
+    char output[1024];
+    int rc = execute_command(cmd, 300000, output, sizeof(output));
+    if (rc != 0) {
+        handle->state = CONTAINER_STATE_DEAD;
+        handle->is_running = false;
+        return cupolas_ERROR_IO;
     }
 
     handle->state = CONTAINER_STATE_RUNNING;

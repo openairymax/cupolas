@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -378,6 +379,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         return cached_result;
     }
 
+    bool modified = false;
     if (cupolas_sanitizer_contains_dangerous_chars(input, ctx)) {
         LOG_WARN("sanitizer_sanitize: malicious input detected - input_len=%zu, level=%d", input_len, (int)ctx->level);
         if (ctx->level == SANITIZE_LEVEL_STRICT) {
@@ -390,23 +392,36 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_ERROR;
         }
-
-        cupolas_rwlock_wrlock(&sanitizer->lock);
-        sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
-        cupolas_rwlock_unlock(&sanitizer->lock);
-
-        cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
-        return SANITIZE_MODIFIED;
+        modified = true;
+    } else {
+        AIRY_STRNCPY_TERM(output, input, output_size);
     }
 
-    AIRY_STRNCPY_TERM(output, input, output_size);
+    /* 规则引擎接线（原实现从不调用 san->rules，add_rule 添加的规则对净化零效果——桩）。
+     * 自定义规则在字符级净化之后追加执行：replacement 为空的拒绝型规则命中时
+     * 整体拒绝（fail-closed），替换型规则命中时标记 MODIFIED。 */
+    if (sanitizer->rules) {
+        char *tmp = (char *)AIRY_MALLOC(output_size);
+        if (tmp) {
+            int rrc = sanitizer_rules_apply(sanitizer->rules, output, tmp, output_size);
+            if (rrc != cupolas_OK) {
+                AIRY_FREE(tmp);
+                cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+                return SANITIZE_REJECTED;
+            }
+            if (strcmp(tmp, output) != 0)
+                modified = true;
+            AIRY_STRNCPY_TERM(output, tmp, output_size);
+            AIRY_FREE(tmp);
+        }
+    }
 
     cupolas_rwlock_wrlock(&sanitizer->lock);
     sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
     cupolas_rwlock_unlock(&sanitizer->lock);
 
     cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
-    return SANITIZE_OK;
+    return modified ? SANITIZE_MODIFIED : SANITIZE_OK;
 }
 
 bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize_context_t *ctx)

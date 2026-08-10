@@ -1,4 +1,5 @@
 #include "cupolas.h"
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -376,6 +377,17 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
     __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
+    /* gethostbyname 可能返回 IPv6 记录（h_length=16），sin_addr 仅 4 字节，
+     * 直接整长拷贝会栈越界写。仅接受 AF_INET 且长度匹配的记录。 */
+    if (host->h_addrtype != AF_INET || host->h_length > (int)sizeof(addr.sin_addr)) {
+#ifdef _WIN32
+        closesocket(sock);
+#else
+        close(sock);
+#endif
+        *result = CUPOLAS_CERT_REQUIRED;
+        return AIRY_ERR_UNKNOWN;
+    }
     __builtin_memcpy(&addr.sin_addr, host->h_addr, host->h_length);
 
     int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
@@ -508,8 +520,12 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
 {
     if (!rule)
         return AIRY_ERR_UNKNOWN;
-    if (g_net_security.filter_rule_count >= cupolas_MAX_FILTER_RULES)
+
+    cupolas_mutex_lock(&g_net_security.lock);
+    if (g_net_security.filter_rule_count >= cupolas_MAX_FILTER_RULES) {
+        cupolas_mutex_unlock(&g_net_security.lock);
         return AIRY_ERR_UNKNOWN;
+    }
 
     filter_rule_entry_t *entry = &g_net_security.filter_rules[g_net_security.filter_rule_count];
     __builtin_memset(entry, 0, sizeof(*entry));
@@ -533,6 +549,7 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
     entry->active = 1;
 
     g_net_security.filter_rule_count++;
+    cupolas_mutex_unlock(&g_net_security.lock);
     return 0;
 }
 
@@ -540,6 +557,8 @@ int cupolas_net_remove_rule(const char *rule_id)
 {
     if (!rule_id)
         return AIRY_ERR_UNKNOWN;
+
+    cupolas_mutex_lock(&g_net_security.lock);
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -550,10 +569,12 @@ int cupolas_net_remove_rule(const char *rule_id)
                 g_net_security.filter_rules[j] = g_net_security.filter_rules[j + 1];
             }
             g_net_security.filter_rule_count--;
+            cupolas_mutex_unlock(&g_net_security.lock);
             return 0;
         }
     }
 
+    cupolas_mutex_unlock(&g_net_security.lock);
     return AIRY_ERR_UNKNOWN;
 }
 
@@ -561,6 +582,8 @@ int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t
 {
     if (!rule_id || !rule)
         return AIRY_ERR_UNKNOWN;
+
+    cupolas_mutex_lock(&g_net_security.lock);
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -586,10 +609,12 @@ int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t
             g_net_security.filter_rules[i].rule.rate_limit = rule->rate_limit;
             g_net_security.filter_rules[i].rule.burst_limit = rule->burst_limit;
 
+            cupolas_mutex_unlock(&g_net_security.lock);
             return 0;
         }
     }
 
+    cupolas_mutex_unlock(&g_net_security.lock);
     return AIRY_ERR_UNKNOWN;
 }
 
@@ -665,10 +690,13 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
     if (!host)
         return 0;
 
+    cupolas_mutex_lock(&g_net_security.lock);
+
     g_net_security.stats.total_connections++;
 
     if (g_net_security.manager.http.enforce_https && protocol == CUPOLAS_PROTO_TCP) {
         g_net_security.stats.plaintext_blocked++;
+        cupolas_mutex_unlock(&g_net_security.lock);
         return 0;
     }
 
@@ -686,19 +714,25 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
         if (host_match && port_match && proto_match) {
             switch (rule->action) {
             case CUPOLAS_FW_ALLOW:
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 1;
             case CUPOLAS_FW_DENY:
                 g_net_security.stats.blocked_connections++;
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 0;
             case CUPOLAS_FW_LOG:
-                return 1;
             case CUPOLAS_FW_RATE_LIMIT:
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 1;
             }
         }
     }
 
-    return 1;
+    /* 默认拒绝（fail-closed）：无 allow 规则匹配的流量一律拦截，
+     * 防止未配置防火墙规则时全部放行（安全穹顶默认拒绝原则）。 */
+    g_net_security.stats.blocked_connections++;
+    cupolas_mutex_unlock(&g_net_security.lock);
+    return 0;
 }
 
 int cupolas_net_check_url(const char *url, const char *method)
@@ -706,11 +740,14 @@ int cupolas_net_check_url(const char *url, const char *method)
     if (!url)
         return 0;
 
+    cupolas_mutex_lock(&g_net_security.lock);
+
     g_net_security.stats.http_requests++;
 
     if (g_net_security.manager.http.enforce_https) {
         if (strncmp(url, "https://", 8) != 0) {
             g_net_security.stats.plaintext_blocked++;
+            cupolas_mutex_unlock(&g_net_security.lock);
             return 0;
         }
         g_net_security.stats.https_requests++;
@@ -725,11 +762,14 @@ int cupolas_net_check_url(const char *url, const char *method)
         if (rule->url_pattern && cupolas_match_url_pattern(rule->url_pattern, url)) {
             switch (rule->action) {
             case CUPOLAS_FW_ALLOW:
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 1;
             case CUPOLAS_FW_DENY:
                 g_net_security.stats.blocked_connections++;
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 0;
             default:
+                cupolas_mutex_unlock(&g_net_security.lock);
                 return 1;
             }
         }
@@ -743,10 +783,18 @@ int cupolas_net_check_url(const char *url, const char *method)
                 break;
             }
         }
-        if (!method_allowed)
+        if (!method_allowed) {
+            cupolas_mutex_unlock(&g_net_security.lock);
             return 0;
+        }
+    } else {
+        /* 未配置方法白名单且无 URL 规则匹配：默认拒绝（fail-closed），
+         * 需显式配置 allow 规则（如 url_pattern="*" action=allow）才放行 */
+        cupolas_mutex_unlock(&g_net_security.lock);
+        return 0;
     }
 
+    cupolas_mutex_unlock(&g_net_security.lock);
     return 1;
 }
 

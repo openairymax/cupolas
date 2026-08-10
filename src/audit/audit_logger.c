@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -234,6 +235,43 @@ static void *audit_writer_thread(void *arg)
     return NULL;
 }
 
+/* 从既有审计日志恢复哈希链尾哈希：进程重启后 g_last_hash 若从全零开始，
+ * 新条目无法与历史链衔接，"不可篡改审计"（BAN-129）要求链状态持久化到磁盘
+ * 并在启动时恢复（audit_rotator_write 已把 prev_hash/curr_hash 落盘）。 */
+static void audit_logger_restore_last_hash(audit_logger_t *logger)
+{
+    if (!logger || !logger->log_dir || !logger->log_prefix)
+        return;
+
+    char path[1024];
+    snprintf(path, sizeof(path), "%s%s%s.log", logger->log_dir,
+             logger->log_dir[0] ? "/" : "", logger->log_prefix);
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return;
+
+    char line[4096];
+    char last_hash[65] = {0};
+    while (fgets(line, sizeof(line), f)) {
+        const char *key = strstr(line, "\"curr_hash\":\"");
+        if (key) {
+            const char *start = key + strlen("\"curr_hash\":\"");
+            const char *end = strchr(start, '"');
+            if (end && (size_t)(end - start) == 64) {
+                __builtin_memcpy(last_hash, start, 64);
+                last_hash[64] = '\0';
+            }
+        }
+    }
+    fclose(f);
+
+    if (last_hash[0]) {
+        cupolas_mutex_lock(&g_hash_chain_lock);
+        __builtin_memcpy(g_last_hash, last_hash, sizeof(g_last_hash));
+        cupolas_mutex_unlock(&g_hash_chain_lock);
+    }
+}
+
 audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
                                     size_t max_file_size, int max_files)
 {
@@ -272,6 +310,9 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
     logger->rotator = audit_rotator_create(log_dir, log_prefix, max_file_size, max_files);
     if (!logger->rotator)
         goto error;
+
+    /* 从磁盘恢复哈希链尾哈希（在启动写入新条目之前，保持链连续） */
+    audit_logger_restore_last_hash(logger);
 
     cupolas_atomic_store32(&logger->running, 1);
 

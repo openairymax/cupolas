@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -290,6 +291,17 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
     __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
+    /* gethostbyname 可能返回 IPv6 记录（h_length=16），sin_addr 仅 4 字节，
+     * 直接整长拷贝会栈越界写。仅接受 AF_INET 且长度匹配的记录。 */
+    if (host->h_addrtype != AF_INET || host->h_length > (int)sizeof(addr.sin_addr)) {
+#ifdef _WIN32
+        closesocket(sock);
+#else
+        close(sock);
+#endif
+        *result = CUPOLAS_CERT_INVALID;
+        return AIRY_EINVAL;
+    }
     __builtin_memcpy(&addr.sin_addr, host->h_addr, host->h_length);
 
     int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));

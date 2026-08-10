@@ -1,5 +1,6 @@
 #include "error.h"
 #include "cupolas.h"
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -851,9 +852,12 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
         return false;
     }
 
+    /* 默认拒绝（fail-closed）：无 ACL 的凭据不向任何 agent 开放访问。
+     * 创建者/使用者须显式 grant_access 后才有对应操作权限。 */
     if (entry->acl.count == 0) {
         cupolas_rwlock_unlock(&vault->lock);
-        return true;
+        LOG_WARN("cupolas_vault_check_access: no ACL entries for cred_id=%s, access denied by default (agent_id=%s)", cred_id, agent_id);
+        return false;
     }
 
     for (size_t i = 0; i < entry->acl.count; i++) {
