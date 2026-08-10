@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -90,7 +91,9 @@ void permission_engine_destroy(permission_engine_t *engine)
     if (!engine)
         return;
 
-    if (cupolas_atomic_sub32(&engine->ref_count, 1) > 1) {
+    /* sub32 返回递减后的新值：新值 > 0 表示仍有引用，不得销毁；
+     * 原实现 >1 才返回，导致新值 ==1（仍有引用）时过早销毁 —— UAF 竞态。 */
+    if (cupolas_atomic_sub32(&engine->ref_count, 1) > 0) {
         return;
     }
 

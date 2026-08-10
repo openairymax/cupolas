@@ -10,6 +10,7 @@
  *   - 低优先级在 HIGH 水位线时被拒绝
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
@@ -184,8 +185,11 @@ static void *mempool_reserve_alloc(airy_mempool_t *pool, size_t size,
         return NULL;
     }
 
-    /* 检查是否有足够空间 */
-    size_t remaining = pool->reserve_size - pool->reserve_used;
+    /* 检查是否有足够空间。注意：CRITICAL 紧急分配会使 reserve_used 超过
+     * reserve_size，先判 reserve_used >= reserve_size，避免减法下溢 */
+    size_t remaining = (pool->reserve_used >= pool->reserve_size)
+                           ? 0
+                           : (pool->reserve_size - pool->reserve_used);
     if (size > remaining) {
         /* CRITICAL 优先级：使用超过预留的紧急分配 */
         if (priority == MEMPOOL_PRIORITY_CRITICAL) {

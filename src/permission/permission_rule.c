@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
@@ -223,7 +224,8 @@ int rule_manager_reload(rule_manager_t *mgr)
                     const char *agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
                     const char *action = yaml_as_string(yaml_get(entry, "action"), "*");
                     const char *resource = yaml_as_string(yaml_get(entry, "resource"), "*");
-                    int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), true);
+                    /* 缺省 allow 必须为拒绝（fail-closed），与上方 sequence 分支一致 */
+                    int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), false);
                     int priority =
                         (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);
 
