@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /**
  * @file guard_integration.c
  * @brief SafetyGuard与Cupolas组件集成
@@ -27,7 +28,6 @@
 #include <string.h>
 
 // ============================================================================
-// 全局守卫管理器实例
 // ============================================================================
 
 static guard_manager_t *g_guard_manager = NULL;
@@ -50,7 +50,6 @@ static void guard_log_security(const char *agent_id, const char *action, const c
 }
 
 // ============================================================================
-// Cupolas钩子函数
 // ============================================================================
 
 /**
@@ -62,25 +61,22 @@ static int __attribute__((unused)) permission_guard_hook(const char *agent_id, c
                                                          int permission_result)
 {
     if (!g_guard_manager || !g_guards_enabled) {
-        return permission_result;  // 守卫未启用，直接返回权限结果
+        return permission_result;
     }
 
-    // 只对允许的操作进行安全检查
     if (permission_result != 1) {
-        return permission_result;  // 权限已拒绝，无需进一步检查
+        return permission_result;
     }
 
-    // 创建检测上下文
     guard_context_t guard_ctx = {.operation = "permission_check",
                                  .resource = resource,
                                  .agent_id = agent_id,
-                                 .session_id = context,  // 使用context作为session_id
+                                 .session_id = context,
                                  .input_data = (void *)action,
                                  .input_size = action ? strlen(action) + 1 : 0,
                                  .context_data = NULL,
                                  .timestamp = cupolas_get_timestamp_ns()};
 
-// 执行安全检测
 #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
@@ -89,37 +85,30 @@ static int __attribute__((unused)) permission_guard_hook(const char *agent_id, c
                                                 &actual_results);
 
     if (guard_result != CUPOLAS_OK) {
-        // 守卫检测失败，记录日志但允许操作
         return permission_result;
     }
 
-    // 检查检测结果
     for (size_t i = 0; i < actual_results; i++) {
         guard_result_t *result = &results[i];
 
-        // 根据风险等级决定动作
         switch (result->risk_level) {
         case RISK_LEVEL_SAFE:
         case RISK_LEVEL_INFO:
-            // 安全或信息级风险，允许操作
             break;
 
         case RISK_LEVEL_LOW:
-            // 低风险，记录警告但允许操作
             guard_log_security(agent_id, action, resource, RISK_LEVEL_LOW, "low_risk_allowed");
             break;
 
         case RISK_LEVEL_MEDIUM:
         case RISK_LEVEL_HIGH:
         case RISK_LEVEL_CRITICAL:
-            // 中高风险，根据推荐动作处理
             if (result->recommended_action == GUARD_ACTION_BLOCK ||
                 result->recommended_action == GUARD_ACTION_ISOLATE ||
                 result->recommended_action == GUARD_ACTION_TERMINATE) {
-                // 阻断操作
                 guard_log_security(agent_id, action, resource, result->risk_level,
                                    "blocked_by_guard");
-                return 0;  // 拒绝访问
+                return 0;
             }
             break;
 
@@ -128,7 +117,7 @@ static int __attribute__((unused)) permission_guard_hook(const char *agent_id, c
         }
     }
 
-    return permission_result;  // 安全检测通过，允许操作
+    return permission_result;
 }
 
 /**
@@ -139,26 +128,22 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
                                                                 char *const argv[])
 {
     if (!g_guard_manager || !g_guards_enabled) {
-        return CUPOLAS_OK;  // 守卫未启用，允许执行
+        return CUPOLAS_OK;
     }
 
-    // 构建命令字符串用于检测
     char cmd_buffer[1024] = {0};
     size_t pos = 0;
 
-    // 添加命令
     if (command) {
         pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, "%s", command);
     }
 
-    // 添加参数
     if (argv) {
         for (int i = 0; argv[i] && pos < sizeof(cmd_buffer) - 1; i++) {
             pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, " %s", argv[i]);
         }
     }
 
-    // 创建检测上下文
     guard_context_t guard_ctx = {.operation = "command_execution",
                                  .resource = "workbench",
                                  .agent_id = g_current_agent_id,
@@ -168,7 +153,6 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
                                  .context_data = NULL,
                                  .timestamp = cupolas_get_timestamp_ns()};
 
-// 执行安全检测
 #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
@@ -177,23 +161,18 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
                                                 &actual_results);
 
     if (guard_result != CUPOLAS_OK) {
-        // 守卫检测失败，记录日志但允许执行
         return CUPOLAS_OK;
     }
 
-    // 检查检测结果
     for (size_t i = 0; i < actual_results; i++) {
         guard_result_t *result = &results[i];
 
-        // 根据风险等级决定动作
         switch (result->risk_level) {
         case RISK_LEVEL_SAFE:
         case RISK_LEVEL_INFO:
-            // 安全或信息级风险，允许执行
             break;
 
         case RISK_LEVEL_LOW:
-            // 低风险，记录警告但允许执行
             guard_log_security("system", command, "command_execute", RISK_LEVEL_LOW,
                                "low_risk_cmd_allowed");
             break;
@@ -201,11 +180,9 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
         case RISK_LEVEL_MEDIUM:
         case RISK_LEVEL_HIGH:
         case RISK_LEVEL_CRITICAL:
-            // 中高风险，根据推荐动作处理
             if (result->recommended_action == GUARD_ACTION_BLOCK ||
                 result->recommended_action == GUARD_ACTION_ISOLATE ||
                 result->recommended_action == GUARD_ACTION_TERMINATE) {
-                // 阻断命令执行
                 guard_log_security("system", command, "command_execute", result->risk_level,
                                    "cmd_blocked_by_guard");
                 return cupolas_ERROR_PERMISSION;
@@ -217,7 +194,7 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
         }
     }
 
-    return CUPOLAS_OK;  // 安全检测通过，允许执行
+    return CUPOLAS_OK;
 }
 
 /**
@@ -229,15 +206,13 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
 {
     (void)input;
     if (!g_guard_manager || !g_guards_enabled) {
-        return sanitizer_result;  // 守卫未启用
+        return sanitizer_result;
     }
 
-    // 只在净化成功后检查输出
     if (sanitizer_result != CUPOLAS_OK || !output) {
         return sanitizer_result;
     }
 
-    // 创建检测上下文
     guard_context_t guard_ctx = {.operation = "input_sanitization",
                                  .resource = "sanitizer",
                                  .agent_id = g_current_agent_id,
@@ -247,7 +222,6 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
                                  .context_data = NULL,
                                  .timestamp = cupolas_get_timestamp_ns()};
 
-// 执行安全检测
 #define MAX_RESULTS 8
     guard_result_t results[MAX_RESULTS];
     size_t actual_results = 0;
@@ -259,17 +233,13 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
         return sanitizer_result;
     }
 
-    // 检查检测结果
     for (size_t i = 0; i < actual_results; i++) {
         guard_result_t *result = &results[i];
 
-        // 高风险输入需要特殊处理
         if (result->risk_level >= RISK_LEVEL_MEDIUM) {
-            // 记录安全事件
             guard_log_security("system", "sanitize_input", "input_data", result->risk_level,
                                "high_risk_input_detected");
 
-            // 对于严重风险，可以清空输出或返回错误
             if (result->risk_level == RISK_LEVEL_CRITICAL) {
                 if (output_size > 0)
                     output[0] = '\0';
@@ -282,7 +252,6 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
 }
 
 // ============================================================================
-// 公共集成API
 // ============================================================================
 
 /**
@@ -293,10 +262,9 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
 CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t *config)
 {
     if (g_guard_manager) {
-        return cupolas_ERROR_BUSY;  // 已初始化
+        return cupolas_ERROR_BUSY;
     }
 
-    // 创建守卫管理器
     g_guard_manager = guard_manager_create(config);
     if (!g_guard_manager) {
         return cupolas_ERROR_NO_MEMORY;
@@ -304,7 +272,6 @@ CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t *config)
 
     g_guards_enabled = true;
 
-    // 创建审计日志记录器
     if (!g_guard_audit_logger) {
         g_guard_audit_logger =
             audit_logger_create(AIRY_TMP_DIR "/cupolas_audit", "guard", 1024 * 1024, 10);
@@ -414,7 +381,6 @@ CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource
         return cupolas_ERROR_BUSY;
     }
 
-    // 创建检测上下文
     guard_context_t guard_ctx = {.operation = operation,
                                  .resource = resource,
                                  .agent_id = agent_id,
@@ -429,7 +395,6 @@ CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource
 }
 
 // ============================================================================
-// 钩子注册函数
 // ============================================================================
 
 /**

@@ -1,11 +1,10 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "yaml_minimal.h"  /* SP03: migrated to commons/utils/config_unified/include/ */
-
+#include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/include/ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,10 +12,27 @@
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define TEST(name) do { tests_run++; printf("  %-50s", name); } while(0)
-#define PASS() do { tests_passed++; printf("[PASS]\n"); } while(0)
-#define FAIL(msg) do { printf("[FAIL] %s\n", msg); } while(0)
-#define ASSERT(cond, msg) do { if (!(cond)) { FAIL(msg); return; } } while(0)
+#define TEST(name)               \
+    do {                         \
+        tests_run++;             \
+        printf("  %-50s", name); \
+    } while (0)
+#define PASS()              \
+    do {                    \
+        tests_passed++;     \
+        printf("[PASS]\n"); \
+    } while (0)
+#define FAIL(msg)                   \
+    do {                            \
+        printf("[FAIL] %s\n", msg); \
+    } while (0)
+#define ASSERT(cond, msg) \
+    do {                  \
+        if (!(cond)) {    \
+            FAIL(msg);    \
+            return;       \
+        }                 \
+    } while (0)
 
 static void test_create_destroy(void)
 {

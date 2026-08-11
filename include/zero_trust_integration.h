@@ -1,5 +1,6 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /** @note This API is planned for next release. Enable with AIRY_ENABLE_V2_API to access. */
 /**
  * @file zero_trust_integration.h
@@ -144,7 +145,6 @@ size_t zta_get_session_count(zta_context_t *ctx);
 size_t zta_get_policy_count(zta_context_t *ctx);
 
 #endif /* AIRY_ENABLE_V2_API */
-
 #ifdef __cplusplus
 }
 #endif

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_entitlements.c - Entitlements Permission Declarations Implementation
  */
@@ -110,6 +110,17 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
     char *saveptr;
     char *token = strtok_r(dup, ",\n", &saveptr);
     while (token) {
+        token = cupolas_str_trim(token);
+        /* 剥离 YAML 内联数组语法 `[read, write]`：首 token 以 `[` 开头、
+         * 尾 token 以 `]` 结尾（strtok 按逗号切分后中括号落在首尾 token 上） */
+        size_t tok_len = strlen(token);
+        if (tok_len > 0 && token[0] == '[') {
+            token++;
+            tok_len--;
+        }
+        if (tok_len > 0 && token[tok_len - 1] == ']') {
+            token[tok_len - 1] = '\0';
+        }
         token = cupolas_str_trim(token);
         if (*token != '\0') {
             if (*count >= capacity) {

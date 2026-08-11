@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_monitoring.c - Monitoring Interface: Prometheus / OpenTelemetry
  */
@@ -22,7 +22,7 @@
 #include "cupolas_monitoring.h"
 
 #include "cupolas_metrics.h"
-/* SP06 解耦：移除 #include "gateway.h"，改为通过 cupolas_endpoint_register_fn_t 回调注入 */
+
 #include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "error.h"
@@ -118,7 +118,6 @@ const char *monitoring_status_string(monitoring_status_t status)
 }
 
 /* ========== System Metrics Collection (Linux /proc) ========== */
-
 #if cupolas_PLATFORM_POSIX
 #include <sys/resource.h>
 #include "airy_memory.h"
@@ -279,7 +278,6 @@ static void *reporter_thread_func(void *arg)
 }
 
 /* ========== Dynamic Endpoint Handlers (via gateway registration) ========== */
-
 static int handle_metrics_endpoint(const cupolas_endpoint_request_t *req,
                                    cupolas_endpoint_response_t *resp)
 {
@@ -367,7 +365,8 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
     __builtin_memset(mgr, 0, sizeof(cupolas_monitoring_t));
 
     if (manager) {
-        AIRY_MEMCPY_SAFE(&mgr->manager, manager, sizeof(monitoring_config_t), sizeof(monitoring_config_t));
+        AIRY_MEMCPY_SAFE(&mgr->manager, manager, sizeof(monitoring_config_t),
+                         sizeof(monitoring_config_t));
     } else {
         __builtin_memset(&mgr->manager, 0, sizeof(monitoring_config_t));
         mgr->manager.backend = MONITORING_BACKEND_PROMETHEUS;
@@ -596,8 +595,8 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                  "    \"scopeMetrics\": [{\n"
                  "      \"scope\": {\"name\": \"cupolas.monitoring\"},\n"
                  "      \"metrics\": [\n",
-                 mgr->manager.opentelemetry.service_name ? mgr->manager.opentelemetry.service_name
-                                                         : "cupolas");
+                 mgr->manager.opentelemetry.service_name ? mgr->manager.opentelemetry.service_name :
+                                                           "cupolas");
 
     if (written >= size) {
         cupolas_rwlock_unlock(&mgr->lock);
@@ -756,7 +755,8 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     mgr->include_count = 0;
     if (include_patterns) {
         for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
-            AIRY_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN);
+            AIRY_STRNCPY_TERM(mgr->include_patterns[mgr->include_count], include_patterns[i],
+                              MAX_PATTERN_LEN);
             mgr->include_count++;
         }
     }
@@ -764,7 +764,8 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     mgr->exclude_count = 0;
     if (exclude_patterns) {
         for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
-            AIRY_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN);
+            AIRY_STRNCPY_TERM(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i],
+                              MAX_PATTERN_LEN);
             mgr->exclude_count++;
         }
     }
@@ -896,9 +897,8 @@ void cupolas_monitoring_shutdown_instance(void)
     cupolas_rwlock_unlock(&g_monitoring_lock);
 }
 
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr,
-                                           void *server_handle,
-                                           cupolas_endpoint_register_fn_t register_fn)
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, void *server_handle,
+                                          cupolas_endpoint_register_fn_t register_fn)
 {
     if (!mgr || !server_handle || !register_fn)
         return AIRY_EINVAL;

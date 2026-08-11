@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_utils.c - Common Utility Functions Implementation
  */
@@ -32,7 +32,6 @@ size_t cupolas_strlcpy(char *dst, const char *src, size_t size)
     return src_len;
 }
 
-/* 安全的内存设置 */
 void cupolas_memset_s(void *ptr, size_t len)
 {
     if (!ptr || len == 0)
@@ -44,7 +43,6 @@ void cupolas_memset_s(void *ptr, size_t len)
     }
 }
 
-/* 安全的内存比较 */
 int cupolas_memcmp_s(const void *ptr1, const void *ptr2, size_t size)
 {
     if (!ptr1 || !ptr2)
@@ -64,7 +62,6 @@ int cupolas_memcmp_s(const void *ptr1, const void *ptr2, size_t size)
     return 0;
 }
 
-/* 时间戳获取 */
 uint64_t cupolas_get_timestamp_ms(void)
 {
 #ifdef _WIN32
@@ -76,7 +73,6 @@ uint64_t cupolas_get_timestamp_ms(void)
 #endif
 }
 
-/* 纳秒级时间戳获取 */
 uint64_t cupolas_get_timestamp_ns(void)
 {
 #ifdef _WIN32
@@ -91,7 +87,6 @@ uint64_t cupolas_get_timestamp_ns(void)
 #endif
 }
 
-/* 简单哈希函数 */
 uint32_t cupolas_hash_string(const char *str)
 {
     if (!str)
@@ -107,7 +102,6 @@ uint32_t cupolas_hash_string(const char *str)
     return hash;
 }
 
-/* 日志格式化输出 */
 void cupolas_log_message(const char *level, const char *format, ...)
 {
     if (!level || !format)

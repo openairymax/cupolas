@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * permission_rule.h - Permission Rule Manager Internal Interface
  */
@@ -26,12 +26,12 @@ extern "C" {
  * - Wildcard support via NULL fields
  */
 typedef struct permission_rule {
-    char *agent_id;               /**< Agent ID (NULL = wildcard) */
-    char *action;                 /**< Action name (NULL = wildcard) */
-    char *resource;               /**< Resource pattern (supports glob) */
-    char *resource_pattern;       /**< Pre-compiled pattern (optional) */
-    int allow;                    /**< Permission result (1=allow, 0=deny) */
-    int priority;                 /**< Priority (higher number = higher priority) */
+    char *agent_id; /**< Agent ID (NULL = wildcard) */
+    char *action; /**< Action name (NULL = wildcard) */
+    char *resource; /**< Resource pattern (supports glob) */
+    char *resource_pattern; /**< Pre-compiled pattern (optional) */
+    int allow; /**< Permission result (1=allow, 0=deny) */
+    int priority; /**< Priority (higher number = higher priority) */
     struct permission_rule *next; /**< Next rule in linked list */
 } permission_rule_t;
 
@@ -44,10 +44,10 @@ typedef struct permission_rule {
  * - Version control for change detection
  */
 typedef struct rule_manager {
-    permission_rule_t *rules;   /**< Linked list of rules */
-    cupolas_rwlock_t rwlock;    /**< Read-write lock for thread safety */
-    char *path;                 /**< Path to rules configuration file */
-    uint64_t last_mtime;        /**< Last modification time of config file */
+    permission_rule_t *rules; /**< Linked list of rules */
+    cupolas_rwlock_t rwlock; /**< Read-write lock for thread safety */
+    char *path; /**< Path to rules configuration file */
+    uint64_t last_mtime; /**< Last modification time of config file */
     cupolas_atomic32_t version; /**< Rule version counter */
 } rule_manager_t;
 

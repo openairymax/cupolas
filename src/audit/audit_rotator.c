@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * audit_rotator.c - Audit Log Rotator Implementation
  */
@@ -299,15 +299,15 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
     json_escape(entry->detail ? entry->detail : "", esc_detail, sizeof(esc_detail));
 
     char line_buf[4096];
-    int written = snprintf(line_buf, sizeof(line_buf),
-                          "{\"ts\":\"%s.%03u\",\"type\":\"%s\",\"agent\":\"%s\",\"action\":\"%s\","
-                          "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d,"
-                          "\"prev_hash\":\"%s\",\"curr_hash\":\"%s\"}\n",
-                          timestamp, (unsigned)(entry->timestamp_ms % 1000),
-                          cupolas_audit_event_type_str(entry->type), esc_agent, esc_action,
-                          esc_resource, esc_detail, entry->result,
-                          entry->prev_hash[0] ? entry->prev_hash : "",
-                          entry->curr_hash[0] ? entry->curr_hash : "");
+    int written =
+        snprintf(line_buf, sizeof(line_buf),
+                 "{\"ts\":\"%s.%03u\",\"type\":\"%s\",\"agent\":\"%s\",\"action\":\"%s\","
+                 "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d,"
+                 "\"prev_hash\":\"%s\",\"curr_hash\":\"%s\"}\n",
+                 timestamp, (unsigned)(entry->timestamp_ms % 1000),
+                 cupolas_audit_event_type_str(entry->type), esc_agent, esc_action, esc_resource,
+                 esc_detail, entry->result, entry->prev_hash[0] ? entry->prev_hash : "",
+                 entry->curr_hash[0] ? entry->curr_hash : "");
     fputs(line_buf, rotator->fp);
 
     if (written > 0) {

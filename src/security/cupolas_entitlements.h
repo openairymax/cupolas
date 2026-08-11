@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_entitlements.h - Entitlements Permission Declarations: Fine-grained Permission System
  */
@@ -27,31 +27,31 @@ extern "C" {
  * - Runtime enforcement: All operations check entitlements
  */
 typedef enum {
-    CUPOLAS_ENT_OK = 0,                 /**< Verification successful */
-    CUPOLAS_ENT_INVALID = -1,           /**< Invalid format */
+    CUPOLAS_ENT_OK = 0, /**< Verification successful */
+    CUPOLAS_ENT_INVALID = -1, /**< Invalid format */
     CUPOLAS_ENT_SIGNATURE_INVALID = -2, /**< Invalid signature */
-    CUPOLAS_ENT_EXPIRED = -3,           /**< Expired */
-    CUPOLAS_ENT_DENIED = -4,            /**< Permission denied */
-    CUPOLAS_ENT_NOT_FOUND = -5,         /**< Not found */
-    CUPOLAS_ENT_PARSE_ERROR = -6        /**< Parse error */
+    CUPOLAS_ENT_EXPIRED = -3, /**< Expired */
+    CUPOLAS_ENT_DENIED = -4, /**< Permission denied */
+    CUPOLAS_ENT_NOT_FOUND = -5, /**< Not found */
+    CUPOLAS_ENT_PARSE_ERROR = -6 /**< Parse error */
 } cupolas_ent_result_t;
 
 /**
  * @brief File system permission structure
  */
 typedef struct {
-    char *path;         /**< Path pattern (supports wildcards) */
+    char *path; /**< Path pattern (supports wildcards) */
     char **permissions; /**< Permission list (read, write, create, delete, execute) */
-    size_t perm_count;  /**< Number of permissions */
+    size_t perm_count; /**< Number of permissions */
 } cupolas_ent_fs_permission_t;
 
 /**
  * @brief Network permission structure
  */
 typedef struct {
-    char *host;      /**< Host pattern (supports wildcards) */
-    uint16_t port;   /**< Port (0 = any) */
-    char *protocol;  /**< Protocol (tcp, udp, http, https) */
+    char *host; /**< Host pattern (supports wildcards) */
+    uint16_t port; /**< Port (0 = any) */
+    char *protocol; /**< Protocol (tcp, udp, http, https) */
     char *direction; /**< Direction (inbound, outbound, both) */
 } cupolas_ent_net_permission_t;
 
@@ -59,22 +59,22 @@ typedef struct {
  * @brief IPC permission structure
  */
 typedef struct {
-    char *target;       /**< Target service */
+    char *target; /**< Target service */
     char **permissions; /**< Permission list (send, receive, call) */
-    size_t perm_count;  /**< Number of permissions */
+    size_t perm_count; /**< Number of permissions */
 } cupolas_ent_ipc_permission_t;
 
 /**
  * @brief Resource limits structure
  */
 typedef struct {
-    uint32_t max_cpu_percent;         /**< Max CPU percentage */
-    uint32_t max_cpu_cores;           /**< Max CPU cores */
-    uint64_t max_memory_bytes;        /**< Max memory in bytes */
-    uint64_t max_disk_bytes;          /**< Max disk in bytes */
-    uint32_t max_processes;           /**< Max processes */
-    uint32_t max_threads;             /**< Max threads */
-    uint32_t max_open_files;          /**< Max open files */
+    uint32_t max_cpu_percent; /**< Max CPU percentage */
+    uint32_t max_cpu_cores; /**< Max CPU cores */
+    uint64_t max_memory_bytes; /**< Max memory in bytes */
+    uint64_t max_disk_bytes; /**< Max disk in bytes */
+    uint32_t max_processes; /**< Max processes */
+    uint32_t max_threads; /**< Max threads */
+    uint32_t max_open_files; /**< Max open files */
     uint32_t max_network_connections; /**< Max network connections */
 } cupolas_ent_resource_limits_t;
 
@@ -82,9 +82,9 @@ typedef struct {
  * @brief Vault access permission structure
  */
 typedef struct {
-    char *cred_id;      /**< Credential identifier */
+    char *cred_id; /**< Credential identifier */
     char **permissions; /**< Permission list (read, write, delete) */
-    size_t perm_count;  /**< Number of permissions */
+    size_t perm_count; /**< Number of permissions */
 } cupolas_ent_vault_permission_t;
 
 /**
@@ -96,10 +96,10 @@ typedef struct cupolas_entitlements cupolas_entitlements_t;
  * @brief Complete entitlements structure
  */
 typedef struct {
-    char *agent_id;      /**< Agent identifier */
-    char *version;       /**< Version string */
+    char *agent_id; /**< Agent identifier */
+    char *version; /**< Version string */
     uint64_t not_before; /**< Validity start */
-    uint64_t not_after;  /**< Validity end */
+    uint64_t not_after; /**< Validity end */
 
     cupolas_ent_fs_permission_t *fs_permissions;
     size_t fs_count;

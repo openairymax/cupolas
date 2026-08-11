@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * permission_rule.c - Permission Rule Manager Implementation
  */
@@ -15,8 +15,7 @@
 
 #include "permission_rule.h"
 
-#include "yaml_minimal.h"  /* SP03: migrated to commons/utils/config_unified/include/ */
-
+#include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/include/ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -224,7 +223,7 @@ int rule_manager_reload(rule_manager_t *mgr)
                     const char *agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
                     const char *action = yaml_as_string(yaml_get(entry, "action"), "*");
                     const char *resource = yaml_as_string(yaml_get(entry, "resource"), "*");
-                    /* 缺省 allow 必须为拒绝（fail-closed），与上方 sequence 分支一致 */
+
                     int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), false);
                     int priority =
                         (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);

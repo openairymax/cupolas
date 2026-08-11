@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * audit_queue.h - Audit Queue Internal Interface: Thread-safe Producer-Consumer Queue
  */
@@ -28,10 +28,10 @@ extern "C" {
  */
 typedef enum audit_event_type {
     AUDIT_EVENT_PERMISSION = 1, /**< Permission check events */
-    AUDIT_EVENT_SANITIZER,      /**< Input sanitization events */
-    AUDIT_EVENT_WORKBENCH,      /**< Workbench execution events */
-    AUDIT_EVENT_SYSTEM,         /**< System-level events */
-    AUDIT_EVENT_CUSTOM          /**< Custom user-defined events */
+    AUDIT_EVENT_SANITIZER, /**< Input sanitization events */
+    AUDIT_EVENT_WORKBENCH, /**< Workbench execution events */
+    AUDIT_EVENT_SYSTEM, /**< System-level events */
+    AUDIT_EVENT_CUSTOM /**< Custom user-defined events */
 } audit_event_type_t;
 
 /**
@@ -40,15 +40,15 @@ typedef enum audit_event_type {
  * Represents a single audit log record with full context
  */
 typedef struct audit_entry {
-    uint64_t timestamp_ms;    /**< Event timestamp (milliseconds since epoch) */
-    audit_event_type_t type;  /**< Event type category */
-    char *agent_id;           /**< Agent identifier */
-    char *action;             /**< Action performed */
-    char *resource;           /**< Resource accessed */
-    char *detail;             /**< Additional details */
-    int result;               /**< Event result (1=success, 0=failure) */
-    char prev_hash[65];       /**< SHA-256 hash of previous entry (64 hex chars + null) */
-    char curr_hash[65];       /**< SHA-256 hash of current entry for chain validation */
+    uint64_t timestamp_ms; /**< Event timestamp (milliseconds since epoch) */
+    audit_event_type_t type; /**< Event type category */
+    char *agent_id; /**< Agent identifier */
+    char *action; /**< Action performed */
+    char *resource; /**< Resource accessed */
+    char *detail; /**< Additional details */
+    int result; /**< Event result (1=success, 0=failure) */
+    char prev_hash[65]; /**< SHA-256 hash of previous entry (64 hex chars + null) */
+    char curr_hash[65]; /**< SHA-256 hash of current entry for chain validation */
     struct audit_entry *next; /**< Next entry in linked list */
 } audit_entry_t;
 
@@ -62,14 +62,14 @@ typedef struct audit_entry {
  * - Bounded capacity with backpressure
  */
 typedef struct audit_queue {
-    audit_entry_t *head;             /**< Queue head (for pop operations) */
-    audit_entry_t *tail;             /**< Queue tail (for push operations) */
-    size_t size;                     /**< Current number of entries */
-    size_t max_size;                 /**< Maximum capacity (0 = unlimited) */
-    cupolas_mutex_t lock;            /**< Mutex for thread safety */
-    cupolas_cond_t not_empty;        /**< Condition: queue not empty */
-    cupolas_cond_t not_full;         /**< Condition: queue not full */
-    bool shutdown;                   /**< Shutdown flag */
+    audit_entry_t *head; /**< Queue head (for pop operations) */
+    audit_entry_t *tail; /**< Queue tail (for push operations) */
+    size_t size; /**< Current number of entries */
+    size_t max_size; /**< Maximum capacity (0 = unlimited) */
+    cupolas_mutex_t lock; /**< Mutex for thread safety */
+    cupolas_cond_t not_empty; /**< Condition: queue not empty */
+    cupolas_cond_t not_full; /**< Condition: queue not full */
+    bool shutdown; /**< Shutdown flag */
     cupolas_atomic64_t total_pushed; /**< Total entries pushed */
     cupolas_atomic64_t total_popped; /**< Total entries popped */
 } audit_queue_t;

@@ -1,5 +1,6 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /** @note This API is planned for next release. Enable with AIRY_ENABLE_V2_API to access. */
 /**
  * @file safety_guard.h
@@ -243,12 +244,10 @@ size_t safety_guard_get_guard_count(safety_guard_context_t *ctx);
 size_t safety_guard_get_policy_count(safety_guard_context_t *ctx);
 size_t safety_guard_get_audit_count(safety_guard_context_t *ctx);
 
-int safety_guard_check_permission(safety_guard_context_t *ctx,
-                                  safety_guard_type_t guard_type,
+int safety_guard_check_permission(safety_guard_context_t *ctx, safety_guard_type_t guard_type,
                                   const char *agent_id, bool *allowed);
 
 #endif /* AIRY_ENABLE_V2_API */
-
 #ifdef __cplusplus
 }
 #endif

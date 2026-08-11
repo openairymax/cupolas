@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * permission_cache.h - Permission Cache Internal Interface: Hash-based LRU Implementation
  */
@@ -28,12 +28,12 @@ extern "C" {
  * - Thread-safe with fine-grained locking
  */
 typedef struct cache_entry {
-    char *key;                 /**< Hash key (agent_id:action:resource:context) */
-    int result;                /**< Cached permission result (1=allow, 0=deny) */
-    uint64_t timestamp_ms;     /**< Creation timestamp (milliseconds) */
-    uint32_t hash;             /**< Pre-computed hash value */
-    struct cache_entry *prev;  /**< Previous entry in LRU list */
-    struct cache_entry *next;  /**< Next entry in LRU list */
+    char *key; /**< Hash key (agent_id:action:resource:context) */
+    int result; /**< Cached permission result (1=allow, 0=deny) */
+    uint64_t timestamp_ms; /**< Creation timestamp (milliseconds) */
+    uint32_t hash; /**< Pre-computed hash value */
+    struct cache_entry *prev; /**< Previous entry in LRU list */
+    struct cache_entry *next; /**< Next entry in LRU list */
     struct cache_entry *hnext; /**< Next entry in hash bucket chain */
 } cache_entry_t;
 
@@ -46,15 +46,15 @@ typedef struct cache_entry {
  * - Hit/miss statistics for monitoring
  */
 typedef struct cache_manager {
-    cache_entry_t **buckets;       /**< Hash table buckets */
-    size_t bucket_count;           /**< Number of hash buckets */
-    cache_entry_t *head;           /**< LRU list head (most recently used) */
-    cache_entry_t *tail;           /**< LRU list tail (least recently used) */
-    size_t capacity;               /**< Maximum number of entries */
-    size_t size;                   /**< Current number of entries */
-    uint32_t ttl_ms;               /**< Time-to-live in milliseconds (0=permanent) */
-    cupolas_mutex_t lock;          /**< Mutex for thread safety */
-    cupolas_atomic64_t hit_count;  /**< Cache hit counter */
+    cache_entry_t **buckets; /**< Hash table buckets */
+    size_t bucket_count; /**< Number of hash buckets */
+    cache_entry_t *head; /**< LRU list head (most recently used) */
+    cache_entry_t *tail; /**< LRU list tail (least recently used) */
+    size_t capacity; /**< Maximum number of entries */
+    size_t size; /**< Current number of entries */
+    uint32_t ttl_ms; /**< Time-to-live in milliseconds (0=permanent) */
+    cupolas_mutex_t lock; /**< Mutex for thread safety */
+    cupolas_atomic64_t hit_count; /**< Cache hit counter */
     cupolas_atomic64_t miss_count; /**< Cache miss counter */
 } cache_manager_t;
 

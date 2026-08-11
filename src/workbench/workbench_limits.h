@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * workbench_limits.h - Resource Limits Runtime Enforcement: Cross-platform Implementation
  */
@@ -32,15 +32,15 @@ extern "C" {
  * - macOS: Mach task with resource limits
  */
 typedef enum limit_type {
-    LIMIT_TYPE_MEMORY = 0,        /**< Memory usage limit */
-    LIMIT_TYPE_CPU_TIME,          /**< CPU time limit */
-    LIMIT_TYPE_CPU_WEIGHT,        /**< CPU weight/priority */
-    LIMIT_TYPE_PROCESSES,         /**< Maximum number of processes */
-    LIMIT_TYPE_THREADS,           /**< Maximum number of threads */
-    LIMIT_TYPE_FILE_SIZE,         /**< Maximum file size */
-    LIMIT_TYPE_FILE_DESCRIPTORS,  /**< Maximum open file descriptors */
+    LIMIT_TYPE_MEMORY = 0, /**< Memory usage limit */
+    LIMIT_TYPE_CPU_TIME, /**< CPU time limit */
+    LIMIT_TYPE_CPU_WEIGHT, /**< CPU weight/priority */
+    LIMIT_TYPE_PROCESSES, /**< Maximum number of processes */
+    LIMIT_TYPE_THREADS, /**< Maximum number of threads */
+    LIMIT_TYPE_FILE_SIZE, /**< Maximum file size */
+    LIMIT_TYPE_FILE_DESCRIPTORS, /**< Maximum open file descriptors */
     LIMIT_TYPE_NETWORK_BANDWIDTH, /**< Network bandwidth limit */
-    LIMIT_TYPE_IO_BANDWIDTH       /**< I/O bandwidth limit */
+    LIMIT_TYPE_IO_BANDWIDTH /**< I/O bandwidth limit */
 } limit_type_t;
 
 /**
@@ -48,18 +48,18 @@ typedef enum limit_type {
  */
 typedef enum limit_mode {
     LIMIT_MODE_SOFT = 0, /**< Soft limit (warning only) */
-    LIMIT_MODE_HARD,     /**< Hard limit (prevent allocation) */
-    LIMIT_MODE_ENFORCED  /**< Enforced limit (kill process) */
+    LIMIT_MODE_HARD, /**< Hard limit (prevent allocation) */
+    LIMIT_MODE_ENFORCED /**< Enforced limit (kill process) */
 } limit_mode_t;
 
 /**
  * @brief Limit status values
  */
 typedef enum limit_status {
-    LIMIT_STATUS_OK = 0,        /**< Within limits */
+    LIMIT_STATUS_OK = 0, /**< Within limits */
     LIMIT_STATUS_SOFT_EXCEEDED, /**< Soft limit exceeded */
     LIMIT_STATUS_HARD_EXCEEDED, /**< Hard limit exceeded */
-    LIMIT_STATUS_KILLED         /**< Process killed due to limit */
+    LIMIT_STATUS_KILLED /**< Process killed due to limit */
 } limit_status_t;
 
 /**
@@ -67,23 +67,19 @@ typedef enum limit_status {
  */
 typedef struct resource_stats {
     size_t memory_current; /**< Current memory usage in bytes */
-    size_t memory_peak;    /**< Peak memory usage in bytes */
-    size_t memory_limit;   /**< Memory limit in bytes */
+    size_t memory_peak; /**< Peak memory usage in bytes */
+    size_t memory_limit; /**< Memory limit in bytes */
 
     uint64_t cpu_time_ns; /**< CPU time consumed in nanoseconds */
-    uint32_t cpu_weight;  /**< CPU weight (1-10000) */
-
+    uint32_t cpu_weight; /**< CPU weight (1-10000) */
     uint32_t processes_current; /**< Current number of processes */
-    uint32_t processes_limit;   /**< Process limit */
-
+    uint32_t processes_limit; /**< Process limit */
     uint32_t threads_current; /**< Current number of threads */
-    uint32_t threads_limit;   /**< Thread limit */
-
+    uint32_t threads_limit; /**< Thread limit */
     size_t file_size_current; /**< Current file size in bytes */
-    size_t file_size_limit;   /**< File size limit in bytes */
-
+    size_t file_size_limit; /**< File size limit in bytes */
     uint32_t file_descriptors_current; /**< Current open file descriptors */
-    uint32_t file_descriptors_limit;   /**< File descriptor limit */
+    uint32_t file_descriptors_limit; /**< File descriptor limit */
 } resource_stats_t;
 
 /**

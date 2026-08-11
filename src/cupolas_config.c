@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_config.c - Configuration Manager: Runtime Configuration Updates
  */
@@ -183,7 +183,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
     if (file_path) {
         snprintf(entry->file_path, sizeof(entry->file_path), "%s", file_path);
     } else {
-        /* 拷贝 config_dir 到局部变量，避免 snprintf 源/目标重叠警告 (-Wrestrict) */
+
         char config_dir_copy[sizeof(entry->file_path)];
         snprintf(config_dir_copy, sizeof(config_dir_copy), "%s", cfg->config_dir);
 #pragma GCC diagnostic push

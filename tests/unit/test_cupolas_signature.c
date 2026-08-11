@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * test_cupolas_signature.c - Signature Module Unit Tests
  */
@@ -90,8 +90,9 @@ TEST(test_signature_verify_data)
     const uint8_t *fake_sig = (const uint8_t *)"fakesignature";
     size_t sig_len = 13;
 
-    int verify_result = cupolas_signature_verify_data(
-        data, data_len, fake_sig, sig_len, CUPOLAS_SIG_ALGO_RSA_SHA256, "test_data/public_key.pem");
+    int verify_result =
+        cupolas_signature_verify_data(data, data_len, fake_sig, sig_len,
+                                      CUPOLAS_SIG_ALGO_RSA_SHA256, "test_data/public_key.pem");
     if (verify_result != 0) {
         printf("Fake signature correctly rejected");
     } else {

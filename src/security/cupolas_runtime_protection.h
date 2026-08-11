@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_runtime_protection.h - Runtime Protection: seccomp, CFI, and Multiple Defense Layers
  */
@@ -28,10 +28,10 @@ extern "C" {
  * - Least privilege: Only necessary syscalls allowed
  */
 typedef enum {
-    CUPOLAS_PROTECT_NONE = 0,     /**< No protection */
-    CUPOLAS_PROTECT_BASIC = 1,    /**< Basic protection */
+    CUPOLAS_PROTECT_NONE = 0, /**< No protection */
+    CUPOLAS_PROTECT_BASIC = 1, /**< Basic protection */
     CUPOLAS_PROTECT_ENHANCED = 2, /**< Enhanced protection */
-    CUPOLAS_PROTECT_MAXIMUM = 3   /**< Maximum protection */
+    CUPOLAS_PROTECT_MAXIMUM = 3 /**< Maximum protection */
 } cupolas_protection_level_t;
 
 /**
@@ -49,49 +49,49 @@ typedef enum {
  */
 typedef enum {
     CUPOLAS_VIOLATION_NONE = 0,
-    CUPOLAS_VIOLATION_SYSCALL = 1,      /**< Illegal syscall */
-    CUPOLAS_VIOLATION_MEMORY = 2,       /**< Memory violation */
+    CUPOLAS_VIOLATION_SYSCALL = 1, /**< Illegal syscall */
+    CUPOLAS_VIOLATION_MEMORY = 2, /**< Memory violation */
     CUPOLAS_VIOLATION_CONTROL_FLOW = 3, /**< CFI violation */
-    CUPOLAS_VIOLATION_INTEGRITY = 4,    /**< Integrity violation */
-    CUPOLAS_VIOLATION_RESOURCE = 5      /**< Resource violation */
+    CUPOLAS_VIOLATION_INTEGRITY = 4, /**< Integrity violation */
+    CUPOLAS_VIOLATION_RESOURCE = 5 /**< Resource violation */
 } cupolas_violation_type_t;
 
 /**
  * @brief Memory protection configuration
  */
 typedef struct {
-    bool enable_aslr;            /**< Address space layout randomization */
-    bool enable_dep;             /**< Data execution prevention (NX bit) */
+    bool enable_aslr; /**< Address space layout randomization */
+    bool enable_dep; /**< Data execution prevention (NX bit) */
     bool enable_stack_protector; /**< Stack protector (Stack Canary) */
-    bool enable_heap_guard;      /**< Heap guard pages */
-    bool enable_mprotect;        /**< Memory page protection */
-    bool enable_guard_pages;     /**< Guard pages */
-    uint32_t stack_canary_type;  /**< Stack canary type */
+    bool enable_heap_guard; /**< Heap guard pages */
+    bool enable_mprotect; /**< Memory page protection */
+    bool enable_guard_pages; /**< Guard pages */
+    uint32_t stack_canary_type; /**< Stack canary type */
 } cupolas_memory_protect_config_t;
 
 /**
  * @brief Control flow integrity configuration
  */
 typedef struct {
-    bool enable_cfi;          /**< Control flow integrity */
-    bool enable_safestack;    /**< SafeStack */
+    bool enable_cfi; /**< Control flow integrity */
+    bool enable_safestack; /**< SafeStack */
     bool enable_shadow_stack; /**< Shadow stack */
-    bool enable_ibt;          /**< Indirect branch tracking */
-    bool enable_cet;          /**< Control-flow enforcement technology */
-    uint32_t cfi_level;       /**< CFI level (1-3) */
+    bool enable_ibt; /**< Indirect branch tracking */
+    bool enable_cet; /**< Control-flow enforcement technology */
+    uint32_t cfi_level; /**< CFI level (1-3) */
 } cupolas_cfi_config_t;
 
 /**
  * @brief Syscall filtering configuration
  */
 typedef struct {
-    bool enable_seccomp;           /**< Enable seccomp */
-    bool enable_seccomp_bpf;       /**< Enable BPF filtering */
-    int default_action;            /**< Default action (allow/deny/kill) */
+    bool enable_seccomp; /**< Enable seccomp */
+    bool enable_seccomp_bpf; /**< Enable BPF filtering */
+    int default_action; /**< Default action (allow/deny/kill) */
     const char **allowed_syscalls; /**< Allowed syscalls list */
-    size_t syscall_count;          /**< Number of syscalls */
-    const char **log_syscalls;     /**< Syscalls to log */
-    size_t log_count;              /**< Log count */
+    size_t syscall_count; /**< Number of syscalls */
+    const char **log_syscalls; /**< Syscalls to log */
+    size_t log_count; /**< Log count */
 } cupolas_seccomp_config_t;
 
 /**
@@ -100,10 +100,10 @@ typedef struct {
 typedef struct {
     bool enable_code_integrity; /**< Enable code integrity */
     bool enable_data_integrity; /**< Enable data integrity */
-    bool enable_ro_sections;    /**< Enable read-only sections */
-    bool enable_self_check;     /**< Enable self-check */
+    bool enable_ro_sections; /**< Enable read-only sections */
+    bool enable_self_check; /**< Enable self-check */
     uint32_t check_interval_ms; /**< Check interval (milliseconds) */
-    uint32_t hash_algorithm;    /**< Hash algorithm */
+    uint32_t hash_algorithm; /**< Hash algorithm */
 } cupolas_integrity_config_t;
 
 /**
@@ -117,7 +117,7 @@ typedef struct {
     cupolas_seccomp_config_t seccomp;
     cupolas_integrity_config_t integrity;
 
-    bool enable_audit;             /**< Enable audit logging */
+    bool enable_audit; /**< Enable audit logging */
     bool enable_violation_handler; /**< Enable violation handler */
     void (*violation_callback)(cupolas_violation_type_t type, const char *details);
 } cupolas_runtime_protect_config_t;
