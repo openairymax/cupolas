@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /**
  * @file guard_core.c
  * @brief SafetyGuard Core Implementation
@@ -22,14 +23,11 @@
 // 内存安全常量（SEC-02 合规）
 // ============================================================================
 
-/** @brief 最大输入数据大小（10 MB）— 防止恶意超大输入耗尽内存 */
 #define GUARD_MAX_INPUT_SIZE (10 * 1024 * 1024)
 
-/** @brief 最大自定义配置大小（1 MB）— 防止配置注入攻击 */
 #define GUARD_MAX_CUSTOM_CONFIG_SIZE (1 * 1024 * 1024)
 
 // ============================================================================
-// 内部数据结构
 // ============================================================================
 
 typedef struct guard_manager_private guard_manager_private_t;
@@ -64,12 +62,10 @@ struct guard_manager_private {
 };
 
 // ============================================================================
-// 静态辅助函数
 // ============================================================================
 
 static void *guard_async_worker(void *arg);
 
-// 生成唯一守卫ID
 static guard_id_t generate_guard_id(guard_manager_private_t *manager)
 {
     cupolas_mutex_lock(&manager->lock);
@@ -78,7 +74,6 @@ static guard_id_t generate_guard_id(guard_manager_private_t *manager)
     return id;
 }
 
-// 查找守卫索引（按ID）
 static size_t find_guard_index_by_id(guard_manager_private_t *manager, guard_id_t guard_id)
 {
     for (size_t i = 0; i < manager->guard_count; i++) {
@@ -89,7 +84,6 @@ static size_t find_guard_index_by_id(guard_manager_private_t *manager, guard_id_
     return SIZE_MAX;
 }
 
-// 查找守卫索引（按名称）
 static size_t find_guard_index_by_name(guard_manager_private_t *manager, const char *name)
 {
     if (!name)
@@ -103,13 +97,11 @@ static size_t find_guard_index_by_name(guard_manager_private_t *manager, const c
     return SIZE_MAX;
 }
 
-// 比较守卫优先级（用于排序）
 static int compare_guard_priority(const void *a, const void *b)
 {
     const guard_t *guard_a = *(const guard_t **)a;
     const guard_t *guard_b = *(const guard_t **)b;
 
-    // 按优先级降序排列（优先级高的先检测）
     if (guard_a->priority > guard_b->priority)
         return AIRY_ERR_UNKNOWN;
     if (guard_a->priority < guard_b->priority)
@@ -117,7 +109,6 @@ static int compare_guard_priority(const void *a, const void *b)
     return 0;
 }
 
-// 排序守卫数组（按优先级）
 static void sort_guards_by_priority(guard_manager_private_t *manager)
 {
     if (manager->guard_count < 2)
@@ -126,10 +117,8 @@ static void sort_guards_by_priority(guard_manager_private_t *manager)
     qsort(manager->guards, manager->guard_count, sizeof(guard_t *), compare_guard_priority);
 }
 
-// 前向声明
 static void free_guard_context(guard_context_t *context);
 
-// 复制检测上下文 - [INFRA] 保留供未来守卫上下文复制使用
 static guard_context_t *copy_guard_context(const guard_context_t *src)
 {
     if (!src)
@@ -139,7 +128,6 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
     if (!dst)
         return NULL;
 
-    // 复制字符串字段（如果非NULL）
     if (src->operation)
         dst->operation = AIRY_STRDUP(src->operation);
     if (src->resource)
@@ -149,12 +137,11 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
     if (src->session_id)
         dst->session_id = AIRY_STRDUP(src->session_id);
 
-    // 复制输入数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (src->input_data && src->input_size > 0) {
         if (src->input_size > GUARD_MAX_INPUT_SIZE) {
             airy_err_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
-                                  "copy_guard_context: input_size %zu exceeds max %zu",
-                                  src->input_size, (size_t)GUARD_MAX_INPUT_SIZE);
+                             "copy_guard_context: input_size %zu exceeds max %zu", src->input_size,
+                             (size_t)GUARD_MAX_INPUT_SIZE);
             free_guard_context(dst);
             return NULL;
         }
@@ -172,7 +159,6 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
     return dst;
 }
 
-// 释放检测上下文 - [INFRA] 保留供未来守卫上下文释放使用
 static void free_guard_context(guard_context_t *context)
 {
     if (!context)
@@ -193,7 +179,6 @@ static void free_guard_context(guard_context_t *context)
 }
 
 // ============================================================================
-// 守卫管理器API实现
 // ============================================================================
 
 guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
@@ -201,24 +186,20 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
     if (!config)
         return NULL;
 
-    // 分配管理器内存
     guard_manager_private_t *manager =
         (guard_manager_private_t *)AIRY_CALLOC(1, sizeof(guard_manager_private_t));
     if (!manager)
         return NULL;
 
-    // 复制配置
     manager->config = *config;
 
-    // 设置默认值
     if (manager->config.max_guards == 0) {
         manager->config.max_guards = 32;
     }
     if (manager->config.default_timeout_ms == 0) {
-        manager->config.default_timeout_ms = 5000;  // 5秒
+        manager->config.default_timeout_ms = 5000;
     }
 
-    // 分配守卫数组
     manager->guard_capacity = manager->config.max_guards;
     manager->guards = (guard_t **)AIRY_CALLOC(manager->guard_capacity, sizeof(guard_t *));
     if (!manager->guards) {
@@ -226,7 +207,6 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
         return NULL;
     }
 
-    // 初始化锁和条件变量
     if (cupolas_mutex_init(&manager->lock) != CUPOLAS_OK) {
         AIRY_FREE(manager->guards);
         AIRY_FREE(manager);
@@ -240,10 +220,9 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
         return NULL;
     }
 
-    // 初始化统计信息
     __builtin_memset(&manager->stats, 0, sizeof(manager->stats));
 
-    manager->next_guard_id = 1000;  // 起始ID
+    manager->next_guard_id = 1000;
     manager->initialized = true;
 
     return (guard_manager_t *)manager;
@@ -273,7 +252,6 @@ void guard_manager_destroy(guard_manager_t *manager)
     cupolas_mutex_destroy(&priv->lock);
     cupolas_cond_destroy(&priv->cond);
 
-    // 释放内存
     AIRY_FREE(priv->guards);
     AIRY_FREE(priv);
 }
@@ -287,25 +265,20 @@ int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard)
 
     cupolas_mutex_lock(&priv->lock);
 
-    // 检查容量
     if (priv->guard_count >= priv->guard_capacity) {
         cupolas_mutex_unlock(&priv->lock);
         return cupolas_ERROR_NO_MEMORY;
     }
 
-    // 检查名称是否重复
     if (find_guard_index_by_name(priv, guard->name) != SIZE_MAX) {
         cupolas_mutex_unlock(&priv->lock);
         return cupolas_ERROR_BUSY;
     }
 
-    // 分配ID
     guard->id = generate_guard_id(priv);
 
-    // 添加到数组
     priv->guards[priv->guard_count++] = guard;
 
-    // 按优先级排序
     if (priv->config.enable_priority_scheduling) {
         sort_guards_by_priority(priv);
     }
@@ -330,10 +303,8 @@ int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id
         return cupolas_ERROR_NOT_FOUND;
     }
 
-    // 移除守卫
     guard_t *guard = priv->guards[index];
 
-    // 移动后续元素
     for (size_t i = index; i < priv->guard_count - 1; i++) {
         priv->guards[i] = priv->guards[i + 1];
     }
@@ -341,7 +312,6 @@ int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id
 
     cupolas_mutex_unlock(&priv->lock);
 
-    // 销毁守卫
     guard_destroy(guard);
 
     return CUPOLAS_OK;
@@ -388,22 +358,18 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
 
     cupolas_mutex_lock(&priv->lock);
 
-    // 更新统计信息
     priv->stats.total_checks++;
 
-    // 执行每个守卫的检测
     size_t result_count = 0;
     uint64_t start_time = cupolas_get_timestamp_ns();
 
     for (size_t i = 0; i < priv->guard_count && result_count < max_results; i++) {
         guard_t *guard = priv->guards[i];
 
-        // 只检测启用的守卫
         if (!guard || guard->state != GUARD_STATE_ENABLED) {
             continue;
         }
 
-        // 执行检测
         guard_result_t result;
         __builtin_memset(&result, 0, sizeof(result));
 
@@ -440,7 +406,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
             size_t remaining = priv->guard_count - i - 1;
             if (remaining > 0) {
                 LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
-                           priv->guard_count, (unsigned long long)(elapsed / 1000000ULL));
+                         priv->guard_count, (unsigned long long)(elapsed / 1000000ULL));
             }
             break;
         }
@@ -449,7 +415,6 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
     uint64_t end_time = cupolas_get_timestamp_ns();
     uint64_t detection_time = end_time - start_time;
 
-    // 更新检测时间统计
     priv->stats.total_detection_time += detection_time;
     if (detection_time > priv->stats.max_detection_time) {
         priv->stats.max_detection_time = detection_time;
@@ -587,7 +552,6 @@ int guard_manager_reset_stats(guard_manager_t *manager)
 }
 
 // ============================================================================
-// 守卫实例管理API实现
 // ============================================================================
 
 guard_t *guard_create(const char *name, const char *description, guard_type_t type,
@@ -596,23 +560,19 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
     if (!name || !ops)
         return NULL;
 
-    // 分配守卫内存
     guard_t *guard = (guard_t *)AIRY_CALLOC(1, sizeof(guard_t));
     if (!guard)
         return NULL;
 
-    // 复制名称和描述
     AIRY_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
     if (description) {
         AIRY_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
     }
 
-    // 设置基本属性
     guard->type = type;
     guard->state = GUARD_STATE_DISABLED;
     guard->priority = GUARD_PRIORITY_NORMAL;
 
-    // 复制操作函数表
     guard->ops = (guard_ops_t *)AIRY_MALLOC(sizeof(guard_ops_t));
     if (!guard->ops) {
         AIRY_FREE(guard);
@@ -620,7 +580,6 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
     }
     __builtin_memcpy(guard->ops, ops, sizeof(guard_ops_t));
 
-    // 初始化统计信息
     __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
 
     guard->created_time = cupolas_get_timestamp_ns();
@@ -633,20 +592,16 @@ void guard_destroy(guard_t *guard)
     if (!guard)
         return;
 
-    // 调用清理函数
     if (guard->ops && guard->ops->cleanup) {
         guard->ops->cleanup(guard->priv_data);
     }
 
-    // 清理操作函数表
     if (guard->ops)
         AIRY_FREE(guard->ops);
 
-    // 清理私有数据
     if (guard->priv_data)
         AIRY_FREE(guard->priv_data);
 
-    // 清理配置中的自定义数据
     if (guard->config.custom_config)
         AIRY_FREE(guard->config.custom_config);
 
@@ -658,24 +613,22 @@ int guard_init(guard_t *guard, const guard_config_t *config)
     if (!guard || !config || !guard->ops)
         return cupolas_ERROR_INVALID_ARG;
 
-    // 复制配置
     guard->config = *config;
 
-    // 复制自定义配置数据（SEC-02: 前置大小校验防缓冲区溢出）
     if (config->custom_config && config->custom_config_size > 0) {
         if (config->custom_config_size > GUARD_MAX_CUSTOM_CONFIG_SIZE) {
             airy_err_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
-                                  "guard_init: custom_config_size %zu exceeds max %zu",
-                                  config->custom_config_size, (size_t)GUARD_MAX_CUSTOM_CONFIG_SIZE);
+                             "guard_init: custom_config_size %zu exceeds max %zu",
+                             config->custom_config_size, (size_t)GUARD_MAX_CUSTOM_CONFIG_SIZE);
             return cupolas_ERROR_INVALID_ARG;
         }
         guard->config.custom_config = AIRY_MALLOC(config->custom_config_size);
         if (!guard->config.custom_config)
             return cupolas_ERROR_NO_MEMORY;
-        __builtin_memcpy(guard->config.custom_config, config->custom_config, config->custom_config_size);
+        __builtin_memcpy(guard->config.custom_config, config->custom_config,
+                         config->custom_config_size);
     }
 
-    // 调用守卫初始化函数
     if (guard->ops->init) {
         int result = guard->ops->init(guard->priv_data, config);
         if (result != CUPOLAS_OK) {
@@ -695,15 +648,12 @@ int guard_check(guard_t *guard, const guard_context_t *context, guard_result_t *
     if (!guard || !context || !result || !guard->ops)
         return cupolas_ERROR_INVALID_ARG;
 
-    // 检查守卫状态
     if (guard->state != GUARD_STATE_ENABLED && guard->state != GUARD_STATE_ACTIVE) {
         return cupolas_ERROR_BUSY;
     }
 
-    // 更新最后使用时间
     guard->last_used_time = cupolas_get_timestamp_ns();
 
-    // 调用检测函数
     if (!guard->ops->check)
         return cupolas_ERROR_NOT_SUPPORTED;
 
@@ -711,15 +661,12 @@ int guard_check(guard_t *guard, const guard_context_t *context, guard_result_t *
     int check_result = guard->ops->check(guard->priv_data, context, result);
     uint64_t end_time = cupolas_get_timestamp_ns();
 
-    // 更新统计信息
     guard->stats.total_checks++;
     guard->stats.total_detection_time += (end_time - start_time);
 
     if (check_result == CUPOLAS_OK) {
-        // 更新检测时间
         result->detection_time = end_time - start_time;
 
-        // 更新风险统计
         if (result->risk_level == RISK_LEVEL_SAFE) {
             guard->stats.safe_checks++;
         } else {

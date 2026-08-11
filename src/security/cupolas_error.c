@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_error.c - Unified Error Code Implementation
  */
@@ -33,27 +33,48 @@
 const char *cupolas_error_string(cupolas_error_t error)
 {
     switch (error) {
-    case cupolas_ERR_OK:               return "Success";
-    case cupolas_ERR_UNKNOWN:          return "Unknown error";
-    case cupolas_ERR_INVALID_PARAM:    return "Invalid parameter";
-    case cupolas_ERR_NULL_POINTER:     return "Null pointer";
-    case cupolas_ERR_OUT_OF_MEMORY:    return "Out of memory";
-    case cupolas_ERR_BUFFER_TOO_SMALL: return "Buffer too small";
-    case cupolas_ERR_NOT_FOUND:        return "Not found";
-    case cupolas_ERR_ALREADY_EXISTS:   return "Already exists";
-    case cupolas_ERR_TIMEOUT:          return "Timeout";
-    case cupolas_ERR_NOT_SUPPORTED:    return "Not supported";
-    case cupolas_ERR_PERMISSION_DENIED: return "Permission denied";
-    case cupolas_ERR_IO:               return "I/O error";
-    case cupolas_ERR_STATE_ERROR:      return "State error";
-    case cupolas_ERR_OVERFLOW:         return "Overflow";
-    case cupolas_ERR_TRY_AGAIN:        return "Try again";
-    case cupolas_ERR_AUTH_FAILED:      return "Authentication failed";
-    case cupolas_ERR_CERT_INVALID:     return "Certificate invalid";
-    case cupolas_ERR_CERT_EXPIRED:     return "Certificate expired";
-    case cupolas_ERR_SIGNATURE_INVALID: return "Signature invalid";
-    case cupolas_ERR_TAMPERED:         return "Data tampered";
-    default:                           return "Unknown error";
+    case cupolas_ERR_OK:
+        return "Success";
+    case cupolas_ERR_UNKNOWN:
+        return "Unknown error";
+    case cupolas_ERR_INVALID_PARAM:
+        return "Invalid parameter";
+    case cupolas_ERR_NULL_POINTER:
+        return "Null pointer";
+    case cupolas_ERR_OUT_OF_MEMORY:
+        return "Out of memory";
+    case cupolas_ERR_BUFFER_TOO_SMALL:
+        return "Buffer too small";
+    case cupolas_ERR_NOT_FOUND:
+        return "Not found";
+    case cupolas_ERR_ALREADY_EXISTS:
+        return "Already exists";
+    case cupolas_ERR_TIMEOUT:
+        return "Timeout";
+    case cupolas_ERR_NOT_SUPPORTED:
+        return "Not supported";
+    case cupolas_ERR_PERMISSION_DENIED:
+        return "Permission denied";
+    case cupolas_ERR_IO:
+        return "I/O error";
+    case cupolas_ERR_STATE_ERROR:
+        return "State error";
+    case cupolas_ERR_OVERFLOW:
+        return "Overflow";
+    case cupolas_ERR_TRY_AGAIN:
+        return "Try again";
+    case cupolas_ERR_AUTH_FAILED:
+        return "Authentication failed";
+    case cupolas_ERR_CERT_INVALID:
+        return "Certificate invalid";
+    case cupolas_ERR_CERT_EXPIRED:
+        return "Certificate expired";
+    case cupolas_ERR_SIGNATURE_INVALID:
+        return "Signature invalid";
+    case cupolas_ERR_TAMPERED:
+        return "Data tampered";
+    default:
+        return "Unknown error";
     }
 }
 

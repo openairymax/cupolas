@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * network_filter.c - Network Filter and Access Control Module Implementation
  */
@@ -129,10 +129,8 @@ static int is_private_ip(const char *ip_addr)
     if (!ip_addr || ip_addr[0] == '\0')
         return 0;
 
-    /* 检查是否为 IPv4 地址 (包含 '.') */
     const char *dot = strchr(ip_addr, '.');
-    if (dot)
-    {
+    if (dot) {
         unsigned int a, b, c, d;
         char ip_copy[64];
         AIRY_STRNCPY_TERM(ip_copy, ip_addr, sizeof(ip_copy));
@@ -142,8 +140,7 @@ static int is_private_ip(const char *ip_addr)
         char *tok_b = strtok_r(NULL, ".", &saveptr);
         char *tok_c = strtok_r(NULL, ".", &saveptr);
         char *tok_d = strtok_r(NULL, ".\r\n", &saveptr);
-        if (tok_a && tok_b && tok_c && tok_d)
-        {
+        if (tok_a && tok_b && tok_c && tok_d) {
             a = (unsigned int)strtoul(tok_a, NULL, 10);
             b = (unsigned int)strtoul(tok_b, NULL, 10);
             c = (unsigned int)strtoul(tok_c, NULL, 10);
@@ -159,30 +156,28 @@ static int is_private_ip(const char *ip_addr)
             /* 192.168.0.0/16 */
             if (a == 192 && b == 168)
                 return 1;
-            /* 127.0.0.0/8 (回环) */
+
             if (a == 127)
                 return 1;
-            /* 169.254.0.0/16 (链路本地) */
+
             if (a == 169 && b == 254)
                 return 1;
-            /* 0.0.0.0/8 (当前网络) */
+
             if (a == 0)
                 return 1;
         }
         return 0;
     }
 
-    /* 检查是否为 IPv6 地址 (包含 ':') */
     const char *colon = strchr(ip_addr, ':');
-    if (colon)
-    {
-        /* ::1 (回环) */
+    if (colon) {
+
         if (strcmp(ip_addr, "::1") == 0)
             return 1;
-        /* 检查以 "fc" 或 "fd" 开头 (fc00::/7) */
+
         if (ip_addr[0] == 'f' && (ip_addr[1] == 'c' || ip_addr[1] == 'd'))
             return 1;
-        /* 检查以 "fe80" 开头 (fe80::/10) */
+
         if (strncmp(ip_addr, "fe80", 4) == 0)
             return 1;
         return 0;
@@ -331,9 +326,7 @@ int network_filter_check_access(const char *host, uint16_t port, cupolas_protoco
 
     g_filter.stats.total_connections++;
 
-    /* === 编码契约: 私有地址检测（SSRF 防护）=== */
-    if (is_private_ip(host))
-    {
+    if (is_private_ip(host)) {
         CUPOLAS_LOG_ERROR("SSRF prevention: blocked access to private IP %s:%u", host, port);
         g_filter.stats.blocked_connections++;
         return 0;

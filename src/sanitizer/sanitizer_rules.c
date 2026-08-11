@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * sanitizer_rules.c - Sanitizer Rules Manager Implementation
  */
@@ -131,7 +131,7 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
 
                     if (out_len - pat_len + rep_len < output_size) {
                         __builtin_memmove(found + rep_len, found + pat_len,
-                                out_len - (found - output) - pat_len);
+                                          out_len - (found - output) - pat_len);
                         __builtin_memcpy(found, rule->replacement, rep_len);
                     }
                 }

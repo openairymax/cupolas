@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_vault.h - Secure Credential Storage: iOS Keychain-like Secure Storage
  */
@@ -34,10 +34,10 @@ extern "C" {
  * 符合编码契约要求: 支持四种凭证轮换策略，用于多凭证集之间的切换。
  */
 typedef enum {
-    CUPOLAS_VAULT_ROTATE_ROUND_ROBIN = 1,  /**< 轮询: 按顺序轮换凭证 */
-    CUPOLAS_VAULT_ROTATE_LEAST_USED  = 2,  /**< 最少使用: 轮换使用次数最少的凭证 */
-    CUPOLAS_VAULT_ROTATE_RATE_LIMITED = 3, /**< 速率限制: 按速率限制轮换凭证 */
-    CUPOLAS_VAULT_ROTATE_PRIORITY    = 4   /**< 优先级: 按优先级轮换凭证 */
+    CUPOLAS_VAULT_ROTATE_ROUND_ROBIN = 1,
+    CUPOLAS_VAULT_ROTATE_LEAST_USED = 2,
+    CUPOLAS_VAULT_ROTATE_RATE_LIMITED = 3,
+    CUPOLAS_VAULT_ROTATE_PRIORITY = 4
 } cupolas_vault_rotation_strategy_t;
 
 /**
@@ -54,25 +54,25 @@ typedef enum {
  * @brief Credential metadata structure
  */
 typedef struct {
-    char *cred_id;                  /**< Credential identifier */
+    char *cred_id; /**< Credential identifier */
     cupolas_vault_cred_type_t type; /**< Credential type */
-    char *description;              /**< Description */
-    char *service;                  /**< Service name */
-    char *account;                  /**< Account name */
-    uint64_t created_at;            /**< Creation timestamp */
-    uint64_t updated_at;            /**< Last update timestamp */
-    uint64_t expires_at;            /**< Expiration timestamp */
-    bool is_accessible;             /**< Is accessible */
+    char *description; /**< Description */
+    char *service; /**< Service name */
+    char *account; /**< Account name */
+    uint64_t created_at; /**< Creation timestamp */
+    uint64_t updated_at; /**< Last update timestamp */
+    uint64_t expires_at; /**< Expiration timestamp */
+    bool is_accessible; /**< Is accessible */
 } cupolas_vault_metadata_t;
 
 /**
  * @brief ACL entry structure
  */
 typedef struct {
-    char *agent_id;            /**< Agent ID */
-    uint32_t operations;       /**< Allowed operations (bitmask) */
-    uint64_t expires_at;       /**< Access expiration */
-    uint32_t access_count;     /**< Access count */
+    char *agent_id; /**< Agent ID */
+    uint32_t operations; /**< Allowed operations (bitmask) */
+    uint64_t expires_at; /**< Access expiration */
+    uint32_t access_count; /**< Access count */
     uint32_t max_access_count; /**< Maximum access count */
 } cupolas_vault_acl_entry_t;
 
@@ -88,12 +88,12 @@ typedef struct {
  * @brief Vault configuration
  */
 typedef struct {
-    const char *storage_path;    /**< Storage path */
+    const char *storage_path; /**< Storage path */
     const char *master_key_path; /**< Master key path */
-    bool enable_audit;           /**< Enable audit logging */
-    bool enable_auto_lock;       /**< Enable auto-lock */
-    uint32_t auto_lock_seconds;  /**< Auto-lock timeout */
-    uint32_t max_retry_count;    /**< Maximum retry count */
+    bool enable_audit; /**< Enable audit logging */
+    bool enable_auto_lock; /**< Enable auto-lock */
+    uint32_t auto_lock_seconds; /**< Auto-lock timeout */
+    uint32_t max_retry_count; /**< Maximum retry count */
 } cupolas_vault_config_t;
 
 /**
@@ -458,8 +458,8 @@ int cupolas_vault_generate_keypair(char *public_key_out, size_t *pub_len, char *
  * @ownership vault: BORROW, cred_group: BORROW, selected_id: BORROW
  */
 int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_group,
-                                    cupolas_vault_rotation_strategy_t strategy,
-                                    char *selected_id, size_t id_buf_size);
+                                    cupolas_vault_rotation_strategy_t strategy, char *selected_id,
+                                    size_t id_buf_size);
 
 #ifdef __cplusplus
 }

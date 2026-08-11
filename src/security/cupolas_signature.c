@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /**
  * @file cupolas_signature.c
  * @brief 代码签名验证实现
@@ -19,7 +20,6 @@
 #include <string.h>
 #include <time.h>
 
-/* OpenSSL 头文件 */
 #ifdef CUPOLAS_USE_OPENSSL
 #include <openssl/ec.h>
 #include <openssl/err.h>

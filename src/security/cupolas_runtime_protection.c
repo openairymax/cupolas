@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_runtime_protection.c - Enhanced Runtime Protection: seccomp, CFI Implementation
  */
@@ -604,7 +604,7 @@ int cupolas_seccomp_add_rule(const char *syscall_name, uint32_t arg_index, const
     rule->action = action;
     rule->arg_index = arg_index;
     rule->arg_value = value;
-AIRY_STRNCPY_TERM(rule->op, op, sizeof(rule->op));
+    AIRY_STRNCPY_TERM(rule->op, op, sizeof(rule->op));
     rule->op[sizeof(rule->op) - 1] = '\0';
     g_runtime_prot.seccomp_rule_count++;
     cupolas_mutex_unlock(&g_runtime_prot.lock);

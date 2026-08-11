@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * permission_cache.c - Permission Cache Implementation: Hash-based LRU Cache
  */
@@ -19,7 +19,6 @@
 #include <string.h>
 
 #include "error.h"
-
 
 #define DEFAULT_BUCKET_COUNT 64
 #define MAX_BUCKET_COUNT 4096

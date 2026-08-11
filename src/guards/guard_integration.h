@@ -1,5 +1,6 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /**
  * @file guard_integration.h
  * @brief SafetyGuard与Cupolas组件集成接口
@@ -16,10 +17,9 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// 集成API
-// ============================================================================
+/* ============================================================================ */
 
+/* ============================================================================ */
 /**
  * @brief 初始化Cupolas守卫集成
  * @param config 守卫管理器配置
@@ -96,4 +96,4 @@ CUPOLAS_API void cupolas_guards_unregister_hooks(void);
 }
 #endif
 
-#endif  // CUPOLAS_GUARD_INTEGRATION_H
+#endif /* CUPOLAS_GUARD_INTEGRATION_H */

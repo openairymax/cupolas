@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_signature.h - Code Signature Verification: Ensure Agent Code Authenticity and Integrity
  */
@@ -27,15 +27,15 @@ extern "C" {
  * - Anti-tampering: Real-time integrity checking
  */
 typedef enum {
-    CUPOLAS_SIG_OK = 0,               /**< Signature valid */
-    CUPOLAS_SIG_INVALID = -1,         /**< Signature invalid */
-    CUPOLAS_SIG_EXPIRED = -2,         /**< Signature expired */
-    CUPOLAS_SIG_REVOKED = -3,         /**< Signature revoked */
-    CUPOLAS_SIG_UNTRUSTED = -4,       /**< Untrusted signer */
-    CUPOLAS_SIG_TAMPERED = -5,        /**< Content tampered */
-    CUPOLAS_SIG_NO_SIGNATURE = -6,    /**< No signature present */
-    CUPOLAS_SIG_CERT_INVALID = -7,    /**< Certificate invalid */
-    CUPOLAS_SIG_CERT_EXPIRED = -8,    /**< Certificate expired */
+    CUPOLAS_SIG_OK = 0, /**< Signature valid */
+    CUPOLAS_SIG_INVALID = -1, /**< Signature invalid */
+    CUPOLAS_SIG_EXPIRED = -2, /**< Signature expired */
+    CUPOLAS_SIG_REVOKED = -3, /**< Signature revoked */
+    CUPOLAS_SIG_UNTRUSTED = -4, /**< Untrusted signer */
+    CUPOLAS_SIG_TAMPERED = -5, /**< Content tampered */
+    CUPOLAS_SIG_NO_SIGNATURE = -6, /**< No signature present */
+    CUPOLAS_SIG_CERT_INVALID = -7, /**< Certificate invalid */
+    CUPOLAS_SIG_CERT_EXPIRED = -8, /**< Certificate expired */
     CUPOLAS_SIG_ALGO_UNSUPPORTED = -9 /**< Algorithm unsupported */
 } cupolas_sig_result_t;
 
@@ -48,7 +48,7 @@ typedef enum {
     CUPOLAS_SIG_ALGO_RSA_SHA512 = 3, /**< RSA with SHA-512 */
     CUPOLAS_SIG_ALGO_ECDSA_P256 = 4, /**< ECDSA P-256 */
     CUPOLAS_SIG_ALGO_ECDSA_P384 = 5, /**< ECDSA P-384 */
-    CUPOLAS_SIG_ALGO_ED25519 = 6     /**< Ed25519 */
+    CUPOLAS_SIG_ALGO_ED25519 = 6 /**< Ed25519 */
 } cupolas_sig_algo_t;
 
 /**
@@ -65,14 +65,14 @@ typedef struct cupolas_signature cupolas_signature_t;
  * @brief Signature verification configuration
  */
 typedef struct {
-    bool check_cert_chain;       /**< Verify certificate chain */
-    bool check_revocation;       /**< Check revocation status */
-    bool check_timestamp;        /**< Verify timestamp */
-    bool allow_self_signed;      /**< Allow self-signed */
-    bool allow_expired_test;     /**< Allow expired for testing */
+    bool check_cert_chain; /**< Verify certificate chain */
+    bool check_revocation; /**< Check revocation status */
+    bool check_timestamp; /**< Verify timestamp */
+    bool allow_self_signed; /**< Allow self-signed */
+    bool allow_expired_test; /**< Allow expired for testing */
     const char *trusted_ca_path; /**< Trusted CA bundle path */
-    const char *crl_path;        /**< CRL distribution path */
-    uint32_t max_chain_depth;    /**< Maximum chain depth */
+    const char *crl_path; /**< CRL distribution path */
+    uint32_t max_chain_depth; /**< Maximum chain depth */
 } cupolas_sig_config_t;
 
 /**

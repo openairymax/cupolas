@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * test_cupolas_integration.c - cupolas Module Integration Tests (INT-11)
  *
@@ -87,72 +87,65 @@ static void test_fourfold_protection_chain(void)
     }
 
     /* --- Phase 1: Permission Engine --- */
-    /* 添加规则并验证权限检查 */
-    int perm_err = cupolas_add_permission_rule(
-        "test_agent_1", "read", "/data/reports/*", 1, 100);
+    int perm_err = cupolas_add_permission_rule("test_agent_1", "read", "/data/reports/*", 1, 100);
     if (perm_err == AIRY_OK) {
         TEST_PASS("fourfold_chain: permission rule added");
 
-        /* 检查应允许的操作 */
-        int allowed = cupolas_check_permission(
-            "test_agent_1", "read", "/data/reports/q1.csv", NULL);
+
+        int allowed =
+            cupolas_check_permission("test_agent_1", "read", "/data/reports/q1.csv", NULL);
         if (allowed == 1)
             TEST_PASS("fourfold_chain: permission check allows matching operation");
         else
             TEST_PASS("fourfold_chain: permission check executed (result=%d)", allowed);
 
-        /* 检查应拒绝的操作 */
-        int denied = cupolas_check_permission(
-            "test_agent_1", "write", "/data/reports/q1.csv", NULL);
+
+        int denied =
+            cupolas_check_permission("test_agent_1", "write", "/data/reports/q1.csv", NULL);
         if (denied == 0)
             TEST_PASS("fourfold_chain: permission check denies unauthorized write");
         else
             TEST_PASS("fourfold_chain: permission check executed (result=%d)", denied);
 
-        /* 清理缓存 */
+
         cupolas_clear_permission_cache();
         TEST_PASS("fourfold_chain: permission cache cleared");
     } else {
         TEST_PASS("fourfold_chain: permission engine check completed (err=%d)", perm_err);
     }
 
-    /* --- Phase 2: Input Sanitizer（多种攻击向量） --- */
+
     const struct {
         const char *input;
         const char *desc;
-    } test_vectors[] = {
-        {"<img src=x onerror=alert(1)>", "XSS injection"},
-        {"Robert'); DROP TABLE Students;--", "SQL injection"},
-        {"${system('rm -rf /')}", "command injection"},
-        {"../etc/passwd", "path traversal"},
-        {"normal text input", "clean input"},
-        {NULL, NULL}
-    };
+    } test_vectors[] = {{"<img src=x onerror=alert(1)>", "XSS injection"},
+                        {"Robert'); DROP TABLE Students;--", "SQL injection"},
+                        {"${system('rm -rf /')}", "command injection"},
+                        {"../etc/passwd", "path traversal"},
+                        {"normal text input", "clean input"},
+                        {NULL, NULL}};
 
     for (int i = 0; test_vectors[i].input; i++) {
         char sanitized[512] = {0};
-        int san_ret = cupolas_sanitize_input(
-            test_vectors[i].input, sanitized, sizeof(sanitized));
-        printf("    Sanitize [%s]: ret=%d, output=%.40s\n",
-               test_vectors[i].desc, san_ret, sanitized);
+        int san_ret = cupolas_sanitize_input(test_vectors[i].input, sanitized, sizeof(sanitized));
+        printf("    Sanitize [%s]: ret=%d, output=%.40s\n", test_vectors[i].desc, san_ret,
+               sanitized);
     }
     TEST_PASS("fourfold_chain: sanitizer handles multiple attack vectors");
 
     /* --- Phase 3: Audit Logging --- */
-    /* 刷新审计日志 — 验证审计子系统可工作 */
+
     cupolas_flush_audit_log();
     TEST_PASS("fourfold_chain: audit log flushed");
 
     /* --- Phase 4: Four-fold chain end-to-end --- */
-    /* 模拟: 输入净化 → 权限检查 → (网络过滤是内部的) → 审计追踪 */
     {
         const char *agent_input = "Analyze /data/reports/sales.csv for Q1 trends";
         char clean_output[512] = {0};
 
-        int san_ret = cupolas_sanitize_input(
-            agent_input, clean_output, sizeof(clean_output));
-        int perm_ret = cupolas_check_permission(
-            "test_agent_1", "read", "/data/reports/sales.csv", NULL);
+        int san_ret = cupolas_sanitize_input(agent_input, clean_output, sizeof(clean_output));
+        int perm_ret =
+            cupolas_check_permission("test_agent_1", "read", "/data/reports/sales.csv", NULL);
 
         printf("    Chain: sanitize=%d, permission=%d\n", san_ret, perm_ret);
     }
@@ -176,19 +169,15 @@ static void test_sanitization_latency(void)
     }
 
     const char *test_inputs[] = {
-        "Hello World",
-        "<script>alert('xss')</script>",
-        "SELECT * FROM users WHERE name = 'admin'",
-        "A very long input string "  "that contains lots of regular content "
+        "Hello World", "<script>alert('xss')</script>", "SELECT * FROM users WHERE name = 'admin'",
+        "A very long input string "
+        "that contains lots of regular content "
         "and also some <special> characters & entities; to test performance",
-        NULL
-    };
+        NULL};
 
-    /* 预热 */
     char warmup[256];
     cupolas_sanitize_input("warmup", warmup, sizeof(warmup));
 
-    /* 正式测量 */
     const int iterations = 1000;
     double total_us = 0.0;
     int measurements = 0;
@@ -203,14 +192,12 @@ static void test_sanitization_latency(void)
         }
         clock_gettime(CLOCK_MONOTONIC, &end);
 
-        double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 +
-                            (end.tv_nsec - start.tv_nsec) / 1e3;
+        double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_nsec - start.tv_nsec) / 1e3;
         double avg_us = elapsed_us / iterations;
         total_us += avg_us;
         measurements++;
 
-        printf("    Input \"%.30s\": avg %.2f us/op\n",
-               test_inputs[i], avg_us);
+        printf("    Input \"%.30s\": avg %.2f us/op\n", test_inputs[i], avg_us);
     }
 
     if (measurements > 0) {
@@ -241,34 +228,31 @@ static void test_sha256_audit_chain(void)
         return;
     }
 
-    /* Phase 1: 执行一系列操作以生成审计记录 */
     {
-        /* 添加权限规则 */
+
         cupolas_add_permission_rule("audit_agent", "read", "/data/*", 1, 50);
 
-        /* 执行权限检查 */
+
         cupolas_check_permission("audit_agent", "read", "/data/file1.txt", NULL);
         cupolas_check_permission("audit_agent", "write", "/data/file1.txt", NULL);
         cupolas_check_permission("unknown_agent", "read", "/data/file1.txt", NULL);
 
-        /* 执行输入净化 */
+
         char output[256];
         cupolas_sanitize_input("test input", output, sizeof(output));
         cupolas_sanitize_input("<img src=x>", output, sizeof(output));
     }
     TEST_PASS("sha256_audit: operations executed for audit trail");
 
-    /* Phase 2: 刷新审计日志（确保写入持久化） */
+
     cupolas_flush_audit_log();
     TEST_PASS("sha256_audit: audit log flushed to disk");
 
-    /* Phase 3: 验证审计日志完整性 */
-    /* 通过再次初始化/清缓存后检查权限来间接验证审计链 */
+
     cupolas_clear_permission_cache();
 
-    /* 重置环境后检查 */
-    int allowed = cupolas_check_permission(
-        "audit_agent", "read", "/data/file1.txt", NULL);
+
+    int allowed = cupolas_check_permission("audit_agent", "read", "/data/file1.txt", NULL);
     printf("    Post-cache-clear permission check: %d (re-evaluated from rules)\n", allowed);
     TEST_PASS("sha256_audit: audit chain integrity verified (no tampering detected)");
 
@@ -286,10 +270,8 @@ static void test_credential_rotation_strategies(void)
     int ret = cupolas_init(NULL, &error);
     if (ret != AIRY_OK) {
         TEST_PASS("credential_rotation: vault init skipped (no separate init needed)");
-        /* vault 可能内嵌在 cupolas_init 中 */
     }
 
-    /* 验证四种轮换策略枚举可用 */
     int strategies_defined = 0;
 
     /* Round Robin */
@@ -299,8 +281,7 @@ static void test_credential_rotation_strategies(void)
 
     /* Least Used */
     strategies_defined++;
-    printf("    Rotation strategy: LEAST_USED (value=%d)\n",
-           (int)CUPOLAS_VAULT_ROTATE_LEAST_USED);
+    printf("    Rotation strategy: LEAST_USED (value=%d)\n", (int)CUPOLAS_VAULT_ROTATE_LEAST_USED);
 
     /* Rate Limited */
     strategies_defined++;
@@ -309,8 +290,7 @@ static void test_credential_rotation_strategies(void)
 
     /* Priority */
     strategies_defined++;
-    printf("    Rotation strategy: PRIORITY (value=%d)\n",
-           (int)CUPOLAS_VAULT_ROTATE_PRIORITY);
+    printf("    Rotation strategy: PRIORITY (value=%d)\n", (int)CUPOLAS_VAULT_ROTATE_PRIORITY);
 
     if (strategies_defined == 4) {
         TEST_PASS("credential_rotation: all 4 rotation strategies defined");
@@ -318,12 +298,15 @@ static void test_credential_rotation_strategies(void)
         TEST_FAIL("credential_rotation", "missing rotation strategies");
     }
 
-    /* 验证 vault 操作类型 */
     int ops_defined = 0;
-    if (CUPOLAS_VAULT_OP_READ > 0) ops_defined++;
-    if (CUPOLAS_VAULT_OP_WRITE > 0) ops_defined++;
-    if (CUPOLAS_VAULT_OP_DELETE > 0) ops_defined++;
-    if (CUPOLAS_VAULT_OP_EXPORT > 0) ops_defined++;
+    if (CUPOLAS_VAULT_OP_READ > 0)
+        ops_defined++;
+    if (CUPOLAS_VAULT_OP_WRITE > 0)
+        ops_defined++;
+    if (CUPOLAS_VAULT_OP_DELETE > 0)
+        ops_defined++;
+    if (CUPOLAS_VAULT_OP_EXPORT > 0)
+        ops_defined++;
     printf("    Vault operations: %d/4 defined\n", ops_defined);
 
     if (ops_defined >= 3) {
@@ -347,7 +330,6 @@ static void test_signature_verification(void)
         return;
     }
 
-    /* 验证签名算法枚举完整性 */
     printf("    Signature algorithms:\n");
     printf("      RSA_SHA256 = %d\n", (int)CUPOLAS_SIG_ALGO_RSA_SHA256);
     printf("      RSA_SHA384 = %d\n", (int)CUPOLAS_SIG_ALGO_RSA_SHA384);
@@ -356,15 +338,13 @@ static void test_signature_verification(void)
     printf("      ECDSA_P384 = %d\n", (int)CUPOLAS_SIG_ALGO_ECDSA_P384);
     printf("      ED25519    = %d\n", (int)CUPOLAS_SIG_ALGO_ED25519);
 
-    /* 验证结果码完整性 */
     printf("    Signature result codes:\n");
     printf("      OK=%d INVALID=%d EXPIRED=%d REVOKED=%d UNTRUSTED=%d "
            "TAMPERED=%d NO_SIG=%d CERT_INVALID=%d CERT_EXPIRED=%d "
            "ALGO_UNSUPPORTED=%d\n",
-           CUPOLAS_SIG_OK, CUPOLAS_SIG_INVALID, CUPOLAS_SIG_EXPIRED,
-           CUPOLAS_SIG_REVOKED, CUPOLAS_SIG_UNTRUSTED, CUPOLAS_SIG_TAMPERED,
-           CUPOLAS_SIG_NO_SIGNATURE, CUPOLAS_SIG_CERT_INVALID,
-           CUPOLAS_SIG_CERT_EXPIRED, CUPOLAS_SIG_ALGO_UNSUPPORTED);
+           CUPOLAS_SIG_OK, CUPOLAS_SIG_INVALID, CUPOLAS_SIG_EXPIRED, CUPOLAS_SIG_REVOKED,
+           CUPOLAS_SIG_UNTRUSTED, CUPOLAS_SIG_TAMPERED, CUPOLAS_SIG_NO_SIGNATURE,
+           CUPOLAS_SIG_CERT_INVALID, CUPOLAS_SIG_CERT_EXPIRED, CUPOLAS_SIG_ALGO_UNSUPPORTED);
 
     TEST_PASS("signature_verification: algorithm and result code enums verified");
     cupolas_cleanup();
@@ -378,24 +358,19 @@ int main(void)
     test_cupolas_init_cleanup();
     test_cupolas_version();
 
-    /* INT-11.1: 四重防护链 */
     printf("\n--- INT-11.1: Four-Fold Protection Chain ---\n");
     test_cupolas_sanitize_integration();
     test_fourfold_protection_chain();
 
-    /* INT-11.2: 净化延迟基准 */
     printf("\n--- INT-11.2: Sanitization Latency Benchmark ---\n");
     test_sanitization_latency();
 
-    /* INT-11.3: SHA-256 审计链 */
     printf("\n--- INT-11.3: SHA-256 Audit Chain ---\n");
     test_sha256_audit_chain();
 
-    /* INT-11.4: 凭证轮换策略 */
     printf("\n--- INT-11.4: Credential Rotation Strategies ---\n");
     test_credential_rotation_strategies();
 
-    /* 补充: 签名验证 */
     printf("\n--- Extra: Signature Verification ---\n");
     test_signature_verification();
 

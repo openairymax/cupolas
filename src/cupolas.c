@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas.c - AgentRT Security Dome Core Implementation (Facade)
  *
@@ -80,7 +80,6 @@ static struct {
  * 其他线程自旋等待状态变为 1。参照 core_init.c 的 DCLP 模式。 */
 static cupolas_atomic32_t g_cupolas_init_state = 0;
 
-/* N3 修复：自旋等待最大重试次数，超过后返回错误避免永久挂起。 */
 #define CUPOLAS_INIT_SPIN_MAX_RETRIES 10000000UL
 
 int cupolas_init(const char *config_path, airy_err_t *error)
@@ -88,18 +87,16 @@ int cupolas_init(const char *config_path, airy_err_t *error)
     CUPOLAS_LOG_INFO("cupolas_init: initializing security dome (config=%s)",
                      config_path ? config_path : "default");
 
-    /* N3 修复：DCLP 守护并发入口。 */
     if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
         return CUPOLAS_OK;
     }
 
-    /* CAS 0→2：仅一个线程能成功进入初始化路径 */
     if (!cupolas_atomic_cas32(&g_cupolas_init_state, 0, 2)) {
-        /* CAS 失败：其他线程正在初始化（state==2）或已完成（state==1） */
+
         if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
             return CUPOLAS_OK;
         }
-        /* state==2：自旋等待初始化完成，让出 CPU 避免空转 */
+
         unsigned long spin_count = 0;
         while (cupolas_atomic_load32(&g_cupolas_init_state) == 2) {
             cupolas_sleep_us(1);
@@ -128,14 +125,13 @@ int cupolas_init(const char *config_path, airy_err_t *error)
         return CUPOLAS_OK;
     }
 
-    /* 仅获胜线程执行：此时 state==2，可安全清零 g_cupolas（无其他线程并发访问） */
     __builtin_memset(&g_cupolas, 0, sizeof(g_cupolas));
 
     if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
         if (error)
             *error = AIRY_ERR_IO;
         CUPOLAS_LOG_ERROR("cupolas_init: mutex init failed");
-        /* N3 修复：重置 init state 允许后续重试 */
+
         cupolas_atomic_store32(&g_cupolas_init_state, 0);
         return cupolas_ERR_UNKNOWN;
     }
@@ -153,10 +149,10 @@ int cupolas_init(const char *config_path, airy_err_t *error)
                     *error = AIRY_ERR_IO;
                 cupolas_config_destroy(g_cupolas.config_mgr);
                 g_cupolas.config_mgr = NULL;
-                /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
+
                 cupolas_mutex_unlock(&g_cupolas.lock);
                 cupolas_mutex_destroy(&g_cupolas.lock);
-                /* N3 修复：重置 init state 允许后续重试 */
+
                 cupolas_atomic_store32(&g_cupolas_init_state, 0);
                 return result;
             }
@@ -172,10 +168,10 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
-        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
+
         cupolas_mutex_unlock(&g_cupolas.lock);
         cupolas_mutex_destroy(&g_cupolas.lock);
-        /* N3 修复：重置 init state 允许后续重试 */
+
         cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -191,10 +187,10 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
-        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
+
         cupolas_mutex_unlock(&g_cupolas.lock);
         cupolas_mutex_destroy(&g_cupolas.lock);
-        /* N3 修复：重置 init state 允许后续重试 */
+
         cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc sanitizer failed");
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -202,9 +198,11 @@ int cupolas_init(const char *config_path, airy_err_t *error)
 
     g_cupolas.wb = NULL;
 
-    g_cupolas.audit = audit_logger_create(
-        g_cupolas.config.audit_log_dir[0] ? g_cupolas.config.audit_log_dir : ".", "cupolas_audit",
-        CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE, CUPOLAS_DEFAULT_AUDIT_MAX_FILES);
+    g_cupolas.audit =
+        audit_logger_create(g_cupolas.config.audit_log_dir[0] ? g_cupolas.config.audit_log_dir :
+                                                                ".",
+                            "cupolas_audit", CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE,
+                            CUPOLAS_DEFAULT_AUDIT_MAX_FILES);
     if (!g_cupolas.audit) {
         if (error)
             *error = AIRY_ERR_OUT_OF_MEMORY;
@@ -216,10 +214,10 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
         }
-        /* N2 修复：mutex init 已成功，错误路径必须 destroy 避免泄漏 */
+
         cupolas_mutex_unlock(&g_cupolas.lock);
         cupolas_mutex_destroy(&g_cupolas.lock);
-        /* N3 修复：重置 init state 允许后续重试 */
+
         cupolas_atomic_store32(&g_cupolas_init_state, 0);
         CUPOLAS_LOG_ERROR("cupolas_init: calloc audit_logger failed");
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -232,7 +230,8 @@ int cupolas_init(const char *config_path, airy_err_t *error)
      * 必须在 unlock 后发布，确保等待线程看到 initialized=1 与 state=1 一致。 */
     cupolas_atomic_store32(&g_cupolas_init_state, 1);
 
-    CUPOLAS_LOG_INFO("cupolas_init: security dome initialized (4 layers: permission+sanitizer+workbench+audit)");
+    CUPOLAS_LOG_INFO(
+        "cupolas_init: security dome initialized (4 layers: permission+sanitizer+workbench+audit)");
     return CUPOLAS_OK;
 }
 
@@ -282,7 +281,6 @@ void cupolas_cleanup(void)
 
     cupolas_mutex_destroy(&g_cupolas.lock);
 
-    /* N3 修复：重置 init state（1→0），允许后续 cupolas_init() 重新初始化 */
     cupolas_atomic_store32(&g_cupolas_init_state, 0);
     CUPOLAS_LOG_INFO("cupolas_cleanup: security dome shutdown complete");
 }

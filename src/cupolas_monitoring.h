@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_monitoring.h - Monitoring Interface: Prometheus / OpenTelemetry Export
  */
@@ -19,28 +19,26 @@
  * 以下类型定义了通用的 HTTP 端点请求/响应抽象，
  * 由调用方（如 gateway_d）负责适配到具体的 HTTP 服务器实现。 */
 
-/** HTTP 端点请求（cupolas 视角的抽象） */
+
 typedef struct cupolas_endpoint_request {
-    void *user_data;  /**< 调用方在注册时传入的 user_data */
+    void *user_data;
 } cupolas_endpoint_request_t;
 
-/** HTTP 端点响应（cupolas 视角的抽象） */
+
 typedef struct cupolas_endpoint_response {
-    int status_code;       /**< HTTP 状态码 */
-    const char *content_type; /**< Content-Type 头 */
-    char *body;            /**< 响应体（调用方负责释放） */
-    size_t body_len;       /**< 响应体长度 */
+    int status_code;
+    const char *content_type;
+    char *body;
+    size_t body_len;
 } cupolas_endpoint_response_t;
 
-/** HTTP 端点处理函数指针 */
+
 typedef int (*cupolas_endpoint_handler_t)(const cupolas_endpoint_request_t *req,
                                           cupolas_endpoint_response_t *resp);
 
-/** HTTP 端点注册函数指针（由调用方注入，如 gateway 适配器） */
-typedef int (*cupolas_endpoint_register_fn_t)(void *server_handle,
-                                              const char *method,
-                                              const char *path,
-                                              cupolas_endpoint_handler_t handler,
+
+typedef int (*cupolas_endpoint_register_fn_t)(void *server_handle, const char *method,
+                                              const char *path, cupolas_endpoint_handler_t handler,
                                               void *user_data);
 
 #ifdef __cplusplus
@@ -57,11 +55,11 @@ extern "C" {
  * - Async reporting: Non-blocking main business logic
  */
 typedef enum monitoring_backend {
-    MONITORING_BACKEND_NONE = 0,      /**< No monitoring backend */
-    MONITORING_BACKEND_PROMETHEUS,    /**< Prometheus pull mode (/metrics endpoint) */
+    MONITORING_BACKEND_NONE = 0, /**< No monitoring backend */
+    MONITORING_BACKEND_PROMETHEUS, /**< Prometheus pull mode (/metrics endpoint) */
     MONITORING_BACKEND_OPENTELEMETRY, /**< OpenTelemetry push mode (OTLP protocol) */
-    MONITORING_BACKEND_STATSD,        /**< StatsD traditional metrics collection */
-    MONITORING_BACKEND_ALL            /**< Enable all backends */
+    MONITORING_BACKEND_STATSD, /**< StatsD traditional metrics collection */
+    MONITORING_BACKEND_ALL /**< Enable all backends */
 } monitoring_backend_t;
 
 /**
@@ -71,31 +69,31 @@ typedef struct monitoring_config {
     monitoring_backend_t backend; /**< Active monitoring backend(s) */
 
     struct {
-        const char *listen_addr;   /**< Listen address for HTTP server */
-        uint16_t port;             /**< Port number for metrics endpoint */
-        const char *endpoint;      /**< Metrics endpoint path */
-        bool enable_tls;           /**< Enable TLS for metrics server */
+        const char *listen_addr; /**< Listen address for HTTP server */
+        uint16_t port; /**< Port number for metrics endpoint */
+        const char *endpoint; /**< Metrics endpoint path */
+        bool enable_tls; /**< Enable TLS for metrics server */
         const char *tls_cert_file; /**< TLS certificate file path */
-        const char *tls_key_file;  /**< TLS private key file path */
+        const char *tls_key_file; /**< TLS private key file path */
     } prometheus;
 
     struct {
-        const char *endpoint;          /**< OTLP collector endpoint URL */
-        const char *service_name;      /**< Service name for identification */
+        const char *endpoint; /**< OTLP collector endpoint URL */
+        const char *service_name; /**< Service name for identification */
         const char *service_namespace; /**< Service namespace */
-        const char *auth_token;        /**< Authentication token */
-        bool enable_tls;               /**< Enable TLS for OTLP connection */
+        const char *auth_token; /**< Authentication token */
+        bool enable_tls; /**< Enable TLS for OTLP connection */
     } opentelemetry;
 
     struct {
-        const char *host;   /**< StatsD server host */
-        uint16_t port;      /**< StatsD server port */
+        const char *host; /**< StatsD server host */
+        uint16_t port; /**< StatsD server port */
         const char *prefix; /**< Metric name prefix */
     } statsd;
 
     uint32_t reporting_interval_ms; /**< Push reporting interval (milliseconds) */
-    uint32_t buffer_size;           /**< Buffer size for metric data */
-    bool enable_caching;            /**< Enable local metric caching */
+    uint32_t buffer_size; /**< Buffer size for metric data */
+    bool enable_caching; /**< Enable local metric caching */
 } monitoring_config_t;
 
 /**
@@ -103,19 +101,19 @@ typedef struct monitoring_config {
  */
 typedef enum monitoring_status {
     MONITORING_STATUS_STOPPED = 0, /**< Monitoring stopped */
-    MONITORING_STATUS_STARTING,    /**< Monitoring starting up */
-    MONITORING_STATUS_RUNNING,     /**< Monitoring active and running */
-    MONITORING_STATUS_ERROR,       /**< Monitoring in error state */
-    MONITORING_STATUS_STOPPING     /**< Monitoring shutting down */
+    MONITORING_STATUS_STARTING, /**< Monitoring starting up */
+    MONITORING_STATUS_RUNNING, /**< Monitoring active and running */
+    MONITORING_STATUS_ERROR, /**< Monitoring in error state */
+    MONITORING_STATUS_STOPPING /**< Monitoring shutting down */
 } monitoring_status_t;
 
 /**
  * @brief Health check result structure
  */
 typedef struct health_check_result {
-    bool healthy;          /**< Health status (true=healthy) */
+    bool healthy; /**< Health status (true=healthy) */
     const char *component; /**< Component name being checked */
-    const char *message;   /**< Status message or error description */
+    const char *message; /**< Status message or error description */
     uint64_t timestamp_ns; /**< Check timestamp in nanoseconds */
 } health_check_result_t;
 
@@ -415,9 +413,8 @@ void cupolas_monitoring_shutdown_instance(void);
  * @since 0.1.0
  * @changed SP06 (0.1.1): gateway_t *gw → void *server_handle + register_fn callback
  */
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr,
-                                           void *server_handle,
-                                           cupolas_endpoint_register_fn_t register_fn);
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, void *server_handle,
+                                          cupolas_endpoint_register_fn_t register_fn);
 
 #ifdef __cplusplus
 }

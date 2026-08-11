@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /**
  * @file mempool.h
  * @brief P3.16: mempool 最小保证分配器 — 紧急预留 + 对象池 + 最低保证分配
@@ -16,9 +19,6 @@
  *   airy_mempool_free(pool, buf);
  *   airy_mempool_destroy(pool);
  *
- * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #ifndef CUPOLAS_MEMPOOL_H
@@ -36,49 +36,49 @@ extern "C" {
  * 常量定义
  * ================================================================ */
 
-/** 默认紧急预留大小（32MB） */
-#define MEMPOOL_DEFAULT_RESERVE_MB    32
-/** 默认对象池块大小 */
-#define MEMPOOL_DEFAULT_BLOCK_SIZE    256
-/** 默认对象池块数量 */
-#define MEMPOOL_DEFAULT_BLOCK_COUNT   4096
+
+#define MEMPOOL_DEFAULT_RESERVE_MB 32
+
+#define MEMPOOL_DEFAULT_BLOCK_SIZE 256
+
+#define MEMPOOL_DEFAULT_BLOCK_COUNT 4096
 
 /* ================================================================
  * 类型定义
  * ================================================================ */
 
-/** 内存池句柄（不透明） */
+
 typedef struct airy_mempool airy_mempool_t;
 
-/** 分配优先级 */
+
 typedef enum {
-    MEMPOOL_PRIORITY_LOW       = 0,  /**< 低优先级（常规分配，可能失败） */
-    MEMPOOL_PRIORITY_NORMAL    = 1,  /**< 普通优先级 */
-    MEMPOOL_PRIORITY_HIGH      = 2,  /**< 高优先级（关键路径） */
-    MEMPOOL_PRIORITY_CRITICAL  = 3,  /**< 紧急优先级（OOM 时仍保证分配） */
+    MEMPOOL_PRIORITY_LOW = 0,
+    MEMPOOL_PRIORITY_NORMAL = 1,
+    MEMPOOL_PRIORITY_HIGH = 2,
+    MEMPOOL_PRIORITY_CRITICAL = 3,
 } airy_mempool_priority_t;
 
-/** 内存池水位线状态 */
+
 typedef enum {
-    MEMPOOL_WATERMARK_NORMAL   = 0,  /**< 正常：使用率 < 50% */
-    MEMPOOL_WATERMARK_WARN     = 1,  /**< 警告：使用率 50-75% */
-    MEMPOOL_WATERMARK_HIGH     = 2,  /**< 高：使用率 75-90% */
-    MEMPOOL_WATERMARK_CRITICAL = 3,  /**< 紧急：使用率 > 90% */
+    MEMPOOL_WATERMARK_NORMAL = 0,
+    MEMPOOL_WATERMARK_WARN = 1,
+    MEMPOOL_WATERMARK_HIGH = 2,
+    MEMPOOL_WATERMARK_CRITICAL = 3,
 } airy_mempool_watermark_t;
 
-/** 内存池统计信息 */
+
 typedef struct {
-    size_t total_reserved;       /**< 总预留大小（字节） */
-    size_t total_allocated;      /**< 当前已分配大小（字节） */
-    size_t peak_allocated;       /**< 峰值分配大小（字节） */
-    size_t available_reserved;   /**< 剩余可用预留大小（字节） */
-    size_t object_pool_total;    /**< 对象池总块数 */
-    size_t object_pool_used;     /**< 对象池已用块数 */
-    size_t total_allocs;         /**< 总分配次数 */
-    size_t total_frees;          /**< 总释放次数 */
-    size_t oom_rejections;       /**< OOM 拒绝次数 */
-    size_t emergency_allocs;     /**< 紧急分配次数 */
-    airy_mempool_watermark_t watermark; /**< 当前水位线 */
+    size_t total_reserved;
+    size_t total_allocated;
+    size_t peak_allocated;
+    size_t available_reserved;
+    size_t object_pool_total;
+    size_t object_pool_used;
+    size_t total_allocs;
+    size_t total_frees;
+    size_t oom_rejections;
+    size_t emergency_allocs;
+    airy_mempool_watermark_t watermark;
 } airy_mempool_stats_t;
 
 /* ================================================================
@@ -96,9 +96,7 @@ typedef struct {
  * @ownership 返回的句柄由调用者管理，需通过 airy_mempool_destroy() 释放
  * @threadsafe 是
  */
-airy_mempool_t *airy_mempool_create(size_t reserve_size,
-                                           size_t block_size,
-                                           size_t block_count);
+airy_mempool_t *airy_mempool_create(size_t reserve_size, size_t block_size, size_t block_count);
 
 /**
  * @brief 销毁内存池
@@ -133,9 +131,7 @@ void airy_mempool_destroy(airy_mempool_t *pool);
  * @ownership 返回的内存由调用者管理，需通过 airy_mempool_free() 归还
  * @threadsafe 是
  */
-void *airy_mempool_alloc(airy_mempool_t *pool,
-                              size_t size,
-                              airy_mempool_priority_t priority);
+void *airy_mempool_alloc(airy_mempool_t *pool, size_t size, airy_mempool_priority_t priority);
 
 /**
  * @brief 释放内存回内存池
@@ -159,8 +155,7 @@ void airy_mempool_free(airy_mempool_t *pool, void *ptr);
  * @param stats 输出统计信息
  * @return 0 成功，非0失败
  */
-int airy_mempool_get_stats(airy_mempool_t *pool,
-                               airy_mempool_stats_t *stats);
+int airy_mempool_get_stats(airy_mempool_t *pool, airy_mempool_stats_t *stats);
 
 /**
  * @brief 获取当前水位线

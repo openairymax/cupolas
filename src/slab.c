@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /**
  * @file slab.c
  * @brief P3.15: Slab 分配器实现 — per-CPU freelist + 全局 partial 链
@@ -9,9 +12,6 @@
  *   - 全局 partial 链表用于 CPU 间负载均衡（steal 机制）
  *   - 分配时优先从当前 CPU 的 partial 页获取，失败时从全局 partial 链 steal
  *
- * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "slab.h"
@@ -32,72 +32,60 @@
  * 常量
  * ================================================================ */
 
-/** 默认每页对象数（根据对象大小计算） */
-#define SLAB_DEFAULT_OBJS_PER_PAGE(obj_size) \
-    ((4096 - sizeof(struct slab_page)) / (obj_size))
+#define SLAB_DEFAULT_OBJS_PER_PAGE(obj_size) ((4096 - sizeof(struct slab_page)) / (obj_size))
 
-/** 最大 CPU 数 */
 #define SLAB_MAX_CPUS 128
 
-/** 对齐到指针大小 */
 #define SLAB_ALIGN(s) (((s) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
 
 /* ================================================================
  * 内部数据结构
  * ================================================================ */
 
-/** slab 页状态 */
 typedef enum {
-    SLAB_PAGE_EMPTY   = 0,
+    SLAB_PAGE_EMPTY = 0,
     SLAB_PAGE_PARTIAL = 1,
-    SLAB_PAGE_FULL    = 2,
+    SLAB_PAGE_FULL = 2,
 } slab_page_state_t;
 
-/** slab 页 */
 typedef struct slab_page {
-    struct slab_page *next;       /**< 链表指针 */
-    void *freelist;               /**< 空闲对象链表头 */
-    size_t free_count;            /**< 空闲对象数 */
-    size_t total_count;           /**< 总对象数 */
-    slab_page_state_t state;      /**< 页状态 */
-    char data[];                  /**< 对象数据区 */
+    struct slab_page *next;
+    void *freelist;
+    size_t free_count;
+    size_t total_count;
+    slab_page_state_t state;
+    char data[];
 } slab_page_t;
 
-/** per-CPU 缓存 */
 typedef struct {
-    slab_page_t *partial;         /**< 当前 partial 页 */
-    size_t alloc_count;           /**< 本 CPU 分配计数 */
-    size_t free_count;            /**< 本 CPU 释放计数 */
+    slab_page_t *partial;
+    size_t alloc_count;
+    size_t free_count;
 } slab_cpu_cache_t;
 
-/** Slab 分配器 */
 struct airy_slab {
-    size_t obj_size;              /**< 对象大小（对齐后） */
-    size_t objs_per_page;         /**< 每页对象数 */
-    size_t page_size;             /**< 每页总大小 */
+    size_t obj_size;
+    size_t objs_per_page;
+    size_t page_size;
 
-    airy_slab_ctor_t ctor;     /**< 构造回调 */
-    airy_slab_dtor_t dtor;     /**< 析构回调 */
-    void *ctor_user_data;         /**< 构造/析构回调用户数据 */
+    airy_slab_ctor_t ctor;
+    airy_slab_dtor_t dtor;
+    void *ctor_user_data;
 
-    /* 全局 partial 链 */
-    slab_page_t *partial_list;    /**< 全局 partial 链表头 */
-    size_t partial_count;         /**< 全局 partial 页数 */
+    slab_page_t *partial_list;
+    size_t partial_count;
 
-    /* 统计 */
-    size_t total_pages;           /**< 总页数 */
-    size_t total_allocs;          /**< 总分配次数 */
-    size_t total_frees;           /**< 总释放次数 */
-    size_t cpu_steals;            /**< CPU 间 steal 次数 */
+    size_t total_pages;
+    size_t total_allocs;
+    size_t total_frees;
+    size_t cpu_steals;
 
-    /* 线程安全 */
 #ifdef __linux__
     pthread_mutex_t lock;
 #elif defined(_WIN32)
     CRITICAL_SECTION lock;
 #endif
 
-    /* per-CPU 缓存 */
     slab_cpu_cache_t cpu_caches[SLAB_MAX_CPUS];
     size_t cpu_count;
 };
@@ -178,8 +166,8 @@ static slab_page_t *slab_page_create(airy_slab_t *slab)
     slab_page_t *page = (slab_page_t *)AIRY_CALLOC(1, total_size);
     if (!page) {
         LOG_ERROR("Slab: OOM creating page (obj_size=%zu, objs_per_page=%zu, "
-                          "total_size=%zu)",
-                          slab->obj_size, slab->objs_per_page, total_size);
+                  "total_size=%zu)",
+                  slab->obj_size, slab->objs_per_page, total_size);
         return NULL;
     }
 
@@ -187,19 +175,18 @@ static slab_page_t *slab_page_create(airy_slab_t *slab)
     page->free_count = slab->objs_per_page;
     page->state = SLAB_PAGE_EMPTY;
 
-    /* 初始化 freelist：将所有对象链接为单链表 */
     page->freelist = page->data;
     char *obj = (char *)page->data;
     for (size_t i = 0; i < slab->objs_per_page - 1; i++) {
         void **next_ptr = (void **)(obj + i * slab->obj_size);
         *next_ptr = (void *)(obj + (i + 1) * slab->obj_size);
     }
-    /* 最后一个对象的 next 为 NULL */
+
     void **last_ptr = (void **)(obj + (slab->objs_per_page - 1) * slab->obj_size);
     *last_ptr = NULL;
 
-    LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)",
-                      slab->obj_size, slab->objs_per_page, slab->total_pages + 1);
+    LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)", slab->obj_size,
+              slab->objs_per_page, slab->total_pages + 1);
 
     return page;
 }
@@ -217,13 +204,13 @@ static void slab_page_destroy(slab_page_t *page)
  */
 static void *slab_page_pop(slab_page_t *page)
 {
-    if (!page->freelist || page->free_count == 0) return NULL;
+    if (!page->freelist || page->free_count == 0)
+        return NULL;
 
     void *obj = page->freelist;
     page->freelist = *(void **)obj;
     page->free_count--;
 
-    /* 更新状态 */
     if (page->free_count == 0) {
         page->state = SLAB_PAGE_FULL;
     } else {
@@ -238,13 +225,13 @@ static void *slab_page_pop(slab_page_t *page)
  */
 static void slab_page_push(slab_page_t *page, void *obj)
 {
-    if (!obj) return;
+    if (!obj)
+        return;
 
     *(void **)obj = page->freelist;
     page->freelist = obj;
     page->free_count++;
 
-    /* 更新状态 */
     if (page->free_count == page->total_count) {
         page->state = SLAB_PAGE_EMPTY;
     } else {
@@ -278,7 +265,8 @@ static slab_page_t *slab_get_partial_page(airy_slab_t *slab)
  */
 static void slab_return_partial_page(airy_slab_t *slab, slab_page_t *page)
 {
-    if (!page) return;
+    if (!page)
+        return;
 
     slab_mutex_lock(slab);
     page->next = slab->partial_list;
@@ -291,11 +279,8 @@ static void slab_return_partial_page(airy_slab_t *slab, slab_page_t *page)
  * 公共 API
  * ================================================================ */
 
-airy_slab_t *airy_slab_create(size_t obj_size,
-                                     size_t objs_per_slab,
-                                     airy_slab_ctor_t ctor,
-                                     airy_slab_dtor_t dtor,
-                                     void *user_data)
+airy_slab_t *airy_slab_create(size_t obj_size, size_t objs_per_slab, airy_slab_ctor_t ctor,
+                              airy_slab_dtor_t dtor, void *user_data)
 {
     if (obj_size == 0) {
         LOG_ERROR("Slab: create called with obj_size=0");
@@ -312,7 +297,8 @@ airy_slab_t *airy_slab_create(size_t obj_size,
 
     if (objs_per_slab == 0) {
         slab->objs_per_page = SLAB_DEFAULT_OBJS_PER_PAGE(slab->obj_size);
-        if (slab->objs_per_page < 4) slab->objs_per_page = 4;
+        if (slab->objs_per_page < 4)
+            slab->objs_per_page = 4;
     } else {
         slab->objs_per_page = objs_per_slab;
     }
@@ -330,24 +316,23 @@ airy_slab_t *airy_slab_create(size_t obj_size,
     }
 
     LOG_INFO("Slab: created (obj_size=%zu, aligned=%zu, objs_per_page=%zu, "
-                     "page_size=%zu, ctor=%s, dtor=%s)",
-                     obj_size, slab->obj_size, slab->objs_per_page,
-                     slab->page_size,
-                     ctor ? "yes" : "no", dtor ? "yes" : "no");
+             "page_size=%zu, ctor=%s, dtor=%s)",
+             obj_size, slab->obj_size, slab->objs_per_page, slab->page_size, ctor ? "yes" : "no",
+             dtor ? "yes" : "no");
 
     return slab;
 }
 
 void airy_slab_destroy(airy_slab_t *slab)
 {
-    if (!slab) return;
+    if (!slab)
+        return;
 
     LOG_INFO("Slab: destroying (total_pages=%zu, total_allocs=%zu, "
-                     "total_frees=%zu, active=%zu, steals=%zu)",
-                     slab->total_pages, slab->total_allocs, slab->total_frees,
-                     slab->total_allocs - slab->total_frees, slab->cpu_steals);
+             "total_frees=%zu, active=%zu, steals=%zu)",
+             slab->total_pages, slab->total_allocs, slab->total_frees,
+             slab->total_allocs - slab->total_frees, slab->cpu_steals);
 
-    /* 释放全局 partial 链中的所有页 */
     slab_page_t *page = slab->partial_list;
     size_t freed_pages = 0;
     while (page) {
@@ -357,7 +342,6 @@ void airy_slab_destroy(airy_slab_t *slab)
         freed_pages++;
     }
 
-    /* 释放 per-CPU partial 页 */
     for (size_t i = 0; i < slab->cpu_count; i++) {
         if (slab->cpu_caches[i].partial) {
             slab_page_destroy(slab->cpu_caches[i].partial);
@@ -373,68 +357,64 @@ void airy_slab_destroy(airy_slab_t *slab)
 
 void *airy_slab_alloc(airy_slab_t *slab)
 {
-    if (!slab) return NULL;
+    if (!slab)
+        return NULL;
 
     int cpu = slab_get_cpu_id();
-    if (cpu < 0 || (size_t)cpu >= slab->cpu_count) cpu = 0;
+    if (cpu < 0 || (size_t)cpu >= slab->cpu_count)
+        cpu = 0;
 
     slab_cpu_cache_t *cache = &slab->cpu_caches[cpu];
 
-    /* 1. 尝试从当前 CPU 的 partial 页分配 */
     if (cache->partial) {
         void *obj = slab_page_pop(cache->partial);
         if (obj) {
             cache->alloc_count++;
             slab->total_allocs++;
-            if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-            LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)",
-                              cpu, slab->total_allocs);
+            if (slab->ctor)
+                slab->ctor(obj, slab->ctor_user_data);
+            LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)", cpu, slab->total_allocs);
             return obj;
         }
-        /* 当前 partial 页已满，归还到全局链 */
+
         LOG_DEBUG("Slab: CPU%d partial page full, returning to global chain", cpu);
         slab_return_partial_page(slab, cache->partial);
         cache->partial = NULL;
     }
 
-    /* 2. 尝试从全局 partial 链 steal */
     cache->partial = slab_get_partial_page(slab);
     if (cache->partial) {
         void *obj = slab_page_pop(cache->partial);
         if (obj) {
             cache->alloc_count++;
             slab->total_allocs++;
-            if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-            LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)",
-                              cpu, slab->cpu_steals);
+            if (slab->ctor)
+                slab->ctor(obj, slab->ctor_user_data);
+            LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)", cpu, slab->cpu_steals);
             return obj;
         }
     }
 
-    /* 3. 分配新页 */
     slab_page_t *new_page = slab_page_create(slab);
     if (!new_page) {
-        LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)",
-                         slab->total_pages);
+        LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)", slab->total_pages);
         return NULL;
     }
 
     slab->total_pages++;
 
-    /* 从新页分配 */
     void *obj = slab_page_pop(new_page);
     if (obj) {
-        /* 新页变为 partial，保存为当前 CPU 缓存 */
+
         cache->partial = new_page;
         cache->alloc_count++;
         slab->total_allocs++;
-        if (slab->ctor) slab->ctor(obj, slab->ctor_user_data);
-        LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)",
-                          cpu, slab->total_pages);
+        if (slab->ctor)
+            slab->ctor(obj, slab->ctor_user_data);
+        LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)", cpu, slab->total_pages);
         return obj;
     }
 
-    /* 不应该到达这里 */
     LOG_ERROR("Slab: new page created but pop returned NULL");
     slab_page_destroy(new_page);
     slab->total_pages--;
@@ -443,33 +423,31 @@ void *airy_slab_alloc(airy_slab_t *slab)
 
 void airy_slab_free(airy_slab_t *slab, void *obj)
 {
-    if (!slab || !obj) return;
+    if (!slab || !obj)
+        return;
 
     int cpu = slab_get_cpu_id();
-    if (cpu < 0 || (size_t)cpu >= slab->cpu_count) cpu = 0;
+    if (cpu < 0 || (size_t)cpu >= slab->cpu_count)
+        cpu = 0;
 
     slab_cpu_cache_t *cache = &slab->cpu_caches[cpu];
 
-    /* 析构回调 */
-    if (slab->dtor) slab->dtor(obj, slab->ctor_user_data);
+    if (slab->dtor)
+        slab->dtor(obj, slab->ctor_user_data);
 
-    /* 尝试归还到当前 CPU 的 partial 页 */
     if (cache->partial) {
         slab_page_push(cache->partial, obj);
         cache->free_count++;
         slab->total_frees++;
 
-        /* 如果页变为全空，归还到全局链 */
         if (cache->partial->state == SLAB_PAGE_EMPTY) {
-            LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain",
-                              cpu);
+            LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain", cpu);
             slab_return_partial_page(slab, cache->partial);
             cache->partial = NULL;
         }
         return;
     }
 
-    /* 没有当前 partial 页，从全局链获取一个 */
     slab_page_t *page = slab_get_partial_page(slab);
     if (page) {
         slab_page_push(page, obj);
@@ -479,7 +457,6 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
         return;
     }
 
-    /* 分配新页存放释放的对象 */
     slab_page_t *new_page = slab_page_create(slab);
     if (new_page) {
         slab->total_pages++;
@@ -490,10 +467,9 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
         return;
     }
 
-    /* 无法分配新页，对象丢失（内存泄漏） */
     LOG_ERROR("Slab: cannot allocate new page for free, object leaked! "
-                      "(total_frees=%zu, total_allocs=%zu)",
-                      slab->total_frees, slab->total_allocs);
+              "(total_frees=%zu, total_allocs=%zu)",
+              slab->total_frees, slab->total_allocs);
 }
 
 /* ================================================================
@@ -502,7 +478,8 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
 
 int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats)
 {
-    if (!slab || !stats) return AIRY_ERR_INVALID_PARAM;
+    if (!slab || !stats)
+        return AIRY_ERR_INVALID_PARAM;
 
     AIRY_MEMSET(stats, 0, sizeof(*stats));
 
@@ -514,7 +491,6 @@ int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats)
     stats->active_objects = slab->total_allocs - slab->total_frees;
     stats->cpu_steals = slab->cpu_steals;
 
-    /* 统计页状态 */
     slab_mutex_lock(slab);
     slab_page_t *page = slab->partial_list;
     while (page) {
@@ -533,13 +509,13 @@ int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats)
 
 size_t airy_slab_shrink(airy_slab_t *slab)
 {
-    if (!slab) return 0;
+    if (!slab)
+        return 0;
 
     size_t freed = 0;
 
     slab_mutex_lock(slab);
 
-    /* 遍历全局 partial 链，释放空页 */
     slab_page_t **prev = &slab->partial_list;
     while (*prev) {
         slab_page_t *page = *prev;
@@ -557,11 +533,9 @@ size_t airy_slab_shrink(airy_slab_t *slab)
     slab_mutex_unlock(slab);
 
     if (freed > 0) {
-        LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)",
-                         freed, slab->total_pages);
+        LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)", freed, slab->total_pages);
     } else {
-        LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)",
-                          slab->total_pages);
+        LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)", slab->total_pages);
     }
 
     return freed;
@@ -569,13 +543,14 @@ size_t airy_slab_shrink(airy_slab_t *slab)
 
 bool airy_slab_validate(airy_slab_t *slab)
 {
-    if (!slab) return false;
+    if (!slab)
+        return false;
 
-    /* 基本检查 */
-    if (slab->obj_size == 0) return false;
-    if (slab->objs_per_page == 0) return false;
+    if (slab->obj_size == 0)
+        return false;
+    if (slab->objs_per_page == 0)
+        return false;
 
-    /* 检查全局 partial 链 */
     slab_mutex_lock(slab);
 
     slab_page_t *page = slab->partial_list;

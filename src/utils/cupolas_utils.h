@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_utils.h - Common Utility Macros and Functions
  *
@@ -161,7 +161,7 @@ extern "C" {
  */
 #define CUPOLAS_FREE(ptr) \
     do {                  \
-        AIRY_FREE(ptr);        \
+        AIRY_FREE(ptr);   \
         ptr = NULL;       \
     } while (0)
 
@@ -174,7 +174,7 @@ extern "C" {
 #define CUPOLAS_FREE_ARRAY(ptr) \
     do {                        \
         if (ptr) {              \
-            AIRY_FREE(ptr);          \
+            AIRY_FREE(ptr);     \
             ptr = NULL;         \
         }                       \
     } while (0)
@@ -206,7 +206,7 @@ extern "C" {
 #define CUPOLAS_CHECK_NULL(ptr) \
     do {                        \
         if ((ptr) == NULL)      \
-            return AIRY_EINVAL;          \
+            return AIRY_EINVAL; \
     } while (0)
 
 /**
@@ -233,7 +233,7 @@ extern "C" {
 #define CUPOLAS_CHECK_RESULT(expr) \
     do {                           \
         if ((expr) != 0)           \
-            return AIRY_EINVAL;             \
+            return AIRY_EINVAL;    \
     } while (0)
 
 /**
@@ -255,7 +255,7 @@ extern "C" {
 #define CUPOLAS_CHECK_TRUE(cond) \
     do {                         \
         if (!(cond))             \
-            return AIRY_EINVAL;           \
+            return AIRY_EINVAL;  \
     } while (0)
 
 /**
@@ -332,44 +332,48 @@ extern "C" {
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG(fmt, ...)                                                       \
+    do {                                                                            \
+        char _cup_buf[512];                                                         \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                    \
+    } while (0)
 
 /**
  * @brief Log informational message (alias of CUPOLAS_LOG)
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_INFO(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS INFO] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG_INFO(fmt, ...)                                                       \
+    do {                                                                                 \
+        char _cup_buf[512];                                                              \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS INFO] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                         \
+    } while (0)
 
 /**
  * @brief Log warning message
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_WARN(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS WARN] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG_WARN(fmt, ...)                                                       \
+    do {                                                                                 \
+        char _cup_buf[512];                                                              \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS WARN] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                         \
+    } while (0)
 
 /**
  * @brief Log error message
  * @param fmt printf-style format string
  * @param ... Format arguments
  */
-#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG_ERROR(fmt, ...)                                                       \
+    do {                                                                                  \
+        char _cup_buf[512];                                                               \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                          \
+    } while (0)
 
 /**
  * @brief Log debug message (stripped in release builds)
@@ -377,11 +381,12 @@ extern "C" {
  * @param ... Format arguments
  * @note Only emitted when debugging is enabled
  */
-#define CUPOLAS_LOG_DEBUG(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG_DEBUG(fmt, ...)                                                       \
+    do {                                                                                  \
+        char _cup_buf[512];                                                               \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS DEBUG] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                          \
+    } while (0)
 
 #else
 
@@ -395,17 +400,17 @@ extern "C" {
 #define CUPOLAS_LOG_WARN(fmt, ...) ((void)0)
 
 /** @brief Error logging always enabled even in release builds */
-#define CUPOLAS_LOG_ERROR(fmt, ...) do { \
-    char _cup_buf[512]; \
-    snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
-    fputs(_cup_buf, stderr); \
-} while(0)
+#define CUPOLAS_LOG_ERROR(fmt, ...)                                                       \
+    do {                                                                                  \
+        char _cup_buf[512];                                                               \
+        snprintf(_cup_buf, sizeof(_cup_buf), "[CUPOLAS ERROR] " fmt "\n", ##__VA_ARGS__); \
+        fputs(_cup_buf, stderr);                                                          \
+    } while (0)
 
 /** @brief Disabled debug logging noop */
 #define CUPOLAS_LOG_DEBUG(fmt, ...) ((void)0)
 
 #endif /* CUPOLAS_ENABLE_LOGGING */
-
 /* ============================================================================
  * Compiler Hints - Performance Optimization Annotations
  * ============================================================================
@@ -452,7 +457,6 @@ extern "C" {
 #define CUPOLAS_UNLIKELY(x) (x)
 
 #endif /* Compiler detection */
-
 /* ============================================================================
  * Alignment and Padding Utilities
  * ============================================================================
@@ -533,7 +537,6 @@ extern "C" {
 #define CUPOLAS_SLEEP_MS(ms) usleep((ms) * 1000)
 
 #endif /* _WIN32 */
-
 /* ============================================================================
  * Compile-Time Assertions
  * ============================================================================
@@ -582,7 +585,6 @@ extern "C" {
 #define CUPOLAS_DEPRECATED(msg)
 
 #endif /* Compiler detection */
-
 /* ============================================================================
  * Utility Function Declarations
  * ============================================================================

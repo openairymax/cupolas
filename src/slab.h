@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /**
  * @file slab.h
  * @brief P3.15: Slab 分配器 — per-CPU freelist + 全局 partial 链 + 构造/析构回调
@@ -16,9 +19,6 @@
  *   airy_slab_free(slab, obj);
  *   airy_slab_destroy(slab);
  *
- * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #ifndef CUPOLAS_SLAB_H
@@ -36,27 +36,27 @@ extern "C" {
  * 类型定义
  * ================================================================ */
 
-/** Slab 句柄（不透明） */
+
 typedef struct airy_slab airy_slab_t;
 
-/** 构造回调：在对象分配后调用 */
+
 typedef void (*airy_slab_ctor_t)(void *obj, void *user_data);
 
-/** 析构回调：在对象释放前调用 */
+
 typedef void (*airy_slab_dtor_t)(void *obj, void *user_data);
 
-/** Slab 统计信息 */
+
 typedef struct {
-    size_t obj_size;            /**< 对象大小 */
-    size_t objs_per_slab;       /**< 每个 slab 页的对象数 */
-    size_t total_slabs;         /**< 总 slab 页数 */
-    size_t full_slabs;          /**< 满页数 */
-    size_t partial_slabs;       /**< 部分满页数 */
-    size_t empty_slabs;         /**< 空页数 */
-    size_t total_allocs;        /**< 总分配次数 */
-    size_t total_frees;         /**< 总释放次数 */
-    size_t active_objects;      /**< 当前活跃对象数 */
-    size_t cpu_steals;          /**< CPU 间偷取次数 */
+    size_t obj_size;
+    size_t objs_per_slab;
+    size_t total_slabs;
+    size_t full_slabs;
+    size_t partial_slabs;
+    size_t empty_slabs;
+    size_t total_allocs;
+    size_t total_frees;
+    size_t active_objects;
+    size_t cpu_steals;
 } airy_slab_stats_t;
 
 /* ================================================================
@@ -76,11 +76,8 @@ typedef struct {
  * @ownership 返回的句柄由调用者管理，需通过 airy_slab_destroy() 释放
  * @threadsafe 是（per-CPU freelist + 全局锁）
  */
-airy_slab_t *airy_slab_create(size_t obj_size,
-                                     size_t objs_per_slab,
-                                     airy_slab_ctor_t ctor,
-                                     airy_slab_dtor_t dtor,
-                                     void *user_data);
+airy_slab_t *airy_slab_create(size_t obj_size, size_t objs_per_slab, airy_slab_ctor_t ctor,
+                              airy_slab_dtor_t dtor, void *user_data);
 
 /**
  * @brief 销毁 Slab 分配器

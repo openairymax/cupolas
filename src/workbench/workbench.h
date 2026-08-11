@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * workbench.h - Virtual Workbench Public Interface: Isolated Execution Environment
  *
@@ -40,11 +40,11 @@ typedef enum workbench_state {
 
 /* Resource Limits Configuration */
 typedef struct workbench_limits {
-    size_t max_memory_bytes;    /* Max memory limit in bytes, 0 = unlimited */
-    uint32_t max_cpu_time_ms;   /* Max CPU time in milliseconds, 0 = unlimited */
-    size_t max_output_bytes;    /* Max output size in bytes, 0 = use default */
-    uint32_t max_processes;     /* Max child processes, 0 = unlimited */
-    uint32_t max_threads;       /* Max threads, 0 = unlimited */
+    size_t max_memory_bytes; /* Max memory limit in bytes, 0 = unlimited */
+    uint32_t max_cpu_time_ms; /* Max CPU time in milliseconds, 0 = unlimited */
+    size_t max_output_bytes; /* Max output size in bytes, 0 = use default */
+    uint32_t max_processes; /* Max child processes, 0 = unlimited */
+    uint32_t max_threads; /* Max threads, 0 = unlimited */
     size_t max_file_size_bytes; /* Max file size in bytes, 0 = unlimited */
 } workbench_limits_t;
 
@@ -59,7 +59,7 @@ typedef struct workbench_config {
     bool redirect_stdout;
     bool redirect_stderr;
     workbench_limits_t limits; /* Resource limits */
-    bool enable_limits;        /* Enable resource control */
+    bool enable_limits; /* Enable resource control */
 } workbench_config_t;
 
 /* Workbench Execution Result */

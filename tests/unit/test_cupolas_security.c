@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * test_cupolas_security.c - Security Submodule Unit Tests
  *
@@ -153,7 +153,7 @@ void test_signature_module(void)
 
     /* Test validity check */
     uint64_t now = ts;
-    uint64_t past = ts - 86400;   /* 24 hours ago */
+    uint64_t past = ts - 86400; /* 24 hours ago */
     uint64_t future = ts + 86400; /* 24 hours in future */
 
     int ret = cupolas_signature_check_validity(past, now);

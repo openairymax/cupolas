@@ -162,6 +162,8 @@ target_compile_definitions(cupolas PRIVATE
 target_include_directories(cupolas PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    # 安全子模块公共头（vault/entitlements/network/error），供 daemon 接线层裸名 include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/security>
     $<INSTALL_INTERFACE:include>
     $<INSTALL_INTERFACE:include/cupolas>
 )

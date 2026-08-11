@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * test_error_code_consistency.c - P0.25.6 (ACC-STD06) 错误码一致性测试
  *
@@ -22,7 +22,6 @@
  * @version 1.0  P0.25.6 初始版本
  */
 
-/* 测试目标头文件：cupolas 内部 enum + commons 权威宏 */
 #include "../src/security/cupolas_error.h"
 
 #include <assert.h>
@@ -31,20 +30,20 @@
 #include <string.h>
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
-#define TEST_FAIL(name, msg) \
-    do { \
+#define TEST_FAIL(name, msg)                  \
+    do {                                      \
         printf("[FAIL] %s: %s\n", name, msg); \
-        g_failed++; \
-        return; \
+        g_failed++;                           \
+        return;                               \
     } while (0)
 
 static int g_passed = 0;
 static int g_failed = 0;
 
 #define RUN_TEST(func) \
-    do { \
-        func(); \
-        g_passed++; \
+    do {               \
+        func();        \
+        g_passed++;    \
     } while (0)
 
 /* ============================================================================
@@ -60,11 +59,10 @@ static int g_failed = 0;
 
 static void test_cupolas_enum_matches_commons(void)
 {
-    /* 成功码 */
+
     if (cupolas_ERR_OK != AIRY_OK)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OK != AIRY_OK");
 
-    /* 通用错误码（-3 到 -50）— cupolas enum 与 commons 宏数值对齐 */
     if ((int)cupolas_ERR_UNKNOWN != (int)AIRY_ERR_UNKNOWN)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_UNKNOWN mismatch");
     if ((int)cupolas_ERR_INVALID_PARAM != (int)AIRY_ERR_INVALID_PARAM)
@@ -148,15 +146,11 @@ static void test_cupolas_alias_macros(void)
 
 static void test_cupolas_segment_no_conflict(void)
 {
-    /* SEC_* 段：upper=-700（最接近 0），lower=-711（最远离 0） */
-    int sec_upper = AIRY_ERR_SEC_BASE;          /* -700 */
-    int sec_lower = AIRY_ERR_ESANITIZE;          /* -711 */
 
-    /* CUPOLAS_* 段：upper=-712（最接近 0），lower=-723（最远离 0） */
-    int cupolas_upper = AIRY_ERR_CUPOLAS_BASE;   /* -712 */
+    int sec_upper = AIRY_ERR_SEC_BASE; /* -700 */
+    int sec_lower = AIRY_ERR_ESANITIZE; /* -711 */
+    int cupolas_upper = AIRY_ERR_CUPOLAS_BASE; /* -712 */
     int cupolas_lower = AIRY_ERR_CUPOLAS_NETWORK; /* -723 */
-
-    /* 数值校验 */
     if (sec_upper != -700)
         TEST_FAIL("cupolas_segment_no_conflict", "SEC_BASE should be -700");
     if (sec_lower != -711)
@@ -171,7 +165,6 @@ static void test_cupolas_segment_no_conflict(void)
     if (!(cupolas_upper < sec_lower))
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS segment overlaps with SEC segment");
 
-    /* CUPOLAS 段内部连续（数值递减：-712, -713, -714, ...） */
     if (AIRY_ERR_CUPOLAS_DENIED != -713)
         TEST_FAIL("cupolas_segment_no_conflict", "CUPOLAS_DENIED should be -713");
     if (AIRY_ERR_CUPOLAS_QUARANTINE != -714)
@@ -209,27 +202,19 @@ static void test_cupolas_segment_no_conflict(void)
 
 static void test_error_segments_disjoint(void)
 {
-    /* 各段：upper（最接近 0 的值，即段基址）与 lower（最远离 0 的值） */
+
     struct {
         const char *name;
-        int upper;     /* 段基址（最接近 0 的值，数值较大） */
-        int lower;     /* 段下界（最远离 0 的值，数值较小） */
+        int upper;
+        int lower;
     } segments[] = {
-        { "GENERIC",  -99,  -50 },   /* 通用基础错误：AIRY_ERR_UNKNOWN=-99，迁移后 -40~-50 区间 */
-        { "SYS",      -100, -123 },  /* 系统与平台错误 -100 到 -123（v3.0 扩展 -120~-123） */
-        { "KERN",     -200, -208 },  /* 内核层错误 -200 到 -208 */
-        { "SVC",      -300, -307 },  /* 服务层错误 -300 到 -307 */
-        { "LLM",      -400, -410 },  /* LLM/AI服务错误 -400 到 -410 */
-        { "EXEC",     -500, -508 },  /* 执行/工具错误 -500 到 -508 */
-        { "MEM",      -600, -607 },  /* 记忆/存储错误 -600 到 -607 */
-        { "SEC",      -700, -711 },  /* 安全/沙箱错误 -700 到 -711 */
-        { "CUPOLAS",  -712, -723 },  /* Cupolas 专属错误 -712 到 -723 */
-        { "COORD",    -800, -806 },  /* 协调/规划错误 -800 到 -806 */
+        {"GENERIC", -99, -50},   {"SYS", -100, -123},   {"KERN", -200, -208}, {"SVC", -300, -307},
+        {"LLM", -400, -410},     {"EXEC", -500, -508},  {"MEM", -600, -607},  {"SEC", -700, -711},
+        {"CUPOLAS", -712, -723}, {"COORD", -800, -806},
     };
 
     const size_t n = sizeof(segments) / sizeof(segments[0]);
 
-    /* 验证各段基址（upper）正确 */
     if (segments[0].upper != AIRY_ERR_UNKNOWN)
         TEST_FAIL("error_segments_disjoint", "GENERIC upper mismatch");
     if (segments[1].upper != AIRY_ERR_SYS_BASE)
@@ -258,8 +243,8 @@ static void test_error_segments_disjoint(void)
         if (!(segments[i].lower > segments[i + 1].upper)) {
             char msg[128];
             snprintf(msg, sizeof(msg), "segment %s [%d,%d] overlaps with %s [%d,%d]",
-                     segments[i].name, segments[i].upper, segments[i].lower,
-                     segments[i + 1].name, segments[i + 1].upper, segments[i + 1].lower);
+                     segments[i].name, segments[i].upper, segments[i].lower, segments[i + 1].name,
+                     segments[i + 1].upper, segments[i + 1].lower);
             TEST_FAIL("error_segments_disjoint", msg);
         }
     }
@@ -294,17 +279,14 @@ static void test_cupolas_error_string_api(void)
     if (str == NULL)
         TEST_FAIL("cupolas_error_string_api", "string for PERMISSION_DENIED is NULL");
 
-    /* 转换函数：sig → unified */
     cupolas_error_t err = cupolas_error_from_sig(cupolas_SIG_ERR_UNTRUSTED);
     if (err != cupolas_ERR_PERMISSION_DENIED)
         TEST_FAIL("cupolas_error_string_api", "from_sig(UNTRUSTED) should be PERMISSION_DENIED");
 
-    /* 转换函数：ent → unified */
     err = cupolas_error_from_ent(cupolas_ENT_ERR_DENIED);
     if (err != cupolas_ERR_PERMISSION_DENIED)
         TEST_FAIL("cupolas_error_string_api", "from_ent(DENIED) should be PERMISSION_DENIED");
 
-    /* 工具宏 */
     if (!cupolas_ERROR_IS_SUCCESS(cupolas_ERR_OK))
         TEST_FAIL("cupolas_error_string_api", "IS_SUCCESS(OK) should be true");
     if (cupolas_ERROR_IS_SUCCESS(cupolas_ERR_OUT_OF_MEMORY))
@@ -317,7 +299,8 @@ static void test_cupolas_error_string_api(void)
     if (cupolas_ERROR_IS_FATAL(cupolas_ERR_OUT_OF_MEMORY))
         TEST_FAIL("cupolas_error_string_api", "IS_FATAL(OOM) should be false (recoverable)");
     if (cupolas_ERROR_IS_FATAL(cupolas_ERR_BUFFER_TOO_SMALL))
-        TEST_FAIL("cupolas_error_string_api", "IS_FATAL(BUFFER_TOO_SMALL) should be false (recoverable)");
+        TEST_FAIL("cupolas_error_string_api",
+                  "IS_FATAL(BUFFER_TOO_SMALL) should be false (recoverable)");
     if (!cupolas_ERROR_IS_FATAL(cupolas_ERR_OVERFLOW))
         TEST_FAIL("cupolas_error_string_api", "IS_FATAL(OVERFLOW) should be true (unrecoverable)");
     if (!cupolas_ERROR_IS_FATAL(cupolas_ERR_UNKNOWN))

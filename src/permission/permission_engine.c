@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * permission_engine.c - Permission Engine Implementation
  */
@@ -200,7 +200,8 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
     }
 
     if (!agent_id || !action || !resource) {
-        LOG_ERROR("permission_engine_check: NULL parameter - agent_id=%p, action=%p, resource=%p", (void *)agent_id, (void *)action, (void *)resource);
+        LOG_ERROR("permission_engine_check: NULL parameter - agent_id=%p, action=%p, resource=%p",
+                  (void *)agent_id, (void *)action, (void *)resource);
         return 0;
     }
 
@@ -212,9 +213,12 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
     int result = rule_manager_match(engine->rules, agent_id, action, resource, context);
 
     if (result < 0) {
-        LOG_ERROR("permission_engine_check: policy evaluation error - agent_id=%s, action=%s, resource=%s, result=%d", agent_id, action, resource, result);
+        LOG_ERROR("permission_engine_check: policy evaluation error - agent_id=%s, action=%s, "
+                  "resource=%s, result=%d",
+                  agent_id, action, resource, result);
     } else if (result == 0) {
-        LOG_WARN("permission_engine_check: access denied - agent_id=%s, action=%s, resource=%s", agent_id, action, resource);
+        LOG_WARN("permission_engine_check: access denied - agent_id=%s, action=%s, resource=%s",
+                 agent_id, action, resource);
     }
 
     cache_manager_put(engine->cache, agent_id, action, resource, context, result);
@@ -253,14 +257,22 @@ int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    if (!agent_id || !action || !resource) {
-        LOG_ERROR("permission_engine_add_rule: NULL parameter - agent_id=%p, action=%p, resource=%p", (void *)agent_id, (void *)action, (void *)resource);
+    if (!resource) {
+        LOG_ERROR("permission_engine_add_rule: NULL resource parameter");
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    int ret = rule_manager_add(engine->rules, agent_id, action, resource, allow, priority);
+    /* agent_id/action 缺省视为通配 "*"（与 YAML 加载路径默认值一致）：
+     * cupolas.add_rule 文档契约中 agent_id/action 为可选字段，
+     * NULL 直接拒绝会导致可选参数无法使用。 */
+    const char *agent = agent_id ? agent_id : "*";
+    const char *act = action ? action : "*";
+
+    int ret = rule_manager_add(engine->rules, agent, act, resource, allow, priority);
     if (ret != cupolas_OK) {
-        LOG_WARN("permission_engine_add_rule: rule conflict or error - agent_id=%s, action=%s, resource=%s, allow=%d, priority=%d, ret=%d", agent_id, action, resource, allow, priority, ret);
+        LOG_WARN("permission_engine_add_rule: rule conflict or error - agent_id=%s, action=%s, "
+                 "resource=%s, allow=%d, priority=%d, ret=%d",
+                 agent, act, resource, allow, priority, ret);
     }
     if (ret == cupolas_OK) {
         cache_manager_clear(engine->cache);

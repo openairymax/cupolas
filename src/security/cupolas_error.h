@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_error.h - Unified Error Code Definitions and Conversion Functions
  *
@@ -43,20 +43,20 @@ typedef enum {
      * POSIX 码数值碰撞。迁移的 9 个值改为引用 commons 宏（本文件已 include error.h）。
      * v4.0 追加修复：OUT_OF_MEMORY(-4→-49) 和 OVERFLOW(-14→-50) 原遗留为字面量
      * 且注释谎称"一致"，实际与 AIRY_EINTR(-4)/AIRY_EFAULT(-14) 碰撞。现已统一引用宏。 */
-    cupolas_ERR_UNKNOWN = AIRY_ERR_UNKNOWN,              /* -99 */
-    cupolas_ERR_INVALID_PARAM = AIRY_ERR_INVALID_PARAM,  /* -40 */
-    cupolas_ERR_NULL_POINTER = -3,                       /* 与 AIRY_ERR_NULL_POINTER 一致 */
-    cupolas_ERR_OUT_OF_MEMORY = AIRY_ERR_OUT_OF_MEMORY,  /* -49（原 -4，迁移避让 AIRY_EINTR） */
+    cupolas_ERR_UNKNOWN = AIRY_ERR_UNKNOWN, /* -99 */
+    cupolas_ERR_INVALID_PARAM = AIRY_ERR_INVALID_PARAM, /* -40 */
+    cupolas_ERR_NULL_POINTER = -3,
+    cupolas_ERR_OUT_OF_MEMORY = AIRY_ERR_OUT_OF_MEMORY,
     cupolas_ERR_BUFFER_TOO_SMALL = AIRY_ERR_BUFFER_TOO_SMALL, /* -41 */
-    cupolas_ERR_NOT_FOUND = -6,                          /* 与 AIRY_ERR_NOT_FOUND 一致 */
+    cupolas_ERR_NOT_FOUND = -6,
     cupolas_ERR_ALREADY_EXISTS = AIRY_ERR_ALREADY_EXISTS, /* -42 */
-    cupolas_ERR_TIMEOUT = -8,                            /* 与 AIRY_ERR_TIMEOUT 一致 */
-    cupolas_ERR_NOT_SUPPORTED = -9,                      /* 与 AIRY_ERR_NOT_SUPPORTED 一致 */
+    cupolas_ERR_TIMEOUT = -8,
+    cupolas_ERR_NOT_SUPPORTED = -9,
     cupolas_ERR_PERMISSION_DENIED = AIRY_ERR_PERMISSION_DENIED, /* -43 */
-    cupolas_ERR_IO = AIRY_ERR_IO,                        /* -44 */
-    cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR,      /* -46 */
-    cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,            /* -50（原 -14，迁移避让 AIRY_EFAULT） */
-    cupolas_ERR_TRY_AGAIN = -15,                         /* cupolas 专属 */
+    cupolas_ERR_IO = AIRY_ERR_IO, /* -44 */
+    cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR, /* -46 */
+    cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,
+    cupolas_ERR_TRY_AGAIN = -15,
     /* v5.0 修复：5 个安全专属错误码从 -16~-20 迁移至 -718~-726 cupolas 专属段，
      * 消除与 airy_types.h POSIX 码的数值碰撞：
      *   -16（与 AIRY_EBUSY 碰撞）→ -724 AIRY_ERR_CUPOLAS_AUTH_FAILED
@@ -64,11 +64,11 @@ typedef enum {
      *   -18 → -726 AIRY_ERR_CUPOLAS_CERT_EXPIRED
      *   -19 → -719 AIRY_ERR_CUPOLAS_SIGNATURE
      *   -20 → -718 AIRY_ERR_CUPOLAS_TAMPERED */
-    cupolas_ERR_AUTH_FAILED = AIRY_ERR_CUPOLAS_AUTH_FAILED,       /* -724（原 -16，迁移避让 AIRY_EBUSY） */
-    cupolas_ERR_CERT_INVALID = AIRY_ERR_CUPOLAS_CERT_INVALID,     /* -725（原 -17，迁移避让 AIRY_EEXIST） */
-    cupolas_ERR_CERT_EXPIRED = AIRY_ERR_CUPOLAS_CERT_EXPIRED,     /* -726（原 -18） */
-    cupolas_ERR_SIGNATURE_INVALID = AIRY_ERR_CUPOLAS_SIGNATURE,   /* -719（原 -19） */
-    cupolas_ERR_TAMPERED = AIRY_ERR_CUPOLAS_TAMPERED              /* -718（原 -20） */
+    cupolas_ERR_AUTH_FAILED = AIRY_ERR_CUPOLAS_AUTH_FAILED,
+    cupolas_ERR_CERT_INVALID = AIRY_ERR_CUPOLAS_CERT_INVALID,
+    cupolas_ERR_CERT_EXPIRED = AIRY_ERR_CUPOLAS_CERT_EXPIRED,
+    cupolas_ERR_SIGNATURE_INVALID = AIRY_ERR_CUPOLAS_SIGNATURE,
+    cupolas_ERR_TAMPERED = AIRY_ERR_CUPOLAS_TAMPERED
 } cupolas_error_t;
 
 /* ============================================================================

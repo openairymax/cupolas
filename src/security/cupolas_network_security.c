@@ -1,8 +1,8 @@
-#include "cupolas.h"
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
+#include "cupolas.h"
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_network_security.c - Network Security: TLS Hardening and Traffic Implementation
  */
@@ -19,7 +19,7 @@
 #include "cupolas_network_security.h"
 
 #include "../platform/platform.h"
-#include <platform.h> /* airy_process_run_capture (BAN-211/235 安全子进程) */
+#include <platform.h>
 #include "airy_memory.h"
 #include "utils/cupolas_utils.h"
 
@@ -902,7 +902,8 @@ int cupolas_dns_configure(const cupolas_dns_security_config_t *manager)
     if (!manager)
         return AIRY_ERR_UNKNOWN;
     g_net_security.manager.dns.enable_dnssec = manager->enable_dnssec;
-    AIRY_STRNCPY_TERM(g_net_security.manager.dns.upstream_server, manager->upstream_server, sizeof(g_net_security.manager.dns.upstream_server));
+    AIRY_STRNCPY_TERM(g_net_security.manager.dns.upstream_server, manager->upstream_server,
+                      sizeof(g_net_security.manager.dns.upstream_server));
     return 0;
 }
 
@@ -969,7 +970,7 @@ int cupolas_dns_verify_dnssec(const char *domain)
         return 0;
 
 #ifdef __linux__
-    /* 验证 domain 仅包含合法 DNS 字符，防止命令注入 */
+
     const char *p = domain;
     int valid = 1;
     while (*p) {
@@ -986,8 +987,8 @@ int cupolas_dns_verify_dnssec(const char *domain)
      * domain 已通过上面的白名单校验，仅含 alnum/-/./_ 。 */
     const char *const argv[] = {"dig", "+dnssec", "+short", domain, "DNSKEY", NULL};
     char output[4096];
-    int exit_code = airy_process_run_capture("dig", (char *const *)argv, NULL, 5000,
-                                                output, sizeof(output));
+    int exit_code =
+        airy_process_run_capture("dig", (char *const *)argv, NULL, 5000, output, sizeof(output));
     if (exit_code == 0 && (strstr(output, "DNSKEY") || strstr(output, "RRSIG"))) {
         return 1;
     }

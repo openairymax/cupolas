@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * audit_logger.c - Audit Logger Implementation
  */
@@ -37,10 +37,8 @@
 #define DEFAULT_BATCH_SIZE 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
 
-/* SEC-13: OOM 关键路径预分配常量 */
-#define AUDIT_OOM_PREALLOC_EVENTS 64  /**< OOM 时预分配的审计事件槽位数 */
+#define AUDIT_OOM_PREALLOC_EVENTS 64
 
-/* SHA-256 审计哈希链追踪 */
 static char g_last_hash[65] = "0000000000000000000000000000000000000000000000000000000000000000";
 static cupolas_mutex_t g_hash_chain_lock;
 
@@ -52,19 +50,14 @@ static cupolas_mutex_t g_hash_chain_lock;
  * 使用静态数组，零运行时内存分配。
  * ============================================================================ */
 
-/** @brief OOM 预分配审计条目池 */
 static audit_entry_t g_audit_oom_entries[AUDIT_OOM_PREALLOC_EVENTS];
 
-/** @brief OOM 预分配池写入索引 */
 static size_t g_audit_oom_write_index = 0;
 
-/** @brief OOM 预分配池已用槽位数 */
 static size_t g_audit_oom_used_count = 0;
 
-/** @brief OOM 预分配池互斥锁 */
 static cupolas_mutex_t g_audit_oom_lock;
 
-/** @brief OOM 预分配池是否已初始化 */
 static bool g_audit_oom_initialized = false;
 
 /**
@@ -105,19 +98,17 @@ static audit_entry_t *audit_oom_pool_alloc(void)
     cupolas_mutex_lock(&g_audit_oom_lock);
 
     if (g_audit_oom_used_count >= AUDIT_OOM_PREALLOC_EVENTS) {
-        /* 池已满，覆盖最旧的条目（环形缓冲区） */
+
         audit_entry_t *entry = &g_audit_oom_entries[g_audit_oom_write_index];
         __builtin_memset(entry, 0, sizeof(audit_entry_t));
-        g_audit_oom_write_index =
-            (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
+        g_audit_oom_write_index = (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
         cupolas_mutex_unlock(&g_audit_oom_lock);
         return entry;
     }
 
     audit_entry_t *entry = &g_audit_oom_entries[g_audit_oom_write_index];
     __builtin_memset(entry, 0, sizeof(audit_entry_t));
-    g_audit_oom_write_index =
-        (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
+    g_audit_oom_write_index = (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
     g_audit_oom_used_count++;
 
     cupolas_mutex_unlock(&g_audit_oom_lock);
@@ -155,20 +146,32 @@ static void audit_compute_chain_hash(const audit_entry_t *entry, const char *pre
     SHA256_Final(digest, &sha256);
 #pragma GCC diagnostic pop
 
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-    {
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
         snprintf(hash_out + i * 2, 3, "%02x", digest[i]);
     }
     hash_out[64] = '\0';
 #else
-    /* OpenSSL 不可用时的回退: 使用简单校验和 */
+
     uint32_t checksum = 0;
     const char *str = prev_hash;
-    while (*str) checksum = checksum * 31 + (unsigned char)*str++;
-    if (entry->agent_id) { str = entry->agent_id; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
+    while (*str)
+        checksum = checksum * 31 + (unsigned char)*str++;
+    if (entry->agent_id) {
+        str = entry->agent_id;
+        while (*str)
+            checksum = checksum * 31 + (unsigned char)*str++;
+    }
     checksum ^= (uint32_t)entry->timestamp_ms;
-    if (entry->action) { str = entry->action; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
-    if (entry->resource) { str = entry->resource; while (*str) checksum = checksum * 31 + (unsigned char)*str++; }
+    if (entry->action) {
+        str = entry->action;
+        while (*str)
+            checksum = checksum * 31 + (unsigned char)*str++;
+    }
+    if (entry->resource) {
+        str = entry->resource;
+        while (*str)
+            checksum = checksum * 31 + (unsigned char)*str++;
+    }
     checksum ^= (uint32_t)entry->result;
     snprintf(hash_out, 65, "%016x%016x%016x%016x", checksum, checksum ^ 0xAAAAAAAA,
              checksum ^ 0x55555555, checksum ^ 0xFFFFFFFF);
@@ -209,7 +212,10 @@ static void *audit_writer_thread(void *arg)
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
                     cupolas_atomic_add64(&logger->total_logged, 1);
                 } else {
-                    LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, total_failed=%llu", (int)batch[i]->type, (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
+                    LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, "
+                              "total_failed=%llu",
+                              (int)batch[i]->type,
+                              (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
                     cupolas_atomic_add64(&logger->total_failed, 1);
                 }
                 audit_entry_destroy(batch[i]);
@@ -224,7 +230,9 @@ static void *audit_writer_thread(void *arg)
             if (audit_rotator_write(logger->rotator, entry) == cupolas_OK) {
                 cupolas_atomic_add64(&logger->total_logged, 1);
             } else {
-                LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, total_failed=%llu", (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
+                LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, "
+                          "total_failed=%llu",
+                          (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
                 cupolas_atomic_add64(&logger->total_failed, 1);
             }
             audit_entry_destroy(entry);
@@ -244,8 +252,8 @@ static void audit_logger_restore_last_hash(audit_logger_t *logger)
         return;
 
     char path[1024];
-    snprintf(path, sizeof(path), "%s%s%s.log", logger->log_dir,
-             logger->log_dir[0] ? "/" : "", logger->log_prefix);
+    snprintf(path, sizeof(path), "%s%s%s.log", logger->log_dir, logger->log_dir[0] ? "/" : "",
+             logger->log_prefix);
     FILE *f = fopen(path, "r");
     if (!f)
         return;
@@ -275,7 +283,7 @@ static void audit_logger_restore_last_hash(audit_logger_t *logger)
 audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
                                     size_t max_file_size, int max_files)
 {
-    /* 初始化哈希链互斥锁（仅首次调用） */
+
     static cupolas_atomic32_t hash_lock_inited = {0};
     if (cupolas_atomic_load32(&hash_lock_inited) == 0) {
         cupolas_mutex_init(&g_hash_chain_lock);
@@ -311,7 +319,6 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
     if (!logger->rotator)
         goto error;
 
-    /* 从磁盘恢复哈希链尾哈希（在启动写入新条目之前，保持链连续） */
     audit_logger_restore_last_hash(logger);
 
     cupolas_atomic_store32(&logger->running, 1);
@@ -363,19 +370,16 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
         /* SEC-13: Fallback to pre-allocated audit buffer under OOM */
         void *emergency_buf = airy_prealloc_acquire(AIRY_PREALLOC_AUDIT);
         if (emergency_buf) {
-            LOG_WARN("audit_logger_log: using emergency buffer fallback for type=%d, agent_id=%s, action=%s", (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)");
+            LOG_WARN("audit_logger_log: using emergency buffer fallback for type=%d, agent_id=%s, "
+                     "action=%s",
+                     (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)");
             /* Write a minimal audit record to the emergency buffer */
-            int written = snprintf((char *)emergency_buf,
-                    AIRY_PREALLOC_AUDIT_BUF_SIZE,
-                    "{\"type\":%d,\"agent_id\":\"%s\",\"action\":\"%s\","
-                    "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d,"
-                    "\"emergency\":true}\n",
-                    (int)type,
-                    agent_id ? agent_id : "",
-                    action ? action : "",
-                    resource ? resource : "",
-                    detail ? detail : "",
-                    result);
+            int written = snprintf((char *)emergency_buf, AIRY_PREALLOC_AUDIT_BUF_SIZE,
+                                   "{\"type\":%d,\"agent_id\":\"%s\",\"action\":\"%s\","
+                                   "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d,"
+                                   "\"emergency\":true}\n",
+                                   (int)type, agent_id ? agent_id : "", action ? action : "",
+                                   resource ? resource : "", detail ? detail : "", result);
 
             if (written > 0 && (size_t)written < AIRY_PREALLOC_AUDIT_BUF_SIZE) {
                 /* Write emergency audit entry directly via rotator */
@@ -397,7 +401,6 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
         return cupolas_ERROR_NO_MEMORY;
     }
 
-    /* === 编码契约: SHA-256 审计哈希链（BAN-129）=== */
     cupolas_mutex_lock(&g_hash_chain_lock);
     __builtin_memcpy(entry->prev_hash, g_last_hash, sizeof(entry->prev_hash));
     audit_compute_chain_hash(entry, g_last_hash, entry->curr_hash);
@@ -406,7 +409,9 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
 
     int ret = audit_queue_try_push(logger->queue, entry);
     if (ret != cupolas_OK) {
-        LOG_ERROR("[CRITICAL] audit_logger_log: audit queue push failed (buffer overflow), type=%d, agent_id=%s, action=%s, ret=%d", (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)", ret);
+        LOG_ERROR("[CRITICAL] audit_logger_log: audit queue push failed (buffer overflow), "
+                  "type=%d, agent_id=%s, action=%s, ret=%d",
+                  (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)", ret);
         audit_entry_destroy(entry);
         cupolas_atomic_add64(&logger->total_failed, 1);
     }
@@ -451,8 +456,11 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
                                const char *first_prev_hash, int *out_invalid_index)
 {
     if (!entries || entry_count == 0 || !first_prev_hash) {
-        LOG_ERROR("audit_logger_verify_chain: NULL/invalid parameter - entries=%p, entry_count=%zu, first_prev_hash=%p", (void *)entries, entry_count, (void *)first_prev_hash);
-        if (out_invalid_index) *out_invalid_index = -1;
+        LOG_ERROR("audit_logger_verify_chain: NULL/invalid parameter - entries=%p, "
+                  "entry_count=%zu, first_prev_hash=%p",
+                  (void *)entries, entry_count, (void *)first_prev_hash);
+        if (out_invalid_index)
+            *out_invalid_index = -1;
         return false;
     }
 
@@ -463,31 +471,35 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
         const audit_entry_t *entry = entries[i];
         if (!entry) {
             LOG_ERROR("audit_logger_verify_chain: NULL entry at index=%zu", i);
-            if (out_invalid_index) *out_invalid_index = (int)i;
+            if (out_invalid_index)
+                *out_invalid_index = (int)i;
             return false;
         }
 
-        /* 验证 prev_hash 是否匹配 */
         if (memcmp(entry->prev_hash, expected_prev, 65) != 0) {
-            LOG_ERROR("audit_logger_verify_chain: prev_hash mismatch at index=%zu, chain tampered", i);
-            if (out_invalid_index) *out_invalid_index = (int)i;
+            LOG_ERROR("audit_logger_verify_chain: prev_hash mismatch at index=%zu, chain tampered",
+                      i);
+            if (out_invalid_index)
+                *out_invalid_index = (int)i;
             return false;
         }
 
-        /* 重新计算 curr_hash 并验证 */
         char recomputed_hash[65];
         audit_compute_chain_hash(entry, expected_prev, recomputed_hash);
         if (memcmp(entry->curr_hash, recomputed_hash, 65) != 0) {
-            LOG_ERROR("audit_logger_verify_chain: curr_hash mismatch at index=%zu, entry tampered or corrupted", i);
-            if (out_invalid_index) *out_invalid_index = (int)i;
+            LOG_ERROR("audit_logger_verify_chain: curr_hash mismatch at index=%zu, entry tampered "
+                      "or corrupted",
+                      i);
+            if (out_invalid_index)
+                *out_invalid_index = (int)i;
             return false;
         }
 
-        /* 前进到下一个条目 */
         __builtin_memcpy(expected_prev, entry->curr_hash, 65);
     }
 
-    if (out_invalid_index) *out_invalid_index = -1;
+    if (out_invalid_index)
+        *out_invalid_index = -1;
     return true;
 }
 

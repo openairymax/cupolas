@@ -1,8 +1,8 @@
-#include "cupolas.h"
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
+#include "cupolas.h"
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_metrics.c - Metrics Export: Prometheus Format
  */
@@ -37,7 +37,6 @@
 #include <unistd.h>
 #endif
 
-/* 预定义指标名称 */
 const char *METRIC_PERMISSIONS_TOTAL = "cupolas_permissions_total";
 const char *METRIC_PERMISSIONS_DURATION_SECONDS = "cupolas_permissions_duration_seconds";
 const char *METRIC_PERMISSIONS_CACHE_HITS = "cupolas_permissions_cache_hits_total";

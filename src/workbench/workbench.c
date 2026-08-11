@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 #include "cupolas.h"
 /**
  * @file workbench.c
@@ -17,7 +18,7 @@
 #include <string.h>
 
 #if !cupolas_PLATFORM_WINDOWS
-#include <unistd.h> /* close() — P2-5: 父进程关闭管道写端 */
+#include <unistd.h>
 #endif
 
 #define DEFAULT_TIMEOUT_MS 30000

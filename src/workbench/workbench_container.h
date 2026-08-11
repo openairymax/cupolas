@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * workbench_container.h - Container Runtime Implementation: Docker/runc-based Isolated Execution
  */
@@ -34,9 +34,9 @@ extern "C" {
  */
 typedef enum container_runtime {
     CONTAINER_RUNTIME_DOCKER = 0, /**< Docker daemon-based runtime */
-    CONTAINER_RUNTIME_RUNC,       /**< OCI runc runtime */
-    CONTAINER_RUNTIME_CRUN,       /**< Lightweight crun runtime */
-    CONTAINER_RUNTIME_AUTO        /**< Auto-detect available runtime */
+    CONTAINER_RUNTIME_RUNC, /**< OCI runc runtime */
+    CONTAINER_RUNTIME_CRUN, /**< Lightweight crun runtime */
+    CONTAINER_RUNTIME_AUTO /**< Auto-detect available runtime */
 } container_runtime_t;
 
 /**
@@ -49,37 +49,35 @@ typedef enum container_runtime {
  * - Image pull policies
  */
 typedef struct container_config {
-    const char *image;   /**< Container image name */
+    const char *image; /**< Container image name */
     const char *command; /**< Command to execute */
-    const char **args;   /**< Command arguments */
-    size_t args_count;   /**< Number of arguments */
+    const char **args; /**< Command arguments */
+    size_t args_count; /**< Number of arguments */
 
-    const char *workdir;   /**< Working directory */
+    const char *workdir; /**< Working directory */
     const char **env_vars; /**< Environment variables */
-    size_t env_count;      /**< Number of environment variables */
-
+    size_t env_count; /**< Number of environment variables */
     container_runtime_t runtime; /**< Container runtime to use */
-
     struct {
         const char *network_mode; /**< Network mode: bridge, none, host */
-        bool readonly_rootfs;     /**< Read-only root filesystem */
-        const char *user;         /**< User/group ID */
-        size_t memory_limit;      /**< Memory limit in bytes */
-        int cpu_shares;           /**< CPU weight/shares */
-        int cpu_quota;            /**< CPU quota in microseconds */
-        int pids_limit;           /**< Maximum number of PIDs */
+        bool readonly_rootfs; /**< Read-only root filesystem */
+        const char *user; /**< User/group ID */
+        size_t memory_limit; /**< Memory limit in bytes */
+        int cpu_shares; /**< CPU weight/shares */
+        int cpu_quota; /**< CPU quota in microseconds */
+        int pids_limit; /**< Maximum number of PIDs */
     } resources;
 
     struct {
-        bool enable_logging;    /**< Enable container logging */
+        bool enable_logging; /**< Enable container logging */
         const char *log_driver; /**< Log driver: json-file, syslog */
-        size_t log_max_size;    /**< Max log file size in bytes */
-        int log_max_files;      /**< Maximum number of log files */
+        size_t log_max_size; /**< Max log file size in bytes */
+        int log_max_files; /**< Maximum number of log files */
     } logging;
 
     struct {
-        bool use_cache;            /**< Use image cache */
-        bool pull_latest;          /**< Always pull latest image */
+        bool use_cache; /**< Use image cache */
+        bool pull_latest; /**< Always pull latest image */
         const char *registry_auth; /**< Registry auth config path */
     } image_policy;
 } container_config_t;
@@ -89,36 +87,36 @@ typedef struct container_config {
  */
 typedef enum container_state {
     CONTAINER_STATE_CREATED = 0, /**< Container created but not running */
-    CONTAINER_STATE_RUNNING,     /**< Container is running */
-    CONTAINER_STATE_PAUSED,      /**< Container is paused */
-    CONTAINER_STATE_STOPPED,     /**< Container is stopped */
-    CONTAINER_STATE_RESTARTING,  /**< Container is restarting */
-    CONTAINER_STATE_DEAD,        /**< Container is dead */
-    CONTAINER_STATE_UNKNOWN      /**< Container state unknown */
+    CONTAINER_STATE_RUNNING, /**< Container is running */
+    CONTAINER_STATE_PAUSED, /**< Container is paused */
+    CONTAINER_STATE_STOPPED, /**< Container is stopped */
+    CONTAINER_STATE_RESTARTING, /**< Container is restarting */
+    CONTAINER_STATE_DEAD, /**< Container is dead */
+    CONTAINER_STATE_UNKNOWN /**< Container state unknown */
 } container_state_t;
 
 /**
  * @brief Container information structure
  */
 typedef struct container_info {
-    char container_id[64];   /**< Container ID (64 characters) */
-    char name[256];          /**< Container name */
+    char container_id[64]; /**< Container ID (64 characters) */
+    char name[256]; /**< Container name */
     container_state_t state; /**< Container state */
-    int exit_code;           /**< Exit code */
-    uint64_t exit_time;      /**< Exit timestamp */
+    int exit_code; /**< Exit code */
+    uint64_t exit_time; /**< Exit timestamp */
 
     struct {
-        size_t memory_usage;   /**< Current memory usage in bytes */
-        size_t memory_limit;   /**< Memory limit in bytes */
-        uint64_t cpu_usage;    /**< CPU usage in nanoseconds */
+        size_t memory_usage; /**< Current memory usage in bytes */
+        size_t memory_limit; /**< Memory limit in bytes */
+        uint64_t cpu_usage; /**< CPU usage in nanoseconds */
         uint64_t pids_current; /**< Current number of PIDs */
     } stats;
 
     struct {
-        uint64_t started_at;  /**< Start timestamp */
+        uint64_t started_at; /**< Start timestamp */
         uint64_t finished_at; /**< Finish timestamp */
-        size_t rx_bytes;      /**< Bytes received */
-        size_t tx_bytes;      /**< Bytes transmitted */
+        size_t rx_bytes; /**< Bytes received */
+        size_t tx_bytes; /**< Bytes transmitted */
     } metrics;
 } container_info_t;
 
@@ -126,13 +124,13 @@ typedef struct container_info {
  * @brief Container execution result
  */
 typedef struct container_result {
-    int exit_code;        /**< Process exit code */
-    char *stdout_data;    /**< Standard output data */
-    size_t stdout_size;   /**< Standard output size */
-    char *stderr_data;    /**< Standard error data */
-    size_t stderr_size;   /**< Standard error size */
+    int exit_code; /**< Process exit code */
+    char *stdout_data; /**< Standard output data */
+    size_t stdout_size; /**< Standard output size */
+    char *stderr_data; /**< Standard error data */
+    size_t stderr_size; /**< Standard error size */
     uint64_t duration_ns; /**< Execution duration in nanoseconds */
-    int oom_killed;       /**< Whether killed by OOM */
+    int oom_killed; /**< Whether killed by OOM */
 } container_result_t;
 
 /**

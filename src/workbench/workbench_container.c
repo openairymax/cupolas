@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
 /*
- * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * workbench_container.c - Container Mode Implementation: Docker/runc-based Isolated Execution
  */
@@ -113,7 +113,7 @@ bool container_runtime_is_available(container_runtime_t runtime)
     default:
         return false;
     }
-    /* BAN-211/235: 直接 execvp（不经 shell），消除命令注入风险 */
+
     const char *const argv[] = {exe, "--version", NULL};
     int exit_code = airy_process_run_capture(exe, (char *const *)argv, NULL, 10000, NULL, 0);
     return exit_code == 0;
@@ -215,7 +215,7 @@ static int split_command_to_argv(char *cmd, char *argv[], int max_args)
     int argc = 0;
     char *p = cmd;
     while (*p && argc < max_args - 1) {
-        /* 跳过前导空白 */
+
         while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
             p++;
         if (!*p)
@@ -276,8 +276,8 @@ static int execute_command(const char *cmd, int timeout_ms, char *output, size_t
     if (argc < 1)
         return AIRY_EINVAL;
 
-    return airy_process_run_capture(argv[0], (char *const *)argv, NULL,
-                                       (uint32_t)timeout_ms, output, output_size);
+    return airy_process_run_capture(argv[0], (char *const *)argv, NULL, (uint32_t)timeout_ms,
+                                    output, output_size);
 }
 
 int container_pull_image(void *mgr, const char *image)
@@ -309,7 +309,6 @@ int container_start(void *mgr, const char *name, container_result_t *result)
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    /* 安全验证: 防止通过 image/command/args 注入命令 */
     if (!is_safe_image_name(handle->manager.image)) {
         return cupolas_ERROR_PERMISSION;
     }
@@ -450,8 +449,7 @@ int container_get_stats(void *mgr, container_info_t *info)
         char *tok_sep = strtok_r(NULL, " /", &saveptr);
         (void)tok_sep;
         char *tok_limit = strtok_r(NULL, " /\r\n", &saveptr);
-        if (tok_used && tok_limit)
-        {
+        if (tok_used && tok_limit) {
             mem_used = strtoul(tok_used, NULL, 10);
             mem_limit_val = strtoul(tok_limit, NULL, 10);
             info->stats.memory_usage = (uint64_t)mem_used;
@@ -557,7 +555,6 @@ int container_exec(void *mgr, const char *command, const char **args, size_t arg
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    /* 安全验证: 防止通过 command/args 注入命令 */
     if (!is_safe_image_name(command)) {
         return cupolas_ERROR_PERMISSION;
     }
