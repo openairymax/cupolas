@@ -10,9 +10,7 @@
 
 /**
  * @file cupolas_vault.c
- * @brief Secure Credential Storage - iOS Keychain-like Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * @brief Secure credential storage (iOS Keychain-like) implementation.
  */
 
 #include "cupolas_vault.h"
@@ -43,11 +41,11 @@
 static vault_global_ctx_t g_vault_ctx = {0};
 
 /* ============================================================================
- * SEC-13: OOM 关键路径预分配池
+ * SEC-13: preallocated pool for OOM critical paths.
  *
- * 启动时预分配 16 个凭证槽位和加密数据缓冲区。
- * 当系统 OOM 时，使用预分配池代替系统 malloc，
- * 确保证书存储关键路径在内存压力下仍可工作。
+ * 16 credential slots and encrypted-data buffers are preallocated at
+ * startup. On OOM the preallocated pool replaces the system malloc so the
+ * credential-storage critical path still works under memory pressure.
  * ============================================================================ */
 
 static credential_entry_t g_vault_oom_entries[VAULT_OOM_PREALLOC_SLOTS];
@@ -61,10 +59,10 @@ static cupolas_mutex_t g_vault_oom_lock;
 static bool g_vault_oom_initialized = false;
 
 /**
- * @brief 初始化 OOM 预分配池（SEC-13.1）
+ * @brief Initialize the OOM prealloc pool (SEC-13.1)
  *
- * 在 cupolas_vault_init() 中调用，启动时预分配资源。
- * 零内存分配——使用静态数组。
+ * Called from cupolas_vault_init(); preallocates resources at startup.
+ * No memory allocation: backed by static arrays.
  */
 static void vault_oom_pool_init(void)
 {
@@ -82,12 +80,12 @@ static void vault_oom_pool_init(void)
 }
 
 /**
- * @brief 从 OOM 预分配池获取一个凭证槽位（SEC-13.1）
+ * @brief Allocate a credential slot from the OOM prealloc pool (SEC-13.1)
  *
- * 当正常 AIRY_CALLOC 失败时调用。
- * 从预分配池中分配一个槽位，不调用系统 malloc。
+ * Called when the normal AIRY_CALLOC fails. Takes a slot from the
+ * preallocated pool without calling the system malloc.
  *
- * @return 凭证条目指针，池耗尽返回 NULL
+ * @return Credential entry pointer, NULL if the pool is exhausted
  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -113,12 +111,12 @@ static credential_entry_t *vault_oom_pool_alloc(void)
 }
 
 /**
- * @brief 从 OOM 预分配池获取加密数据缓冲区（SEC-13.1）
+ * @brief Get the encrypted-data buffer from the OOM prealloc pool (SEC-13.1)
  *
- * 返回与槽位索引对应的预分配数据缓冲区。
+ * Returns the preallocated data buffer matching the slot index.
  *
- * @param entry 从 vault_oom_pool_alloc() 获取的条目指针
- * @return 数据缓冲区指针，无效条目返回 NULL
+ * @param entry Entry pointer obtained from vault_oom_pool_alloc()
+ * @return Data buffer pointer, NULL for an invalid entry
  */
 static uint8_t *vault_oom_pool_get_data_buffer(credential_entry_t *entry)
 {
@@ -135,9 +133,9 @@ static uint8_t *vault_oom_pool_get_data_buffer(credential_entry_t *entry)
 }
 
 /**
- * @brief 释放 OOM 预分配池槽位（SEC-13.1）
+ * @brief Release an OOM prealloc pool slot (SEC-13.1)
  *
- * @param entry 要释放的条目指针
+ * @param entry Entry pointer to release
  */
 static void vault_oom_pool_free(credential_entry_t *entry)
 {
@@ -155,10 +153,6 @@ static void vault_oom_pool_free(credential_entry_t *entry)
     cupolas_mutex_unlock(&g_vault_oom_lock);
 }
 #pragma GCC diagnostic pop
-
-/* ============================================================================
- * 初始化/清理
- * ============================================================================ */
 
 #define VLT_INIT_UNINIT 0
 #define VLT_INIT_PROGRESS 1

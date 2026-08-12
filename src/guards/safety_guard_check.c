@@ -3,10 +3,12 @@
 
 /**
  * @file safety_guard_check.c
- * @brief V2 SafetyGuard API 实现 - 规则匹配与策略执行域
+ * @brief V2 SafetyGuard API implementation: rule matching and policy
+ *        enforcement domain.
  *
- * 本文件实现 6 种默认守卫检查（权限/速率/内容/输入/资源/审计）、
- * 默认检查函数分派，以及守卫链执行（check / check_chain / check_permission）。
+ * Implements the 6 default guard checks (permission/rate-limit/content/
+ * input/resource/audit), default check-function dispatch, and guard-chain
+ * execution (check / check_chain / check_permission).
  */
 
 #include "safety_guard.h"
@@ -20,8 +22,8 @@
 #include <string.h>
 
 /**
- * @brief 默认权限检查（SAFETY_GUARD_PERMISSION）
- * 检查 agent_id 是否有权限执行指定操作
+ * @brief Default permission check (SAFETY_GUARD_PERMISSION)
+ * Checks whether agent_id is allowed to perform the given operation
  */
 static safety_decision_t default_permission_check(const safety_guard_descriptor_t *guard,
                                                   const safety_event_t *event,
@@ -49,10 +51,10 @@ static safety_decision_t default_permission_check(const safety_guard_descriptor_
 }
 
 /**
- * @brief 默认速率限制检查（SAFETY_GUARD_RATE_LIMIT）
- * 基于注册的配额系统检查工具调用频率。
- * 具体限制通过 safety_guard_set_quota() 为每个 agent 单独配置。
- * 此默认实现检查 event->flags 中的频控标记位。
+ * @brief Default rate-limit check (SAFETY_GUARD_RATE_LIMIT)
+ * Checks tool-call frequency against the registered quota system. Per-agent
+ * limits are configured via safety_guard_set_quota(). This default
+ * implementation inspects the rate-limit flag in event->flags.
  */
 static safety_decision_t default_rate_limit_check(const safety_guard_descriptor_t *guard,
                                                   const safety_event_t *event,
@@ -77,8 +79,8 @@ static safety_decision_t default_rate_limit_check(const safety_guard_descriptor_
 }
 
 /**
- * @brief 默认内容过滤检查（SAFETY_GUARD_CONTENT_FILTER）
- * 检查输入内容是否包含敏感/危险模式
+ * @brief Default content-filter check (SAFETY_GUARD_CONTENT_FILTER)
+ * Checks the input content for sensitive/dangerous patterns
  */
 static safety_decision_t default_content_filter_check(const safety_guard_descriptor_t *guard,
                                                       const safety_event_t *event,
@@ -114,8 +116,8 @@ static safety_decision_t default_content_filter_check(const safety_guard_descrip
 }
 
 /**
- * @brief 默认输入检查（SAFETY_GUARD_INPUT）
- * 检查输入参数的合法性
+ * @brief Default input check (SAFETY_GUARD_INPUT)
+ * Checks the validity of the input parameters
  */
 static safety_decision_t default_input_check(const safety_guard_descriptor_t *guard,
                                              const safety_event_t *event, safety_result_t *result)
@@ -140,16 +142,17 @@ static safety_decision_t default_input_check(const safety_guard_descriptor_t *gu
 }
 
 /**
- * @brief 默认资源检查（SAFETY_GUARD_RESOURCE）
+ * @brief Default resource check (SAFETY_GUARD_RESOURCE)
  *
- * 基于事件数据进行资源验证：
- * 1. 检查 event->flags 中的资源耗尽标志位（bit 1 = RESOURCE_EXHAUSTED）
- * 2. 检查 context_size 是否超过单次资源操作上限（100MB）
- * 3. 检查 resource 字段是否为已知受限资源
+ * Resource validation based on event data:
+ * 1. Resource-exhaustion flag in event->flags (bit 1 = RESOURCE_EXHAUSTED)
+ * 2. context_size against the per-operation limit (100MB)
+ * 3. resource field against the list of restricted resources
  *
- * 注意：默认检查函数签名不含 context，无法访问 ctx->quotas。
- * 精确配额检查通过 safety_guard_check_quota() API 或注册自定义
- * check_fn（将 ctx 作为 user_data 传入）实现。
+ * Note: the default check signature has no context, so ctx->quotas is not
+ * reachable here. Precise quota checks are done via
+ * safety_guard_check_quota() or a registered custom check_fn (passing ctx
+ * as user_data).
  */
 static safety_decision_t default_resource_check(const safety_guard_descriptor_t *guard,
                                                 const safety_event_t *event,
@@ -205,16 +208,18 @@ static safety_decision_t default_resource_check(const safety_guard_descriptor_t 
 }
 
 /**
- * @brief 默认审计检查（SAFETY_GUARD_AUDIT）
+ * @brief Default audit check (SAFETY_GUARD_AUDIT)
  *
- * 审计守卫的设计语义：审计不阻止操作，只记录事件。
- * 实际的审计日志写入由编排函数（safety_guard_check / check_chain）
- * 在调用本函数后通过 safety_guard_record_audit() 完成。
+ * Design semantics: auditing never blocks operations, it only records
+ * events. The actual audit-log write is performed by the orchestration
+ * functions (safety_guard_check / check_chain) via
+ * safety_guard_record_audit() after this check runs.
  *
- * 本函数的职责：
- * 1. 验证事件具有审计所需的最小元数据（subject + action）
- * 2. 标记审计结果，供编排函数记录
- * 3. 始终返回 ALLOW（审计不阻断业务流）
+ * Responsibilities:
+ * 1. Verify the event carries the minimal metadata for auditing
+ *    (subject + action)
+ * 2. Mark the audit result for the orchestrator to record
+ * 3. Always return ALLOW (auditing does not block the business flow)
  */
 static safety_decision_t default_audit_check(const safety_guard_descriptor_t *guard,
                                              const safety_event_t *event, safety_result_t *result)

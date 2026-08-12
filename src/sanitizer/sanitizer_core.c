@@ -1,16 +1,9 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * sanitizer_core.c - Input Sanitizer Core Implementation
- */
-
 /**
  * @file sanitizer_core.c
- * @brief Input Sanitizer Core Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * @brief Input sanitizer core implementation.
  */
 
 #include "sanitizer.h"
@@ -104,10 +97,10 @@ void sanitizer_destroy(sanitizer_t *sanitizer)
 }
 
 /**
- * @brief 检查HTML危险字符
- * @param c 字符
- * @param ctx 净化上下文
- * @return 是否为危险字符
+ * @brief Check whether a character is dangerous in HTML context
+ * @param c Character
+ * @param ctx Sanitization context
+ * @return true if dangerous
  */
 static bool is_html_dangerous(char c, const sanitize_context_t *ctx)
 {
@@ -117,10 +110,10 @@ static bool is_html_dangerous(char c, const sanitize_context_t *ctx)
 }
 
 /**
- * @brief 检查SQL危险字符
- * @param c 字符
- * @param ctx 净化上下文
- * @return 是否为危险字符
+ * @brief Check whether a character is dangerous in SQL context
+ * @param c Character
+ * @param ctx Sanitization context
+ * @return true if dangerous
  */
 static bool cupolas_sanitizer_is_sql_dangerous(char c, const sanitize_context_t *ctx)
 {
@@ -132,10 +125,10 @@ static bool cupolas_sanitizer_is_sql_dangerous(char c, const sanitize_context_t 
 }
 
 /**
- * @brief 检查Shell危险字符
- * @param c 字符
- * @param ctx 净化上下文
- * @return 是否为危险字符
+ * @brief Check whether a character is dangerous in shell context
+ * @param c Character
+ * @param ctx Sanitization context
+ * @return true if dangerous
  */
 static bool cupolas_sanitizer_is_shell_dangerous(char c, const sanitize_context_t *ctx)
 {
@@ -148,11 +141,11 @@ static bool cupolas_sanitizer_is_shell_dangerous(char c, const sanitize_context_
 }
 
 /**
- * @brief 检查路径危险字符
- * @param c 当前字符
- * @param prev_char 前一个字符
- * @param ctx 净化上下文
- * @return 是否为危险字符
+ * @brief Check whether a character is dangerous in path context
+ * @param c Current character
+ * @param prev_char Previous character
+ * @param ctx Sanitization context
+ * @return true if dangerous
  */
 static bool cupolas_sanitizer_is_path_dangerous(char c, char prev_char,
                                                 const sanitize_context_t *ctx)
@@ -165,9 +158,9 @@ static bool cupolas_sanitizer_is_path_dangerous(char c, char prev_char,
 }
 
 /**
- * @brief 检查控制字符
- * @param c 字符
- * @return 是否为危险控制字符
+ * @brief Check whether a character is a dangerous control character
+ * @param c Character
+ * @return true if a dangerous control character
  */
 static bool cupolas_sanitizer_is_control_dangerous(char c)
 {
@@ -206,13 +199,13 @@ static bool cupolas_sanitizer_contains_dangerous_chars(const char *input,
 }
 
 /**
- * @brief 尝试转义HTML字符
- * @param c 字符
- * @param output 输出缓冲区
- * @param out_pos 输出位置指针
- * @param output_size 输出缓冲区大小
- * @param ctx 净化上下文
- * @return 是否处理了该字符（true表示已处理，false表示未处理）
+ * @brief Try to escape an HTML character
+ * @param c Character
+ * @param output Output buffer
+ * @param out_pos Output position pointer
+ * @param output_size Output buffer size
+ * @param ctx Sanitization context
+ * @return true if the character was handled, false otherwise
  */
 static bool cupolas_sanitizer_try_escape_html(char c, char *output, size_t *out_pos,
                                               size_t output_size, const sanitize_context_t *ctx)
@@ -245,13 +238,13 @@ static bool cupolas_sanitizer_try_escape_html(char c, char *output, size_t *out_
 }
 
 /**
- * @brief 尝试转义SQL字符
- * @param c 字符
- * @param output 输出缓冲区
- * @param out_pos 输出位置指针
- * @param output_size 输出缓冲区大小
- * @param ctx 净化上下文
- * @return 是否处理了该字符
+ * @brief Try to escape an SQL character
+ * @param c Character
+ * @param output Output buffer
+ * @param out_pos Output position pointer
+ * @param output_size Output buffer size
+ * @param ctx Sanitization context
+ * @return true if the character was handled, false otherwise
  */
 static bool cupolas_sanitizer_try_escape_sql(char c, char *output, size_t *out_pos,
                                              size_t output_size, const sanitize_context_t *ctx)
@@ -270,9 +263,9 @@ static bool cupolas_sanitizer_try_escape_sql(char c, char *output, size_t *out_p
 }
 
 /**
- * @brief 检查是否为Shell特殊字符
- * @param c 字符
- * @return 是否为Shell特殊字符
+ * @brief Check whether a character is shell-special
+ * @param c Character
+ * @return true if shell-special
  */
 static bool cupolas_sanitizer_is_shell_special_char(char c)
 {
@@ -281,13 +274,13 @@ static bool cupolas_sanitizer_is_shell_special_char(char c)
 }
 
 /**
- * @brief 尝试转义Shell字符
- * @param c 字符
- * @param output 输出缓冲区
- * @param out_pos 输出位置指针
- * @param output_size 输出缓冲区大小
- * @param ctx 净化上下文
- * @return 是否处理了该字符
+ * @brief Try to escape a shell character
+ * @param c Character
+ * @param output Output buffer
+ * @param out_pos Output position pointer
+ * @param output_size Output buffer size
+ * @param ctx Sanitization context
+ * @return true if the character was handled, false otherwise
  */
 static bool cupolas_sanitizer_try_escape_shell(char c, char *output, size_t *out_pos,
                                                size_t output_size, const sanitize_context_t *ctx)
@@ -402,9 +395,11 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         AIRY_STRNCPY_TERM(output, input, output_size);
     }
 
-    /* 规则引擎接线（原实现从不调用 san->rules，add_rule 添加的规则对净化零效果——桩）。
-     * 自定义规则在字符级净化之后追加执行：replacement 为空的拒绝型规则命中时
-     * 整体拒绝（fail-closed），替换型规则命中时标记 MODIFIED。 */
+    /* Rule-engine wiring (the original implementation never called
+     * san->rules, so add_rule had no effect on sanitization -- a stub).
+     * Custom rules run after character-level sanitization: a rejecting rule
+     * with an empty replacement rejects the whole input (fail-closed), and
+     * a replacing rule marks the output MODIFIED. */
     if (sanitizer->rules) {
         char *tmp = (char *)AIRY_MALLOC(output_size);
         if (tmp) {

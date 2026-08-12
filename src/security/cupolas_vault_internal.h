@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_internal.h
- * @brief Vault 内部共享定义：内部常量、内部结构与跨文件辅助函数声明
+ * @brief Vault internal shared definitions: constants, internal structures,
+ *        and cross-file helper declarations.
  */
 
 #ifndef CUPOLAS_VAULT_INTERNAL_H
@@ -13,10 +14,6 @@
 
 #include "../platform/platform.h"
 #include "atomic_compat.h"
-
-/* ============================================================================
- * 内部常量
- * ============================================================================ */
 
 #define VAULT_MAGIC 0x564C5453 /* "VLTS" */
 #define VAULT_VERSION 1
@@ -29,10 +26,6 @@
 
 #define VAULT_OOM_PREALLOC_SLOTS 16
 #define VAULT_OOM_PREALLOC_DATA_SIZE 4096
-
-/* ============================================================================
- * 内部结构
- * ============================================================================ */
 
 typedef struct {
     char *cred_id;
@@ -62,10 +55,6 @@ typedef struct {
     cupolas_vault_config_t default_config;
     cupolas_rwlock_t global_lock;
 } vault_global_ctx_t;
-
-/* ============================================================================
- * 跨文件辅助函数
- * ============================================================================ */
 
 credential_entry_t *find_entry(cupolas_vault_t *vault, const char *cred_id);
 

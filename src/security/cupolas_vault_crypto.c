@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_crypto.c
- * @brief 密码学工具域：类型/操作字符串映射与随机口令、密钥对生成
+ * @brief Crypto utilities domain: type/operation string mapping and
+ *        random passphrase / key-pair generation.
  */
 
 #include "error.h"
@@ -32,10 +33,6 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #endif
-
-/* ============================================================================
- * 辅助函数
- * ============================================================================ */
 
 const char *cupolas_vault_cred_type_string(cupolas_vault_cred_type_t type)
 {

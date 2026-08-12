@@ -1,16 +1,9 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * audit_logger.c - Audit Logger Implementation
- */
-
 /**
  * @file audit_logger.c
- * @brief Audit Logger Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2024
+ * @brief Audit logger implementation.
  */
 
 #include "audit.h"
@@ -43,11 +36,11 @@ static char g_last_hash[65] = "0000000000000000000000000000000000000000000000000
 static cupolas_mutex_t g_hash_chain_lock;
 
 /* ============================================================================
- * SEC-13.2: OOM 审计事件预分配池
+ * SEC-13.2: preallocated OOM audit-event pool.
  *
- * 启动时预分配 64 个审计条目的环形缓冲区。
- * OOM 时写入预分配缓冲区，确保不丢失审计事件。
- * 使用静态数组，零运行时内存分配。
+ * A ring buffer of 64 audit entries is preallocated at startup. On OOM the
+ * events are written into this buffer so no audit event is lost. Static
+ * arrays only: zero runtime allocations.
  * ============================================================================ */
 
 static audit_entry_t g_audit_oom_entries[AUDIT_OOM_PREALLOC_EVENTS];
@@ -61,10 +54,10 @@ static cupolas_mutex_t g_audit_oom_lock;
 static bool g_audit_oom_initialized = false;
 
 /**
- * @brief 初始化审计 OOM 预分配池（SEC-13.2）
+ * @brief Initialize the OOM prealloc pool (SEC-13.2)
  *
- * 在 audit_logger_create() 首次调用时初始化。
- * 零内存分配——使用静态数组。
+ * Initialized on the first audit_logger_create() call.
+ * No memory allocation: backed by a static array.
  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -82,12 +75,12 @@ static void audit_oom_pool_init(void)
 }
 
 /**
- * @brief 从 OOM 预分配池获取一个审计条目（SEC-13.2）
+ * @brief Allocate an audit entry from the OOM prealloc pool (SEC-13.2)
  *
- * 当正常 audit_entry_create() 失败时调用。
- * 从环形预分配缓冲区中获取一个槽位，不调用系统 malloc。
+ * Called when the normal audit_entry_create() fails. Takes a slot from the
+ * ring buffer without calling the system malloc.
  *
- * @return 审计条目指针，池耗尽返回 NULL
+ * @return Audit entry pointer, or NULL if the pool is exhausted
  */
 static audit_entry_t *audit_oom_pool_alloc(void)
 {
@@ -117,10 +110,11 @@ static audit_entry_t *audit_oom_pool_alloc(void)
 #pragma GCC diagnostic pop
 
 /**
- * @brief 计算审计条目的 SHA-256 哈希链值
- * 
- * 哈希格式: SHA256(prev_hash + id + timestamp + subject + action + resource + detail + result)
- * 使用哈希链保证审计日志的不可篡改性。
+ * @brief Compute the SHA-256 hash-chain value of an audit entry
+ *
+ * Hash format: SHA256(prev_hash + id + timestamp + subject + action +
+ * resource + detail + result). The chain makes the audit log
+ * tamper-evident.
  */
 static void audit_compute_chain_hash(const audit_entry_t *entry, const char *prev_hash,
                                      char *hash_out)
@@ -243,9 +237,11 @@ static void *audit_writer_thread(void *arg)
     return NULL;
 }
 
-/* 从既有审计日志恢复哈希链尾哈希：进程重启后 g_last_hash 若从全零开始，
- * 新条目无法与历史链衔接，"不可篡改审计"（BAN-129）要求链状态持久化到磁盘
- * 并在启动时恢复（audit_rotator_write 已把 prev_hash/curr_hash 落盘）。 */
+/* Restore the hash-chain tail from existing audit logs: after a process
+ * restart, starting g_last_hash from all zeros would break the link to the
+ * historical chain. Tamper-evident auditing (BAN-129) requires the chain
+ * state to be persisted to disk and restored at startup
+ * (audit_rotator_write already persists prev_hash/curr_hash). */
 static void audit_logger_restore_last_hash(audit_logger_t *logger)
 {
     if (!logger || !logger->log_dir || !logger->log_prefix)
@@ -441,16 +437,17 @@ int audit_logger_log_workbench(audit_logger_t *logger, const char *agent_id, con
 }
 
 /**
- * @brief 验证审计哈希链完整性（BAN-129 编码契约）
+ * @brief Verify the integrity of the audit hash chain (BAN-129 contract)
  *
- * 从给定条目列表重新计算哈希链，验证每个条目的 curr_hash 是否与
- * 基于 prev_hash + 条目内容的 SHA-256 哈希一致。
+ * Recomputes the chain from the given entry list and checks each entry's
+ * curr_hash against the SHA-256 hash derived from prev_hash plus the entry
+ * content.
  *
- * @param entries     审计条目数组
- * @param entry_count 条目数量
- * @param first_prev_hash 链起始哈希（通常为全零）
- * @param out_invalid_index 输出第一个无效条目的索引（-1 表示全部有效）
- * @return true 如果哈希链完整，false 如果有篡改
+ * @param entries     Audit entries in chronological order
+ * @param entry_count Number of entries
+ * @param first_prev_hash Chain start hash (usually all zeros)
+ * @param out_invalid_index Index of the first invalid entry (-1 if all valid)
+ * @return true if the chain is intact, false on any tampering
  */
 bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count,
                                const char *first_prev_hash, int *out_invalid_index)

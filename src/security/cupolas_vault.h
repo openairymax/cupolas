@@ -29,9 +29,10 @@ extern "C" {
 #include <cupolas_vault_cred_type.h>
 
 /**
- * @brief 凭证轮换策略
- * 
- * 符合编码契约要求: 支持四种凭证轮换策略，用于多凭证集之间的切换。
+ * @brief Credential rotation strategies
+ *
+ * Per the coding contract: four rotation strategies for switching among
+ * multiple credential sets.
  */
 typedef enum {
     CUPOLAS_VAULT_ROTATE_ROUND_ROBIN = 1,
@@ -444,16 +445,19 @@ int cupolas_vault_generate_keypair(char *public_key_out, size_t *pub_len, char *
                                    size_t *priv_len);
 
 /**
- * @brief 凭证轮换: 根据指定策略从凭证池中选择下一个凭证
- * 
- * 符合编码契约要求: 支持四种轮换策略。
- * 
- * @param[in] vault          Vault 上下文 (BORROW - caller retains ownership)
- * @param[in] cred_group     凭证组标识 (BORROW - not stored, copied internally)
- * @param[in] strategy        轮换策略
- * @param[out] selected_id    选中的凭证 ID (BORROW - caller-owned buffer, function writes to it)
- * @param[in] id_buf_size     selected_id 缓冲区大小
- * @return 0 成功, 负数失败
+ * @brief Rotate credentials: select the next credential from the pool
+ *        according to the given strategy
+ *
+ * Per the coding contract: supports four rotation strategies.
+ *
+ * @param[in] vault          Vault context (BORROW - caller retains ownership)
+ * @param[in] cred_group     Credential group identifier (BORROW - not stored,
+ *                           copied internally)
+ * @param[in] strategy       Rotation strategy
+ * @param[out] selected_id   Selected credential ID (BORROW - caller-owned
+ *                           buffer, function writes to it)
+ * @param[in] id_buf_size    selected_id buffer size
+ * @return 0 on success, negative on failure
  *
  * @ownership vault: BORROW, cred_group: BORROW, selected_id: BORROW
  */

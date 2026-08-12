@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_metadata.c
- * @brief 元数据域：凭证元数据查询、释放与列表管理
+ * @brief Metadata domain: credential metadata query, release, and list
+ *        management.
  */
 
 #include "error.h"
@@ -32,10 +33,6 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #endif
-
-/* ============================================================================
- * 元数据操作
- * ============================================================================ */
 
 int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
                                cupolas_vault_metadata_t *metadata)

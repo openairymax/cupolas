@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_rotation.c
- * @brief 凭证轮换域：按策略选择凭证及 ACL 查询/释放
+ * @brief Credential rotation domain: strategy-based credential selection
+ *        and ACL query/release.
  */
 
 #include "error.h"
@@ -32,10 +33,6 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #endif
-
-/* ============================================================================
- * 凭证轮换与 ACL
- * ============================================================================ */
 
 static uint64_t vault_group_usage(const credential_entry_t *entry)
 {
@@ -86,13 +83,14 @@ int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_gro
         return cupolas_ERR_PERMISSION_DENIED;
     }
 
-    /* 凭证组语义：cred_group 为凭证 id 前缀，组内凭证共享组前缀
-     * （如 "svc:pay:key-1" / "svc:pay:key-2" 同属组 "svc:pay"）。
-     * 轮换策略基于既有字段真实打分，统一 argmin 选优：
-     *  - ROUND_ROBIN    ：取 updated_at 最旧的（最久未轮换者优先）
-     *  - LEAST_USED     ：取组内 ACL access_count 总和最小的
-     *  - RATE_LIMITED   ：取 access_count/max_access_count 使用率最低的
-     *  - PRIORITY       ：取 updated_at 最新的（最近更新的优先级最高） */
+    /* Credential-group semantics: cred_group is a credential-id prefix, and
+     * credentials in a group share that prefix (e.g. "svc:pay:key-1" /
+     * "svc:pay:key-2" both belong to group "svc:pay"). Rotation strategies
+     * score the existing fields and uniformly pick the argmin:
+     *  - ROUND_ROBIN : oldest updated_at (longest since rotation)
+     *  - LEAST_USED  : smallest sum of ACL access_count in the group
+     *  - RATE_LIMITED: lowest access_count/max_access_count usage
+     *  - PRIORITY    : newest updated_at (most recently updated first) */
     size_t best_idx = 0;
     uint64_t best_score = 0;
     bool found = false;

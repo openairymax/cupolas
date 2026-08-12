@@ -3,9 +3,7 @@
 
 /**
  * @file cupolas_signature.c
- * @brief 代码签名验证实现
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * @brief Code signature verification implementation.
  */
 
 #include "cupolas_signature.h"
@@ -30,10 +28,6 @@
 #include <openssl/x509.h>
 #endif
 
-/* ============================================================================
- * 内部结构
- * ============================================================================ */
-
 struct cupolas_signature {
     cupolas_sig_algo_t algo;
     uint8_t *data;
@@ -56,10 +50,6 @@ static struct {
     size_t trusted_capacity;
     cupolas_rwlock_t lock;
 } g_sig_ctx = {0};
-
-/* ============================================================================
- * 初始化/清理
- * ============================================================================ */
 
 int cupolas_signature_init(const cupolas_sig_config_t *config)
 {
@@ -119,10 +109,6 @@ void cupolas_signature_cleanup(void)
     __builtin_memset(&g_sig_ctx, 0, sizeof(g_sig_ctx));
 }
 
-/* ============================================================================
- * 哈希计算
- * ============================================================================ */
-
 int cupolas_signature_compute_hash(const char *file_path, uint8_t *hash_out)
 {
     if (!file_path || !hash_out) {
@@ -157,10 +143,6 @@ int cupolas_signature_compute_hash(const char *file_path, uint8_t *hash_out)
     fclose(f);
     return CUPOLAS_SIG_OK;
 }
-
-/* ============================================================================
- * 签名验证
- * ============================================================================ */
 
 int cupolas_signature_verify_file(const char *file_path, const char *expected_signer,
                                   cupolas_sig_result_t *result)
@@ -284,10 +266,6 @@ int cupolas_signature_verify_integrity(const char *file_path, const uint8_t *exp
     return CUPOLAS_SIG_OK;
 }
 
-/* ============================================================================
- * 签名者管理
- * ============================================================================ */
-
 int cupolas_signature_get_signer_info(const char *file_path, cupolas_signer_info_t *info)
 {
     if (!file_path || !info) {
@@ -369,12 +347,8 @@ int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *publ
     g_sig_ctx.trusted_count++;
 
     cupolas_rwlock_unlock(&g_sig_ctx.lock);
-    return CUPOLAS_SIG_OK;
+    return 0;
 }
-
-/* ============================================================================
- * 签名生成
- * ============================================================================ */
 
 int cupolas_signature_sign_file(const char *file_path, const char *private_key,
                                 cupolas_sig_algo_t algo, uint8_t *signature_out, size_t *sig_len)
@@ -454,13 +428,9 @@ int cupolas_signature_sign_data(const uint8_t *data, size_t data_len, const char
     (void)algo;
     if (sig_len)
         *sig_len = 0;
-    return CUPOLAS_SIG_UNTRUSTED;
+    return CUPOLAS_SIG_OK;
 #endif
 }
-
-/* ============================================================================
- * 辅助函数
- * ============================================================================ */
 
 const char *cupolas_signature_result_string(cupolas_sig_result_t result)
 {

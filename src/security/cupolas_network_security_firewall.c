@@ -9,11 +9,9 @@
 
 /**
  * @file cupolas_network_security_firewall.c
- * @brief Network Security - 防火墙规则管理域
+ * @brief Network security: firewall rules management domain.
  *
- * 本文件实现过滤规则的添加/删除/更新/查询/列举管理。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements add/delete/update/query/list management of filter rules.
  */
 
 #include "cupolas_network_security.h"

@@ -4,9 +4,8 @@
 #include "cupolas.h"
 /**
  * @file workbench.c
- * @brief 安全工作位实现 - 跨平台进程管理
- * @author SPHARX Ltd. - Airymax Team
- * @date 2024
+ * @brief Secure workbench implementation: cross-platform process
+ *        management.
  */
 
 #include "workbench.h"
@@ -187,13 +186,13 @@ static int cupolas_workbench_read_output(workbench_t *wb)
 }
 
 /**
- * @brief 填充执行结果结构体
- * @param wb 工作位实例
- * @param result 结果结构体指针
- * @param exit_code 退出码
- * @param signaled 是否被信号终止
- * @param signal 信号值
- * @param timed_out 是否超时
+ * @brief Fill in the execution result structure
+ * @param wb Workbench instance
+ * @param result Result structure pointer
+ * @param exit_code Exit code
+ * @param signaled Whether terminated by a signal
+ * @param signal Signal value
+ * @param timed_out Whether timed out
  */
 static void cupolas_workbench_fill_result(workbench_t *wb, workbench_result_t *result,
                                           int exit_code, bool signaled, int signal, bool timed_out)
@@ -215,9 +214,9 @@ static void cupolas_workbench_fill_result(workbench_t *wb, workbench_result_t *r
 }
 
 /**
- * @brief 设置进程属性
- * @param wb 工作位实例
- * @param attr 进程属性结构体指针
+ * @brief Set up process attributes
+ * @param wb Workbench instance
+ * @param attr Process attribute structure pointer
  */
 static void cupolas_workbench_setup_process_attr(workbench_t *wb, cupolas_process_attr_t *attr)
 {
@@ -281,10 +280,12 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
     wb->state = WORKBENCH_STATE_RUNNING;
     cupolas_mutex_unlock(&wb->lock);
 
-    /* P2-5 (cupolas_d): 关闭父进程持有的 stdout/stderr 写端与 stdin 读端。
-     * 若保留写端，随后 cupolas_workbench_read_output 的阻塞读将因管道永不
-     * EOF 而永久挂起（execute_command 死锁）。子进程已在 exec 时经
-     * FD_CLOEXEC 关闭其继承副本，写端此时仅剩父进程一份。 */
+    /* P2-5 (cupolas_d): close the parent's stdout/stderr write ends and the
+     * stdin read end. If the write ends are kept, the subsequent blocking
+     * read in cupolas_workbench_read_output would hang forever because the
+     * pipe never sees EOF (execute_command deadlock). The child already
+     * closed its inherited copies at exec via FD_CLOEXEC, so the parent now
+     * holds the only write ends. */
     if (wb->manager.redirect_stdout) {
         close(wb->stdout_pipe[1]);
         wb->stdout_pipe[1] = -1;
@@ -366,9 +367,10 @@ int workbench_execute_async(workbench_t *wb, const char *command, char *const ar
     wb->state = WORKBENCH_STATE_RUNNING;
     cupolas_mutex_unlock(&wb->lock);
 
-    /* P2-5 (cupolas_d): 异步路径同样关闭父进程持有的 stdout/stderr 写端与
-     * stdin 读端，保证 workbench_wait 的 read_output 可读到 EOF（写端保留
-     * stdin_pipe[1] 供 workbench_write_stdin 继续写入）。 */
+    /* P2-5 (cupolas_d): the async path closes the parent's stdout/stderr
+     * write ends and the stdin read end as well, so workbench_wait's
+     * read_output sees EOF (stdin_pipe[1] is kept for
+     * workbench_write_stdin). */
     if (wb->manager.redirect_stdout) {
         close(wb->stdout_pipe[1]);
         wb->stdout_pipe[1] = -1;

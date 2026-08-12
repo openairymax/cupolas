@@ -1,16 +1,10 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * cupolas_entitlements.c - Entitlements Permission Declarations Implementation
- */
-
 /**
  * @file cupolas_entitlements.c
- * @brief Entitlements Permission Declarations - Fine-grained Permission Mechanism Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * @brief Entitlements permission declarations implementation: fine-grained
+ *        permission mechanism.
  */
 
 #include "cupolas_entitlements.h"
@@ -111,8 +105,9 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
     char *token = strtok_r(dup, ",\n", &saveptr);
     while (token) {
         token = cupolas_str_trim(token);
-        /* 剥离 YAML 内联数组语法 `[read, write]`：首 token 以 `[` 开头、
-         * 尾 token 以 `]` 结尾（strtok 按逗号切分后中括号落在首尾 token 上） */
+        /* Strip YAML inline-array syntax `[read, write]`: the first token
+         * starts with `[` and the last ends with `]` (after strtok splits
+         * on commas, the brackets land on the first/last tokens). */
         size_t tok_len = strlen(token);
         if (tok_len > 0 && token[0] == '[') {
             token++;
@@ -191,10 +186,6 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
     return 0;
 }
 
-/* ============================================================================
- * 键处理函数声明
- * ============================================================================ */
-
 static void handle_agent_id(cupolas_entitlements_info_t *info, const char *value)
 {
     info->agent_id = cupolas_strdup(value);
@@ -260,10 +251,6 @@ static void handle_allowed_capabilities(cupolas_entitlements_info_t *info, const
     info->allowed_capabilities = cupolas_parse_string_array(value, &info->cap_count);
 }
 
-/* ============================================================================
- * 键处理映射表
- * ============================================================================ */
-
 typedef struct {
     const char *key;
     void (*handler)(cupolas_entitlements_info_t *, const char *);
@@ -286,10 +273,6 @@ static const key_handler_map_t g_key_handlers[] = {
 };
 
 static const size_t g_key_handlers_count = sizeof(g_key_handlers) / sizeof(g_key_handlers[0]);
-
-/* ============================================================================
- * 主解析函数
- * ============================================================================ */
 
 static int cupolas_parse_entitlements_content(const char *content,
                                               cupolas_entitlements_info_t *info)
@@ -589,9 +572,12 @@ bool cupolas_entitlements_is_signed(cupolas_entitlements_t *entitlements)
     return entitlements->signature != NULL && entitlements->sig_len > 0;
 }
 
-/* 裁决前统一校验（fail-closed）：entitlements 必须已通过签名验证（is_verified==1）
- * 且仍在有效期内。未验证/被篡改/已过期的 entitlements 一律拒绝——签名校验与
- * 权限裁决不得解耦，否则加载被篡改的 entitlements 后裁决照常生效（安全缺陷）。 */
+/* Unified pre-arbitration check (fail-closed): entitlements must have
+ * passed signature verification (is_verified==1) and still be within their
+ * validity period. Unverified/tampered/expired entitlements are always
+ * rejected -- signature validation and permission arbitration must not be
+ * decoupled, otherwise arbitration would proceed on tampered entitlements
+ * (a security flaw). */
 static int entitlements_verified_valid(cupolas_entitlements_t *entitlements)
 {
     if (!entitlements)

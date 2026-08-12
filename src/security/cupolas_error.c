@@ -1,16 +1,9 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * cupolas_error.c - Unified Error Code Implementation
- */
-
 /**
  * @file cupolas_error.c
- * @brief Unified Error Code Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026-03-26
+ * @brief Unified error code implementation.
  */
 
 #include "cupolas_error.h"
@@ -21,9 +14,10 @@
  * Error Code String Mapping Table
  * ============================================================================ */
 
-/* v5.0 修复：安全专属错误码迁移至 -718~-726 段后，值域跨度从 0~-99 扩展至
- * 0~-726，数组索引方式不再可行（会产生 727 元素稀疏数组）。改用 switch
- * 查找，保持 O(1) 时间复杂度且无内存浪费。 */
+/* v5.0 fix: after migrating the security-specific error codes to the
+ * -718..-726 range, the value span grew from 0..-99 to 0..-726, so an
+ * array lookup is no longer viable (it would create a 727-element sparse
+ * array). A switch lookup keeps O(1) time with no memory waste. */
 
 /**
  * @brief Convert error code to human-readable string

@@ -190,9 +190,9 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
     } else if (policy_b) {
         *resolved_decision = policy_b->default_decision;
     } else {
-        /* 两个策略 ID 均未在上下文中注册：无法解析冲突。
-         * 安全穹顶遵循 fail-closed 原则——拒绝而非放行，
-         * 并返回错误码告知调用方策略 ID 无效。 */
+        /* Neither policy ID is registered in the context, so the conflict
+         * cannot be resolved. The security dome is fail-closed: deny rather
+         * than allow, and report the invalid policy IDs to the caller. */
         *resolved_decision = SAFETY_DECISION_DENY;
         return AIRY_ERR_NOT_FOUND;
     }

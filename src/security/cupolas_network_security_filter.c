@@ -9,12 +9,10 @@
 
 /**
  * @file cupolas_network_security_filter.c
- * @brief Network Security - 包过滤与 HTTP 安全域
+ * @brief Network security: packet filter and HTTP security domain.
  *
- * 本文件实现主机/URL 规则匹配、连接与 URL 访问检查，
- * 以及 HTTP 请求校验与安全响应头注入。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements host/URL rule matching, connection and URL access checks,
+ * HTTP request validation, and secure response-header injection.
  */
 
 #include "cupolas_network_security.h"
@@ -125,8 +123,9 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
         }
     }
 
-    /* 默认拒绝（fail-closed）：无 allow 规则匹配的流量一律拦截，
-     * 防止未配置防火墙规则时全部放行（安全穹顶默认拒绝原则）。 */
+    /* Deny by default (fail-closed): traffic not matching any allow rule is
+     * intercepted, preventing all traffic from passing when no firewall
+     * rules are configured (security dome default-deny principle). */
     g_net_security.stats.blocked_connections++;
     cupolas_mutex_unlock(&g_net_security.lock);
     return 0;
@@ -185,8 +184,9 @@ int cupolas_net_check_url(const char *url, const char *method)
             return 0;
         }
     } else {
-        /* 未配置方法白名单且无 URL 规则匹配：默认拒绝（fail-closed），
-         * 需显式配置 allow 规则（如 url_pattern="*" action=allow）才放行 */
+        /* No method whitelist configured and no URL rule matched: deny by
+         * default (fail-closed). An explicit allow rule (e.g.
+         * url_pattern="*" action=allow) is required to pass. */
         cupolas_mutex_unlock(&g_net_security.lock);
         return 0;
     }

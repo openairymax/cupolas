@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_credential.c
- * @brief 凭证存取域：凭证增删改查与 AES-256-GCM 加解密存储
+ * @brief Credential store domain: credential CRUD and AES-256-GCM
+ *        encrypted storage.
  */
 
 #include "error.h"
@@ -32,10 +33,6 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #endif
-
-/* ============================================================================
- * 凭证操作
- * ============================================================================ */
 
 credential_entry_t *find_entry(cupolas_vault_t *vault, const char *cred_id)
 {

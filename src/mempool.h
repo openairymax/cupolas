@@ -3,22 +3,21 @@
 
 /**
  * @file mempool.h
- * @brief P3.16: mempool 最小保证分配器 — 紧急预留 + 对象池 + 最低保证分配
+ * @brief P3.16: mempool minimum-guarantee allocator.
  *
- * 在 OOM 场景下保证 IPC 消息等关键路径的内存分配。
- * 核心特性：
- *   - 紧急预留池（默认 32MB）
- *   - 对象池（固定大小对象快速分配）
- *   - 最低保证分配（OOM 时优先满足关键路径）
- *   - 分级水位线（正常/警告/紧急）
+ * Guarantees memory allocation for critical paths (e.g. IPC messages) under
+ * OOM conditions. Key features:
+ *   - Emergency reserve pool (default 32MB)
+ *   - Object pool (fast fixed-size object allocation)
+ *   - Minimum-guarantee allocation (critical paths served first on OOM)
+ *   - Tiered watermarks (normal/warn/high/critical)
  *
- * 典型用法：
+ * Typical usage:
  *   airy_mempool_t *pool = airy_mempool_create(32 * 1024 * 1024, 256, 1024);
  *   void *buf = airy_mempool_alloc(pool, 512, MEMPOOL_PRIORITY_CRITICAL);
- *   // ... 使用 buf ...
+ *   // ... use buf ...
  *   airy_mempool_free(pool, buf);
  *   airy_mempool_destroy(pool);
- *
  */
 
 #ifndef CUPOLAS_MEMPOOL_H
@@ -32,24 +31,13 @@
 extern "C" {
 #endif
 
-/* ================================================================
- * 常量定义
- * ================================================================ */
-
-
 #define MEMPOOL_DEFAULT_RESERVE_MB 32
 
 #define MEMPOOL_DEFAULT_BLOCK_SIZE 256
 
 #define MEMPOOL_DEFAULT_BLOCK_COUNT 4096
 
-/* ================================================================
- * 类型定义
- * ================================================================ */
-
-
 typedef struct airy_mempool airy_mempool_t;
-
 
 typedef enum {
     MEMPOOL_PRIORITY_LOW = 0,
@@ -58,14 +46,12 @@ typedef enum {
     MEMPOOL_PRIORITY_CRITICAL = 3,
 } airy_mempool_priority_t;
 
-
 typedef enum {
     MEMPOOL_WATERMARK_NORMAL = 0,
     MEMPOOL_WATERMARK_WARN = 1,
     MEMPOOL_WATERMARK_HIGH = 2,
     MEMPOOL_WATERMARK_CRITICAL = 3,
 } airy_mempool_watermark_t;
-
 
 typedef struct {
     size_t total_reserved;
@@ -81,103 +67,94 @@ typedef struct {
     airy_mempool_watermark_t watermark;
 } airy_mempool_stats_t;
 
-/* ================================================================
- * 生命周期 API
- * ================================================================ */
-
 /**
- * @brief 创建内存池
+ * @brief Create a memory pool
  *
- * @param reserve_size   紧急预留大小（字节），0 使用默认 32MB
- * @param block_size     对象池块大小（字节），0 使用默认 256B
- * @param block_count    对象池块数量，0 使用默认 4096
- * @return 内存池句柄，失败返回 NULL
+ * @param reserve_size Emergency reserve size in bytes, 0 for the default 32MB
+ * @param block_size Object-pool block size in bytes, 0 for the default 256B
+ * @param block_count Object-pool block count, 0 for the default 4096
+ * @return Memory pool handle, NULL on failure
  *
- * @ownership 返回的句柄由调用者管理，需通过 airy_mempool_destroy() 释放
- * @threadsafe 是
+ * @ownership Returned handle is caller-managed; release with
+ *            airy_mempool_destroy()
+ * @threadsafe Yes
  */
 airy_mempool_t *airy_mempool_create(size_t reserve_size, size_t block_size, size_t block_count);
 
 /**
- * @brief 销毁内存池
+ * @brief Destroy a memory pool
  *
- * 释放所有预留内存和对象池。
+ * Releases all reserve memory and the object pool.
  *
- * @param pool 内存池句柄
+ * @param pool Memory pool handle
  *
  * @ownership pool: TRANSFER
- * @threadsafe 否
+ * @threadsafe No
  */
 void airy_mempool_destroy(airy_mempool_t *pool);
 
-/* ================================================================
- * 分配/释放 API
- * ================================================================ */
-
 /**
- * @brief 从内存池分配内存
+ * @brief Allocate memory from the pool
  *
- * 分配策略：
- *   - 等于 block_size 的分配 → 优先从对象池获取
- *   - 其他大小 → 从预留池分配
- *   - 优先级 CRITICAL → OOM 时仍保证分配（从紧急预留取）
- *   - 水位线告警时 → 低优先级分配可能被拒绝
+ * Allocation strategy:
+ *   - Size == block_size -> served from the object pool first
+ *   - Other sizes -> allocated from the reserve pool
+ *   - CRITICAL priority -> still guaranteed on OOM (from the emergency
+ *     reserve)
+ *   - Watermark warnings -> low-priority allocations may be rejected
  *
- * @param pool     内存池句柄
- * @param size     分配大小（字节）
- * @param priority 分配优先级
- * @return 内存指针，失败返回 NULL
+ * @param pool Memory pool handle
+ * @param size Allocation size in bytes
+ * @param priority Allocation priority
+ * @return Memory pointer, NULL on failure
  *
- * @ownership 返回的内存由调用者管理，需通过 airy_mempool_free() 归还
- * @threadsafe 是
+ * @ownership Returned memory is caller-managed; return it with
+ *            airy_mempool_free()
+ * @threadsafe Yes
  */
 void *airy_mempool_alloc(airy_mempool_t *pool, size_t size, airy_mempool_priority_t priority);
 
 /**
- * @brief 释放内存回内存池
+ * @brief Return memory to the pool
  *
- * @param pool 内存池句柄
- * @param ptr  内存指针（NULL 无操作）
+ * @param pool Memory pool handle
+ * @param ptr Memory pointer (NULL is a no-op)
  *
  * @ownership ptr: TRANSFER
- * @threadsafe 是
+ * @threadsafe Yes
  */
 void airy_mempool_free(airy_mempool_t *pool, void *ptr);
 
-/* ================================================================
- * 统计与诊断 API
- * ================================================================ */
-
 /**
- * @brief 获取内存池统计信息
+ * @brief Get memory pool statistics
  *
- * @param pool  内存池句柄
- * @param stats 输出统计信息
- * @return 0 成功，非0失败
+ * @param pool Memory pool handle
+ * @param stats Statistics output
+ * @return 0 on success, non-zero on failure
  */
 int airy_mempool_get_stats(airy_mempool_t *pool, airy_mempool_stats_t *stats);
 
 /**
- * @brief 获取当前水位线
+ * @brief Get the current watermark
  *
- * @param pool 内存池句柄
- * @return 当前水位线状态
+ * @param pool Memory pool handle
+ * @return Current watermark level
  */
 airy_mempool_watermark_t airy_mempool_get_watermark(airy_mempool_t *pool);
 
 /**
- * @brief 收缩内存池：释放空闲对象池块
+ * @brief Shrink the pool: release idle object-pool blocks
  *
- * @param pool 内存池句柄
- * @return 释放的块数
+ * @param pool Memory pool handle
+ * @return Number of blocks released
  */
 size_t airy_mempool_shrink(airy_mempool_t *pool);
 
 /**
- * @brief 验证内存池内部一致性
+ * @brief Validate internal pool consistency
  *
- * @param pool 内存池句柄
- * @return true 一致，false 损坏
+ * @param pool Memory pool handle
+ * @return true if consistent, false if corrupted
  */
 bool airy_mempool_validate(airy_mempool_t *pool);
 

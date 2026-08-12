@@ -1,16 +1,10 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * workbench_container.c - Container Mode Implementation: Docker/runc-based Isolated Execution
- */
-
 /**
  * @file workbench_container.c
- * @brief Container Mode Implementation - Docker/runc-based Isolated Execution
- * @author SPHARX Ltd. - Airymax Team
- * @date 2024
+ * @brief Container mode implementation: Docker/runc-based isolated
+ *        execution.
  *
  * This module implements container management:
  * - Container lifecycle management (create, start, stop, remove)
@@ -192,20 +186,24 @@ void container_manager_destroy(void *mgr)
 }
 
 /**
- * @brief 将命令字符串拆分为 argv 数组（shell 风格，支持单/双引号）
+ * @brief Split a command string into an argv array (shell-style, supports
+ *        single/double quotes)
  *
- * 用于替代 popen/system 的 shell 调用。拆分后的 argv 直接传给 execvp，
- * 不经过 /bin/sh，从根本上消除命令注入风险（BAN-211/235）。
+ * Replaces popen/system shell calls. The split argv is passed directly to
+ * execvp without going through /bin/sh, fundamentally eliminating command
+ * injection risk (BAN-211/235).
  *
- * 支持的语法：
- * - 空白字符分隔 token
- * - 单引号 '...' 内的内容原样保留
- * - 双引号 "..." 内的内容保留（本函数不展开变量/命令替换）
+ * Supported syntax:
+ * - Tokens separated by whitespace
+ * - Content inside single quotes '...' kept verbatim
+ * - Content inside double quotes "..." kept (no variable/command
+ *   substitution in this function)
  *
- * @param[in,out] cmd 命令字符串（将被原地修改，token 指向其内部）
- * @param[out]    argv 输出 argv 数组（指针数组，指向 cmd 内的 token）
- * @param[in]     max_args argv 数组最大容量（含末尾 NULL）
- * @return token 数量，失败返回 -1
+ * @param[in,out] cmd Command string (modified in place; tokens point into
+ *                    it)
+ * @param[out]    argv Output argv array (pointer array into cmd's tokens)
+ * @param[in]     max_args argv array capacity (including trailing NULL)
+ * @return Number of tokens, -1 on failure
  */
 static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 {
@@ -250,17 +248,20 @@ static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 }
 
 /**
- * @brief 执行命令并捕获输出（argv 形式，不经 shell，BAN-211/235 合规）
+ * @brief Execute a command and capture output (argv form, no shell,
+ *        BAN-211/235 compliant)
  *
- * @param cmd         命令字符串（将被原地拆分为 argv）
- * @param timeout_ms  超时（毫秒）
- * @param output      输出缓冲区（可为 NULL）
- * @param output_size 输出缓冲区大小
- * @return 退出码(0-255)；-1=启动失败；-2=超时
+ * @param cmd         Command string (split into argv in place)
+ * @param timeout_ms  Timeout in milliseconds
+ * @param output      Output buffer (may be NULL)
+ * @param output_size Output buffer size
+ * @return Exit code (0-255); -1 = failed to start; -2 = timed out
  *
- * @note 调用者已通过 is_safe_image_name() 验证用户输入；此处不再需要
- *       SEC-011 shell 元字符检查，因为 execvp 不经过 shell，元字符仅作为
- *       字面参数传递给子进程，无注入风险。
+ * @note The caller has already validated user input via
+ *       is_safe_image_name(); the SEC-011 shell metacharacter check is not
+ *       needed here because execvp does not go through a shell -- metachar
+ *       characters are passed as literal arguments to the child process,
+ *       with no injection risk.
  */
 static int execute_command(const char *cmd, int timeout_ms, char *output, size_t output_size)
 {
@@ -342,8 +343,9 @@ int container_start(void *mgr, const char *name, container_result_t *result)
         snprintf(cmd + len, MAX_COMMAND_LENGTH * 2 - len, " %s", handle->manager.args[i]);
     }
 
-    /* 真实执行容器启动（原实现仅拼装命令字符串即置 RUNNING，属桩行为）。
-     * 失败时状态置 ERROR 并返回错误，禁止假成功。 */
+    /* Actually launch the container (the original implementation only
+     * assembled the command string and set RUNNING -- stub behavior). On
+     * failure set the state to ERROR and return an error; no fake success. */
     char output[1024];
     int rc = execute_command(cmd, 300000, output, sizeof(output));
     if (rc != 0) {
