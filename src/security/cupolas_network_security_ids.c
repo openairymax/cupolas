@@ -9,11 +9,10 @@
 
 /**
  * @file cupolas_network_security_ids.c
- * @brief Network Security - 检测引擎域
+ * @brief Network security: detection engine domain.
  *
- * 本文件实现 IDS 开关、连接异常检测与告警回调注册。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements the IDS switch, connection anomaly detection, and alert
+ * callback registration.
  */
 
 #include "cupolas_network_security.h"

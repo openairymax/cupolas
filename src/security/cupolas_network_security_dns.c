@@ -9,11 +9,10 @@
 
 /**
  * @file cupolas_network_security_dns.c
- * @brief Network Security - DNS 安全域
+ * @brief Network security: DNS security domain.
  *
- * 本文件实现 DNS 安全配置、域名解析拦截、域名白/黑名单与 DNSSEC 校验。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements DNS security configuration, resolution interception,
+ * domain whitelist/blacklist, and DNSSEC validation.
  */
 
 #include "cupolas_network_security.h"
@@ -135,8 +134,9 @@ int cupolas_dns_verify_dnssec(const char *domain)
     if (!valid)
         return 0;
 
-    /* BAN-211/235: 直接 execvp dig（不经 shell），消除命令注入风险。
-     * domain 已通过上面的白名单校验，仅含 alnum/-/./_ 。 */
+    /* BAN-211/235: execvp dig directly (no shell) to eliminate command
+     * injection risk. domain passed the whitelist check above, so it only
+     * contains alnum/-/./_. */
     const char *const argv[] = {"dig", "+dnssec", "+short", domain, "DNSKEY", NULL};
     char output[4096];
     int exit_code =

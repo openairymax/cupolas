@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_io.c
- * @brief 导入导出域：Vault 加密导出与导入（AES-256-CBC 容器格式）
+ * @brief Import/export domain: encrypted vault export and import
+ *        (AES-256-CBC container format).
  */
 
 #include "error.h"
@@ -32,10 +33,6 @@
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #endif
-
-/* ============================================================================
- * 导入/导出
- * ============================================================================ */
 
 int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const char *password,
                          const char *agent_id)

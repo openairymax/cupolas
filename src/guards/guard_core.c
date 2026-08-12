@@ -20,7 +20,7 @@
 #include <time.h>
 
 // ============================================================================
-// 内存安全常量（SEC-02 合规）
+// Memory safety constants (SEC-02 compliance)
 // ============================================================================
 
 #define GUARD_MAX_INPUT_SIZE (10 * 1024 * 1024)
@@ -152,7 +152,7 @@ static guard_context_t *copy_guard_context(const guard_context_t *src)
         }
     }
 
-    // 注意：context_data不复制，由调用者管理
+    // Note: context_data is not copied; the caller manages it.
     dst->context_data = src->context_data;
     dst->timestamp = src->timestamp;
 

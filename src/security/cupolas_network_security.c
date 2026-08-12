@@ -11,12 +11,11 @@
 
 /**
  * @file cupolas_network_security.c
- * @brief Network Security - TLS 加固与生命周期域
+ * @brief Network security: TLS hardening and lifecycle domain.
  *
- * 本文件保留网络安全模块的入口与核心状态机：初始化/清理/配置查询、
- * TLS 版本与证书校验、密码套件策略及版本字符串转换。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Entry point and core state machine of the network security module:
+ * init/cleanup/config queries, TLS version and certificate validation,
+ * cipher-suite policy, and version-string conversion.
  */
 
 #include "cupolas_network_security.h"
@@ -354,8 +353,9 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
     __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    /* gethostbyname 可能返回 IPv6 记录（h_length=16），sin_addr 仅 4 字节，
-     * 直接整长拷贝会栈越界写。仅接受 AF_INET 且长度匹配的记录。 */
+    /* gethostbyname may return IPv6 records (h_length=16) while sin_addr is
+     * only 4 bytes; a full-length copy would overrun the stack. Only accept
+     * AF_INET records with a matching length. */
     if (host->h_addrtype != AF_INET || host->h_length > (int)sizeof(addr.sin_addr)) {
 #ifdef _WIN32
         closesocket(sock);

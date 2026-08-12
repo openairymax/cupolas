@@ -3,13 +3,13 @@
 
 /**
  * @file guard_integration.c
- * @brief SafetyGuard与Cupolas组件集成
+ * @brief SafetyGuard integration with Cupolas components.
  *
- * 将SafetyGuard框架集成到现有Cupolas组件中：
- * 1. 权限检查后置守卫
- * 2. 命令执行前守卫
- * 3. 输入净化守卫
- * 4. 审计日志增强
+ * Integrates the SafetyGuard framework into existing Cupolas components:
+ * 1. Post-permission-check guard
+ * 2. Pre-command-execution guard
+ * 3. Input sanitization guard
+ * 4. Enhanced audit logging
  */
 
 #include "../../include/cupolas.h"
@@ -36,7 +36,7 @@ static audit_logger_t *g_guard_audit_logger = NULL;
 static char g_current_agent_id[64] = "system";
 
 /**
- * @brief 记录安全守卫审计日志
+ * @brief Record a security guard audit log
  */
 static void guard_log_security(const char *agent_id, const char *action, const char *resource,
                                int risk_level, const char *detail)
@@ -53,8 +53,8 @@ static void guard_log_security(const char *agent_id, const char *action, const c
 // ============================================================================
 
 /**
- * @brief 权限检查守卫钩子
- * @note [SECURITY] 保留供未来权限增强使用
+ * @brief Permission-check guard hook
+ * @note [SECURITY] Reserved for future permission enhancements
  */
 static int __attribute__((unused)) permission_guard_hook(const char *agent_id, const char *action,
                                                          const char *resource, const char *context,
@@ -121,8 +121,8 @@ static int __attribute__((unused)) permission_guard_hook(const char *agent_id, c
 }
 
 /**
- * @brief 命令执行守卫钩子
- * @note [SECURITY] 保留供未来命令安全增强使用
+ * @brief Command-execution guard hook
+ * @note [SECURITY] Reserved for future command security enhancements
  */
 static int __attribute__((unused)) command_execution_guard_hook(const char *command,
                                                                 char *const argv[])
@@ -198,8 +198,8 @@ static int __attribute__((unused)) command_execution_guard_hook(const char *comm
 }
 
 /**
- * @brief 输入净化守卫钩子
- * @note [SECURITY] 保留供未来输入净化增强使用
+ * @brief Input sanitization guard hook
+ * @note [SECURITY] Reserved for future input sanitization enhancements
  */
 static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char *output,
                                                         size_t output_size, int sanitizer_result)
@@ -255,9 +255,9 @@ static int __attribute__((unused)) sanitizer_guard_hook(const char *input, char 
 // ============================================================================
 
 /**
- * @brief 初始化Cupolas守卫集成
- * @param config 守卫管理器配置
- * @return 错误码
+ * @brief Initialize the Cupolas guard integration
+ * @param config Guard manager configuration
+ * @return Error code
  */
 CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t *config)
 {
@@ -281,7 +281,7 @@ CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t *config)
 }
 
 /**
- * @brief 清理Cupolas守卫集成
+ * @brief Clean up the Cupolas guard integration
  */
 CUPOLAS_API void cupolas_guards_cleanup(void)
 {
@@ -300,8 +300,9 @@ CUPOLAS_API void cupolas_guards_cleanup(void)
 }
 
 /**
- * @brief 设置当前代理ID（供外部调用者设置真实代理身份）
- * @param agent_id 代理标识符
+ * @brief Set the current agent ID (for external callers to set the real
+ *        agent identity)
+ * @param agent_id Agent identifier
  */
 CUPOLAS_API void cupolas_guards_set_agent_id(const char *agent_id)
 {
@@ -311,7 +312,7 @@ CUPOLAS_API void cupolas_guards_set_agent_id(const char *agent_id)
 }
 
 /**
- * @brief 启用守卫
+ * @brief Enable guards
  */
 CUPOLAS_API void cupolas_guards_enable(void)
 {
@@ -319,7 +320,7 @@ CUPOLAS_API void cupolas_guards_enable(void)
 }
 
 /**
- * @brief 禁用守卫
+ * @brief Disable guards
  */
 CUPOLAS_API void cupolas_guards_disable(void)
 {
@@ -327,8 +328,8 @@ CUPOLAS_API void cupolas_guards_disable(void)
 }
 
 /**
- * @brief 检查守卫是否启用
- * @return 1启用，0禁用
+ * @brief Check whether guards are enabled
+ * @return 1 if enabled, 0 if disabled
  */
 CUPOLAS_API int cupolas_guards_is_enabled(void)
 {
@@ -336,8 +337,8 @@ CUPOLAS_API int cupolas_guards_is_enabled(void)
 }
 
 /**
- * @brief 获取守卫管理器实例
- * @return 守卫管理器句柄
+ * @brief Get the guard manager instance
+ * @return Guard manager handle
  */
 CUPOLAS_API guard_manager_t *cupolas_guards_get_manager(void)
 {
@@ -345,9 +346,9 @@ CUPOLAS_API guard_manager_t *cupolas_guards_get_manager(void)
 }
 
 /**
- * @brief 注册守卫到Cupolas
- * @param guard 守卫实例
- * @return 错误码
+ * @brief Register a guard with Cupolas
+ * @param guard Guard instance
+ * @return Error code
  */
 CUPOLAS_API int cupolas_guards_register_guard(guard_t *guard)
 {
@@ -359,16 +360,16 @@ CUPOLAS_API int cupolas_guards_register_guard(guard_t *guard)
 }
 
 /**
- * @brief 执行安全检测（针对Cupolas操作）
- * @param operation 操作名称
- * @param resource 资源标识
- * @param agent_id 代理ID
- * @param input_data 输入数据
- * @param input_size 输入数据大小
- * @param results 结果数组（输出）
- * @param max_results 最大结果数
- * @param actual_results 实际结果数（输出）
- * @return 错误码
+ * @brief Run security checks (for Cupolas operations)
+ * @param operation Operation name
+ * @param resource Resource identifier
+ * @param agent_id Agent ID
+ * @param input_data Input data
+ * @param input_size Input data size
+ * @param results Result array (output)
+ * @param max_results Maximum number of results
+ * @param actual_results Actual number of results (output)
+ * @return Error code
  */
 CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource,
                                      const char *agent_id, const void *input_data,
@@ -398,10 +399,10 @@ CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource
 // ============================================================================
 
 /**
- * @brief 注册Cupolas钩子
+ * @brief Register the Cupolas hooks
  *
- * 将守卫钩子注册到Cupolas各个组件。
- * 注意：此函数需要在Cupolas初始化后调用。
+ * Registers the guard hooks into the Cupolas components.
+ * Note: must be called after Cupolas initialization.
  */
 CUPOLAS_API int cupolas_guards_register_hooks(void)
 {
@@ -458,7 +459,7 @@ CUPOLAS_API int cupolas_guards_register_hooks(void)
 }
 
 /**
- * @brief 注销Cupolas钩子
+ * @brief Unregister the Cupolas hooks
  */
 CUPOLAS_API void cupolas_guards_unregister_hooks(void)
 {

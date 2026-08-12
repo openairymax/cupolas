@@ -39,10 +39,13 @@ extern "C" {
  */
 typedef enum {
     cupolas_ERR_OK = 0,
-    /* v4.0-P0-2: 与 v3.0/v4.0 迁移后的 AIRY_ERR_* 扩展码对齐，避免与 airy_types.h
-     * POSIX 码数值碰撞。迁移的 9 个值改为引用 commons 宏（本文件已 include error.h）。
-     * v4.0 追加修复：OUT_OF_MEMORY(-4→-49) 和 OVERFLOW(-14→-50) 原遗留为字面量
-     * 且注释谎称"一致"，实际与 AIRY_EINTR(-4)/AIRY_EFAULT(-14) 碰撞。现已统一引用宏。 */
+    /* v4.0-P0-2: aligned with the post-migration AIRY_ERR_* extended codes
+     * to avoid numeric collisions with the POSIX codes in airy_types.h. The
+     * 9 migrated values now reference the commons macros (this file includes
+     * error.h). v4.0 extra fix: OUT_OF_MEMORY(-4->-49) and OVERFLOW(-14->-50)
+     * were leftover literals whose comments falsely claimed consistency,
+     * while they actually collided with AIRY_EINTR(-4)/AIRY_EFAULT(-14).
+     * They now reference the macros. */
     cupolas_ERR_UNKNOWN = AIRY_ERR_UNKNOWN, /* -99 */
     cupolas_ERR_INVALID_PARAM = AIRY_ERR_INVALID_PARAM, /* -40 */
     cupolas_ERR_NULL_POINTER = -3,
@@ -57,13 +60,14 @@ typedef enum {
     cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR, /* -46 */
     cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,
     cupolas_ERR_TRY_AGAIN = -15,
-    /* v5.0 修复：5 个安全专属错误码从 -16~-20 迁移至 -718~-726 cupolas 专属段，
-     * 消除与 airy_types.h POSIX 码的数值碰撞：
-     *   -16（与 AIRY_EBUSY 碰撞）→ -724 AIRY_ERR_CUPOLAS_AUTH_FAILED
-     *   -17（与 AIRY_EEXIST 碰撞）→ -725 AIRY_ERR_CUPOLAS_CERT_INVALID
-     *   -18 → -726 AIRY_ERR_CUPOLAS_CERT_EXPIRED
-     *   -19 → -719 AIRY_ERR_CUPOLAS_SIGNATURE
-     *   -20 → -718 AIRY_ERR_CUPOLAS_TAMPERED */
+    /* v5.0 fix: 5 security-specific error codes migrated from -16..-20 to
+     * the cupolas-dedicated -718..-726 segment, eliminating numeric
+     * collisions with the POSIX codes in airy_types.h:
+     *   -16 (collided with AIRY_EBUSY)  -> -724 AIRY_ERR_CUPOLAS_AUTH_FAILED
+     *   -17 (collided with AIRY_EEXIST) -> -725 AIRY_ERR_CUPOLAS_CERT_INVALID
+     *   -18 -> -726 AIRY_ERR_CUPOLAS_CERT_EXPIRED
+     *   -19 -> -719 AIRY_ERR_CUPOLAS_SIGNATURE
+     *   -20 -> -718 AIRY_ERR_CUPOLAS_TAMPERED */
     cupolas_ERR_AUTH_FAILED = AIRY_ERR_CUPOLAS_AUTH_FAILED,
     cupolas_ERR_CERT_INVALID = AIRY_ERR_CUPOLAS_CERT_INVALID,
     cupolas_ERR_CERT_EXPIRED = AIRY_ERR_CUPOLAS_CERT_EXPIRED,

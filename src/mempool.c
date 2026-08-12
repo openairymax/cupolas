@@ -3,15 +3,16 @@
 
 /**
  * @file mempool.c
- * @brief P3.16: mempool 最小保证分配器 — 紧急预留 + 对象池 + OOM 保证
+ * @brief P3.16: mempool minimum-guarantee allocator.
  *
- * 实现细节：
- *   - 紧急预留池：预分配固定大小内存，仅 HIGH/CRITICAL 优先级可用
- *   - 对象池：固定大小块快速分配，使用 freelist 链表
- *   - 分级水位线：正常(50%) → 警告(75%) → 高(90%) → 紧急
- *   - OOM 时 CRITICAL 优先级保证分配（从紧急预留池取）
- *   - 低优先级在 HIGH 水位线时被拒绝
- *
+ * Implementation notes:
+ *   - Emergency reserve pool: preallocated fixed-size memory, usable only
+ *     by HIGH/CRITICAL priorities
+ *   - Object pool: fast fixed-size block allocation via a freelist
+ *   - Tiered watermark: normal(50%) -> warn(75%) -> high(90%) -> critical
+ *   - On OOM, CRITICAL priority is still guaranteed allocation (from the
+ *     emergency reserve)
+ *   - Low priorities are rejected at the HIGH watermark
  */
 
 #include "mempool.h"
@@ -27,10 +28,6 @@
 #include <windows.h>
 #endif
 
-/* ================================================================
- * 常量
- * ================================================================ */
-
 #define MEMPOOL_DEFAULT_RESERVE_SIZE (32UL * 1024 * 1024)
 
 #define MEMPOOL_DEFAULT_BLOCK_SIZE 256
@@ -42,10 +39,6 @@
 #define MEMPOOL_ALIGNMENT sizeof(void *)
 
 #define MEMPOOL_ALIGN(s) (((s) + MEMPOOL_ALIGNMENT - 1) & ~(MEMPOOL_ALIGNMENT - 1))
-
-/* ================================================================
- * 内部数据结构
- * ================================================================ */
 
 typedef struct mempool_block {
     struct mempool_block *next;
@@ -85,10 +78,6 @@ struct airy_mempool {
     CRITICAL_SECTION lock;
 #endif
 };
-
-/* ================================================================
- * 平台抽象
- * ================================================================ */
 
 static int mempool_mutex_init(airy_mempool_t *pool)
 {
@@ -136,12 +125,8 @@ static void mempool_mutex_destroy(airy_mempool_t *pool)
 #endif
 }
 
-/* ================================================================
- * 内部辅助函数
- * ================================================================ */
-
 /**
- * @brief 计算当前水位线
+ * @brief Compute the current watermark level
  */
 static airy_mempool_watermark_t mempool_calc_watermark(airy_mempool_t *pool)
 {
@@ -160,7 +145,7 @@ static airy_mempool_watermark_t mempool_calc_watermark(airy_mempool_t *pool)
 }
 
 /**
- * @brief 从预留池分配
+ * @brief Allocate from the reserve pool
  */
 static void *mempool_reserve_alloc(airy_mempool_t *pool, size_t size,
                                    airy_mempool_priority_t priority)
@@ -177,8 +162,9 @@ static void *mempool_reserve_alloc(airy_mempool_t *pool, size_t size,
         return NULL;
     }
 
-    /* 检查是否有足够空间。注意：CRITICAL 紧急分配会使 reserve_used 超过
-     * reserve_size，先判 reserve_used >= reserve_size，避免减法下溢 */
+    /* Check for enough space. Note: CRITICAL emergency allocations can push
+     * reserve_used beyond reserve_size, so check reserve_used >= reserve_size
+     * first to avoid subtracting underflow. */
     size_t remaining =
         (pool->reserve_used >= pool->reserve_size) ? 0 : (pool->reserve_size - pool->reserve_used);
     if (size > remaining) {
@@ -209,7 +195,7 @@ static void *mempool_reserve_alloc(airy_mempool_t *pool, size_t size,
 }
 
 /**
- * @brief 从对象池分配
+ * @brief Allocate from the object pool
  */
 static void *mempool_block_alloc(airy_mempool_t *pool)
 {
@@ -224,7 +210,7 @@ static void *mempool_block_alloc(airy_mempool_t *pool)
 }
 
 /**
- * @brief 释放对象池块
+ * @brief Return an object-pool block
  */
 static void mempool_block_free(airy_mempool_t *pool, void *ptr)
 {
@@ -239,7 +225,7 @@ static void mempool_block_free(airy_mempool_t *pool, void *ptr)
 }
 
 /**
- * @brief 判断一个指针是否来自对象池
+ * @brief Check whether a pointer comes from the object pool
  */
 static bool mempool_is_block_ptr(airy_mempool_t *pool, void *ptr)
 {
@@ -255,7 +241,7 @@ static bool mempool_is_block_ptr(airy_mempool_t *pool, void *ptr)
 }
 
 /**
- * @brief 初始化对象池
+ * @brief Initialize the object pool
  */
 static int mempool_init_blocks(airy_mempool_t *pool)
 {
@@ -279,10 +265,6 @@ static int mempool_init_blocks(airy_mempool_t *pool)
 
     return 0;
 }
-
-/* ================================================================
- * 公共 API
- * ================================================================ */
 
 airy_mempool_t *airy_mempool_create(size_t reserve_size, size_t block_size, size_t block_count)
 {
@@ -470,10 +452,6 @@ void airy_mempool_free(airy_mempool_t *pool, void *ptr)
 
     mempool_mutex_unlock(pool);
 }
-
-/* ================================================================
- * 统计与诊断
- * ================================================================ */
 
 int airy_mempool_get_stats(airy_mempool_t *pool, airy_mempool_stats_t *stats)
 {

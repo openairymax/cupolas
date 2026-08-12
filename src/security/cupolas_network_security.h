@@ -247,255 +247,258 @@ typedef struct {
 } cupolas_http_security_config_t;
 
 /* ============================================================================
- * 公共 API（与 cupolas_network_security.c 实现一一对应）
+ * Public API (one-to-one with the cupolas_network_security.c implementation)
  *
- * 历史遗留：旧代 API（cupolas_network_security_init、cupolas_tls_*、
- * cupolas_firewall_*、cupolas_cert_* 共 30 个）仅在头文件声明、实现缺失，
- * 任何调用方链接必失败。
- * 现按实现（cupolas_net_* 新代）对齐声明，消除「声明与实现断裂」。
+ * Legacy note: the old-generation APIs (cupolas_network_security_init,
+ * cupolas_tls_*, cupolas_firewall_*, cupolas_cert_* -- 30 in total) were
+ * only declared in this header with no implementation, so any caller
+ * would fail at link time. The declarations are now aligned with the
+ * implemented cupolas_net_* API, eliminating the declaration/implementation
+ * split.
  * ============================================================================ */
 
 /**
- * @brief 初始化网络安全模块（默认 TLS 1.2-1.3、强制 HTTPS、DNSSEC）
- * @param[in] manager 配置（NULL 使用安全默认值）
- * @return 0 成功，负值失败
+ * @brief Initialize the network security module (default TLS 1.2-1.3,
+ *        enforced HTTPS, DNSSEC)
+ * @param[in] manager Configuration (NULL for secure defaults)
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_security_init(const cupolas_tls_config_t *manager);
 
 /**
- * @brief 关闭网络安全模块
+ * @brief Shut down the network security module
  */
 void cupolas_net_security_cleanup(void);
 
 /**
- * @brief 读取当前安全配置
- * @param[out] manager 配置输出
- * @return 0 成功，负值失败
+ * @brief Read the current security configuration
+ * @param[out] manager Configuration output
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_security_get_config(cupolas_tls_config_t *manager);
 
 /**
- * @brief 配置 TLS 策略（版本/密码套件/校验模式）
- * @param[in] manager 配置（NULL 使用安全默认值）
- * @return 0 成功，负值失败
+ * @brief Configure the TLS policy (version/cipher suites/verify mode)
+ * @param[in] manager Configuration (NULL for secure defaults)
+ * @return 0 on success, negative on failure
  */
 int cupolas_tls_configure(const cupolas_tls_config_t *manager);
 
 /**
- * @brief 验证证书文件（路径）与主机名匹配
- * @param[in] cert_path 证书文件路径
- * @param[in] hostname  预期主机名
- * @param[out] result   验证结果（cupolas_cert_mode_t）
- * @return 0 成功，负值失败
+ * @brief Verify that a certificate file (path) matches the hostname
+ * @param[in] cert_path Certificate file path
+ * @param[in] hostname  Expected hostname
+ * @param[out] result   Verification result (cupolas_cert_mode_t)
+ * @return 0 on success, negative on failure
  */
 int cupolas_tls_verify_cert(const char *cert_path, const char *hostname,
                             cupolas_cert_mode_t *result);
 
 /**
- * @brief 验证证书链（PEM 内存数据）
- * @param[in] cert_chain 证书链 PEM
- * @param[in] chain_len  证书链长度
- * @param[out] result    验证结果
- * @return 0 成功，负值失败
+ * @brief Verify a certificate chain (PEM in memory)
+ * @param[in] cert_chain Certificate chain PEM
+ * @param[in] chain_len  Certificate chain length
+ * @param[out] result    Verification result
+ * @return 0 on success, negative on failure
  */
 int cupolas_tls_verify_cert_chain(const char *cert_chain, size_t chain_len,
                                   cupolas_cert_mode_t *result);
 
 /**
- * @brief 主动连接检测主机证书有效性
- * @param[in] hostname 主机名
- * @param[in] port     端口
- * @param[out] result  验证结果
- * @return 0 成功，负值失败
+ * @brief Actively connect and check the host's certificate validity
+ * @param[in] hostname Hostname
+ * @param[in] port     Port
+ * @param[out] result  Verification result
+ * @return 0 on success, negative on failure
  */
 int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_mode_t *result);
 
 /**
- * @brief 获取支持的密码套件列表
- * @param[out] suites 套件数组（调用方须释放）
- * @param[out] count  套件数量
- * @return 0 成功，负值失败
+ * @brief Get the list of supported cipher suites
+ * @param[out] suites Suite array (caller must free)
+ * @param[out] count  Number of suites
+ * @return 0 on success, negative on failure
  */
 int cupolas_tls_get_cipher_suites(char ***suites, size_t *count);
 
 /**
- * @brief 判断密码套件是否安全
- * @param[in] suite 套件名
- * @return 1 安全，0 不安全
+ * @brief Check whether a cipher suite is secure
+ * @param[in] suite Suite name
+ * @return 1 if secure, 0 if not
  */
 int cupolas_tls_is_cipher_secure(const char *suite);
 
 /**
- * @brief 添加网络过滤规则
- * @param[in] rule 规则
- * @return 0 成功，负值失败
+ * @brief Add a network filter rule
+ * @param[in] rule Rule
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule);
 
 /**
- * @brief 删除网络过滤规则
- * @param[in] rule_id 规则 ID
- * @return 0 成功，负值失败
+ * @brief Remove a network filter rule
+ * @param[in] rule_id Rule ID
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_remove_rule(const char *rule_id);
 
 /**
- * @brief 更新网络过滤规则
- * @param[in] rule_id 规则 ID
- * @param[in] rule    新规则
- * @return 0 成功，负值失败
+ * @brief Update a network filter rule
+ * @param[in] rule_id Rule ID
+ * @param[in] rule    New rule
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t *rule);
 
 /**
- * @brief 查询单条网络过滤规则
- * @param[in] rule_id 规则 ID
- * @param[out] rule   规则输出
- * @return 0 成功，负值失败
+ * @brief Get a single network filter rule
+ * @param[in] rule_id Rule ID
+ * @param[out] rule   Rule output
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_get_rule(const char *rule_id, cupolas_net_filter_rule_t *rule);
 
 /**
- * @brief 列出全部网络过滤规则
- * @param[out] rules 规则数组（调用方释放）
- * @param[out] count 规则数量
- * @return 0 成功，负值失败
+ * @brief List all network filter rules
+ * @param[out] rules Rule array (caller frees)
+ * @param[out] count Number of rules
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_list_rules(cupolas_net_filter_rule_t **rules, size_t *count);
 
 /**
- * @brief 网络访问裁决（host+port+protocol+direction）
- * @return 0 允许，负值拒绝
+ * @brief Network access decision (host+port+protocol+direction)
+ * @return 0 to allow, negative to deny
  */
 int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t protocol,
                              const char *direction);
 
 /**
- * @brief URL 访问裁决（scheme/host/port/path 全维度）
- * @return 0 允许，负值拒绝
+ * @brief URL access decision (scheme/host/port/path, all dimensions)
+ * @return 0 to allow, negative to deny
  */
 int cupolas_net_check_url(const char *url, const char *method);
 
 /**
- * @brief 配置 HTTP 安全策略
- * @return 0 成功，负值失败
+ * @brief Configure the HTTP security policy
+ * @return 0 on success, negative on failure
  */
 int cupolas_http_configure(const cupolas_http_security_config_t *manager);
 
 /**
- * @brief 校验 HTTP 请求（method/url/headers/body_size）
- * @return 0 允许，负值拒绝
+ * @brief Validate an HTTP request (method/url/headers/body_size)
+ * @return 0 to allow, negative to deny
  */
 int cupolas_http_validate_request(const char *method, const char *url, const char **headers,
                                   size_t header_count, size_t body_size);
 
 /**
- * @brief 为响应追加安全头（HSTS/CSP 等）
- * @return 0 成功，负值失败
+ * @brief Append security headers to a response (HSTS/CSP etc.)
+ * @return 0 on success, negative on failure
  */
 int cupolas_http_add_security_headers(const char **headers, size_t header_count,
                                       size_t max_headers);
 
 /**
- * @brief 判断 URL 是否安全
- * @return 1 安全，0 不安全
+ * @brief Check whether a URL is safe
+ * @return 1 if safe, 0 if not
  */
 int cupolas_http_is_url_safe(const char *url);
 
 /**
- * @brief 配置 DNS 安全策略
- * @return 0 成功，负值失败
+ * @brief Configure the DNS security policy
+ * @return 0 on success, negative on failure
  */
 int cupolas_dns_configure(const cupolas_dns_security_config_t *manager);
 
 /**
- * @brief 安全 DNS 解析（受域名白名单约束）
- * @return 0 成功，负值失败
+ * @brief Secure DNS resolution (constrained by the domain whitelist)
+ * @return 0 on success, negative on failure
  */
 int cupolas_dns_resolve(const char *hostname, char *ip_out, size_t ip_len);
 
 /**
- * @brief 判断域名是否被允许解析
- * @return 1 允许，0 拒绝
+ * @brief Check whether a domain is allowed to be resolved
+ * @return 1 if allowed, 0 if denied
  */
 int cupolas_dns_is_domain_allowed(const char *domain);
 
 /**
- * @brief 验证域名的 DNSSEC 签名
- * @return 0 验证通过，负值失败/未签名
+ * @brief Verify the DNSSEC signature of a domain
+ * @return 0 if verified, negative on failure/unsigned
  */
 int cupolas_dns_verify_dnssec(const char *domain);
 
 /**
- * @brief 获取活动连接列表
- * @return 0 成功，负值失败
+ * @brief Get the list of active connections
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_get_connections(cupolas_connection_info_t **connections, size_t *count);
 
 /**
- * @brief 关闭指定连接
- * @return 0 成功，负值失败
+ * @brief Close a specific connection
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_close_connection(const char *local_ip, uint16_t local_port, const char *remote_ip,
                                  uint16_t remote_port);
 
 /**
- * @brief 获取网络安全统计
- * @return 0 成功，负值失败
+ * @brief Get network security statistics
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_get_stats(cupolas_net_stats_t *stats);
 
 /**
- * @brief 重置网络安全统计
+ * @brief Reset network security statistics
  */
 void cupolas_net_reset_stats(void);
 
 /**
- * @brief 启用/关闭入侵检测（IDS）
- * @return 0 成功，负值失败
+ * @brief Enable/disable intrusion detection (IDS)
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_ids_enable(bool enabled);
 
 /**
- * @brief 对连接执行异常检测
- * @return 0 正常，负值异常
+ * @brief Run anomaly detection on a connection
+ * @return 0 if normal, negative if anomalous
  */
 int cupolas_net_detect_anomaly(const cupolas_connection_info_t *connection);
 
 /**
- * @brief 注册 IDS 告警回调
- * @return 0 成功，负值失败
+ * @brief Register an IDS alert callback
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_ids_set_callback(void (*callback)(const char *alert_type, const char *details,
                                                   const cupolas_connection_info_t *conn));
 
 /**
- * @brief 解析 URL（scheme/host/port/path）
- * @return 0 成功，负值失败
+ * @brief Parse a URL (scheme/host/port/path)
+ * @return 0 on success, negative on failure
  */
 int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *port, char *path);
 
 /**
- * @brief 判断 IP 是否在 CIDR 网段内
- * @return 1 在网段内，0 不在
+ * @brief Check whether an IP is inside a CIDR range
+ * @return 1 if inside, 0 if not
  */
 int cupolas_net_ip_in_cidr(const char *ip, const char *cidr);
 
 /**
- * @brief 校验 IP 地址格式
- * @return 0 合法，负值非法
+ * @brief Validate an IP address format
+ * @return 0 if valid, negative if invalid
  */
 int cupolas_net_validate_ip(const char *ip);
 
 /**
- * @brief 校验端口号范围
- * @return 0 合法，负值非法
+ * @brief Validate a port number range
+ * @return 0 if valid, negative if invalid
  */
 int cupolas_net_validate_port(uint16_t port);
 
 /**
- * @brief 证书验证结果字符串
- * @return 静态字符串（勿 free）
+ * @brief Certificate validation result string
+ * @return Static string (do not free)
  */
 const char *cupolas_cert_result_string(cupolas_cert_mode_t result);
 

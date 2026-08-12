@@ -9,11 +9,9 @@
 
 /**
  * @file cupolas_network_security_util.c
- * @brief Network Security - 网络工具域
+ * @brief Network security: network utilities domain.
  *
- * 本文件实现 URL 解析、CIDR 归属判定与 IP/端口合法性校验。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements URL parsing, CIDR membership, and IP/port validity checks.
  */
 
 #include "cupolas_network_security.h"

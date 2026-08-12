@@ -136,18 +136,19 @@ void audit_logger_flush(audit_logger_t *logger);
 void audit_logger_stats(audit_logger_t *logger, uint64_t *total_logged, uint64_t *total_failed);
 
 /**
- * @brief 验证审计哈希链完整性（BAN-129 编码契约）
+ * @brief Verify the integrity of the audit hash chain (BAN-129 contract)
  *
- * 从给定条目列表重新计算 SHA-256 哈希链，验证每个条目的
- * curr_hash 是否与基于 prev_hash + 条目内容重新计算的哈希一致。
- * 任何不一致都表示审计日志被篡改。
+ * Recomputes the SHA-256 hash chain from the given entry list and checks
+ * each entry's curr_hash against the hash recomputed from prev_hash plus
+ * the entry content. Any mismatch means the audit log was tampered with.
  *
- * @param entries     审计条目数组（按时间顺序排列）
- * @param entry_count 条目数量
- * @param first_prev_hash 链起始哈希（通常为64个'0'字符）
- * @param out_invalid_index 输出第一个无效条目的索引（-1 表示全部有效，可为NULL）
- * @return true 如果哈希链完整且未被篡改，false 如果有任何不匹配
- * @note Thread-safe: Yes (只读访问条目)
+ * @param entries     Audit entries in chronological order
+ * @param entry_count Number of entries
+ * @param first_prev_hash Chain start hash (usually 64 '0' characters)
+ * @param out_invalid_index Index of the first invalid entry (-1 if all
+ *                          valid; may be NULL)
+ * @return true if the chain is intact, false on any mismatch
+ * @note Thread-safe: Yes (entries are accessed read-only)
  */
 bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count,
                                const char *first_prev_hash, int *out_invalid_index);

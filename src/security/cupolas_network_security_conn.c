@@ -9,11 +9,10 @@
 
 /**
  * @file cupolas_network_security_conn.c
- * @brief Network Security - 连接监控域
+ * @brief Network security: connection monitoring domain.
  *
- * 本文件实现连接信息枚举、连接关闭与统计信息查询/重置。
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * Implements connection enumeration, connection close, and statistics
+ * query/reset.
  */
 
 #include "cupolas_network_security.h"

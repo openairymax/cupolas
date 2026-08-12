@@ -3,10 +3,11 @@
 
 /**
  * @file guard_core.h
- * @brief SafetyGuard Core Framework
+ * @brief SafetyGuard core framework.
  *
- * 安全守卫框架核心定义，提供统一的安全检测接口和守卫管理器。
- * 支持多种守卫类型（规则、模型、行为分析等）和优先级调度。
+ * Core definitions of the safety guard framework: a unified security
+ * check interface and a guard manager supporting multiple guard types
+ * (rule, model, behavioral, etc.) and priority scheduling.
  */
 
 #ifndef CUPOLAS_GUARD_CORE_H
@@ -206,70 +207,70 @@ typedef struct guard_manager guard_manager_t;
 
 /* ============================================================================ */
 /**
- * @brief 创建守卫管理器
- * @param config 管理器配置
- * @return 守卫管理器句柄，失败返回NULL
+ * @brief Create a guard manager
+ * @param config Manager configuration
+ * @return Guard manager handle, NULL on failure
  */
 CUPOLAS_API guard_manager_t *guard_manager_create(const guard_manager_config_t *config);
 
 /**
- * @brief 销毁守卫管理器
- * @param manager 守卫管理器句柄
+ * @brief Destroy a guard manager
+ * @param manager Guard manager handle
  */
 CUPOLAS_API void guard_manager_destroy(guard_manager_t *manager);
 
 /**
- * @brief 注册守卫到管理器
- * @param manager 守卫管理器
- * @param guard 守卫实例
- * @return 错误码
+ * @brief Register a guard with the manager
+ * @param manager Guard manager
+ * @param guard Guard instance
+ * @return Error code
  */
 CUPOLAS_API int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard);
 
 /**
- * @brief 从管理器注销守卫
- * @param manager 守卫管理器
- * @param guard_id 守卫ID
- * @return 错误码
+ * @brief Unregister a guard from the manager
+ * @param manager Guard manager
+ * @param guard_id Guard ID
+ * @return Error code
  */
 CUPOLAS_API int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id);
 
 /**
- * @brief 根据名称查找守卫
- * @param manager 守卫管理器
- * @param name 守卫名称
- * @return 守卫实例，未找到返回NULL
+ * @brief Find a guard by name
+ * @param manager Guard manager
+ * @param name Guard name
+ * @return Guard instance, NULL if not found
  */
 CUPOLAS_API guard_t *guard_manager_find_guard_by_name(guard_manager_t *manager, const char *name);
 
 /**
- * @brief 根据ID查找守卫
- * @param manager 守卫管理器
- * @param id 守卫ID
- * @return 守卫实例，未找到返回NULL
+ * @brief Find a guard by ID
+ * @param manager Guard manager
+ * @param id Guard ID
+ * @return Guard instance, NULL if not found
  */
 CUPOLAS_API guard_t *guard_manager_find_guard_by_id(guard_manager_t *manager, guard_id_t id);
 
 /**
- * @brief 执行安全检测（同步）
- * @param manager 守卫管理器
- * @param context 检测上下文
- * @param results 结果数组（输出）
- * @param max_results 最大结果数
- * @param actual_results 实际结果数（输出）
- * @return 错误码
+ * @brief Run security checks (synchronous)
+ * @param manager Guard manager
+ * @param context Check context
+ * @param results Result array (output)
+ * @param max_results Maximum number of results
+ * @param actual_results Actual number of results (output)
+ * @return Error code
  */
 CUPOLAS_API int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *context,
                                          guard_result_t *results, size_t max_results,
                                          size_t *actual_results);
 
 /**
- * @brief 执行安全检测（异步）
- * @param manager 守卫管理器
- * @param context 检测上下文
- * @param callback 回调函数
- * @param user_data 用户数据
- * @return 请求ID，失败返回0
+ * @brief Run security checks (asynchronous)
+ * @param manager Guard manager
+ * @param context Check context
+ * @param callback Completion callback
+ * @param user_data Callback user data
+ * @return Request ID, 0 on failure
  */
 CUPOLAS_API uint64_t guard_manager_check_async(guard_manager_t *manager,
                                                const guard_context_t *context,
@@ -279,17 +280,17 @@ CUPOLAS_API uint64_t guard_manager_check_async(guard_manager_t *manager,
                                                void *user_data);
 
 /**
- * @brief 获取管理器统计信息
- * @param manager 守卫管理器
- * @param stats 统计信息（输出）
- * @return 错误码
+ * @brief Get manager statistics
+ * @param manager Guard manager
+ * @param stats Statistics (output)
+ * @return Error code
  */
 CUPOLAS_API int guard_manager_get_stats(guard_manager_t *manager, guard_stats_t *stats);
 
 /**
- * @brief 重置管理器统计信息
- * @param manager 守卫管理器
- * @return 错误码
+ * @brief Reset manager statistics
+ * @param manager Guard manager
+ * @return Error code
  */
 CUPOLAS_API int guard_manager_reset_stats(guard_manager_t *manager);
 
@@ -297,74 +298,74 @@ CUPOLAS_API int guard_manager_reset_stats(guard_manager_t *manager);
 
 /* ============================================================================ */
 /**
- * @brief 创建守卫实例
- * @param name 守卫名称
- * @param description 守卫描述
- * @param type 守卫类型
- * @param ops 守卫操作函数表
- * @return 守卫实例，失败返回NULL
+ * @brief Create a guard instance
+ * @param name Guard name
+ * @param description Guard description
+ * @param type Guard type
+ * @param ops Guard operation function table
+ * @return Guard instance, NULL on failure
  */
 CUPOLAS_API guard_t *guard_create(const char *name, const char *description, guard_type_t type,
                                   const guard_ops_t *ops);
 
 /**
- * @brief 销毁守卫实例
- * @param guard 守卫实例
+ * @brief Destroy a guard instance
+ * @param guard Guard instance
  */
 CUPOLAS_API void guard_destroy(guard_t *guard);
 
 /**
- * @brief 初始化守卫
- * @param guard 守卫实例
- * @param config 守卫配置
- * @return 错误码
+ * @brief Initialize a guard
+ * @param guard Guard instance
+ * @param config Guard configuration
+ * @return Error code
  */
 CUPOLAS_API int guard_init(guard_t *guard, const guard_config_t *config);
 
 /**
- * @brief 执行守卫检测
- * @param guard 守卫实例
- * @param context 检测上下文
- * @param result 检测结果（输出）
- * @return 错误码
+ * @brief Run a guard check
+ * @param guard Guard instance
+ * @param context Check context
+ * @param result Check result (output)
+ * @return Error code
  */
 CUPOLAS_API int guard_check(guard_t *guard, const guard_context_t *context, guard_result_t *result);
 
 /**
- * @brief 启用守卫
- * @param guard 守卫实例
- * @return 错误码
+ * @brief Enable a guard
+ * @param guard Guard instance
+ * @return Error code
  */
 CUPOLAS_API int guard_enable(guard_t *guard);
 
 /**
- * @brief 禁用守卫
- * @param guard 守卫实例
- * @return 错误码
+ * @brief Disable a guard
+ * @param guard Guard instance
+ * @return Error code
  */
 CUPOLAS_API int guard_disable(guard_t *guard);
 
 /**
- * @brief 更新守卫规则
- * @param guard 守卫实例
- * @param rules 规则数组
- * @param count 规则数量
- * @return 错误码
+ * @brief Update guard rules
+ * @param guard Guard instance
+ * @param rules Rule array
+ * @param count Number of rules
+ * @return Error code
  */
 CUPOLAS_API int guard_update_rules(guard_t *guard, const guard_rule_t *rules, size_t count);
 
 /**
- * @brief 获取守卫统计信息
- * @param guard 守卫实例
- * @param stats 统计信息（输出）
- * @return 错误码
+ * @brief Get guard statistics
+ * @param guard Guard instance
+ * @param stats Statistics (output)
+ * @return Error code
  */
 CUPOLAS_API int guard_get_stats(guard_t *guard, guard_stats_t *stats);
 
 /**
- * @brief 重置守卫统计信息
- * @param guard 守卫实例
- * @return 错误码
+ * @brief Reset guard statistics
+ * @param guard Guard instance
+ * @return Error code
  */
 CUPOLAS_API int guard_reset_stats(guard_t *guard);
 

@@ -3,7 +3,8 @@
 
 /**
  * @file cupolas_vault_access.c
- * @brief 访问控制域：基于 ACL 的凭证访问授权、撤销与校验
+ * @brief Access-control domain: ACL-based credential authorization, revoke,
+ *        and validation.
  */
 
 #include "error.h"
@@ -33,10 +34,6 @@
 #include <openssl/sha.h>
 #endif
 
-/* ============================================================================
- * 访问控制
- * ============================================================================ */
-
 bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
                                 cupolas_vault_operation_t operation)
 {
@@ -54,8 +51,9 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
         return false;
     }
 
-    /* 默认拒绝（fail-closed）：无 ACL 的凭据不向任何 agent 开放访问。
-     * 创建者/使用者须显式 grant_access 后才有对应操作权限。 */
+    /* Deny by default (fail-closed): a credential without ACLs is not open
+     * to any agent. The creator/user must explicitly grant_access to get
+     * the corresponding operation permissions. */
     if (entry->acl.count == 0) {
         cupolas_rwlock_unlock(&vault->lock);
         LOG_WARN("cupolas_vault_check_access: no ACL entries for cred_id=%s, access denied by "

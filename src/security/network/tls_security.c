@@ -291,8 +291,9 @@ int tls_check_connection(const char *hostname, uint16_t port, cupolas_cert_resul
     __builtin_memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    /* gethostbyname 可能返回 IPv6 记录（h_length=16），sin_addr 仅 4 字节，
-     * 直接整长拷贝会栈越界写。仅接受 AF_INET 且长度匹配的记录。 */
+    /* gethostbyname may return IPv6 records (h_length=16) while sin_addr is
+     * only 4 bytes; a full-length copy would overrun the stack. Only accept
+     * AF_INET records with a matching length. */
     if (host->h_addrtype != AF_INET || host->h_length > (int)sizeof(addr.sin_addr)) {
 #ifdef _WIN32
         closesocket(sock);

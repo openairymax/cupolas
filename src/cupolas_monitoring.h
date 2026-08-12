@@ -15,9 +15,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* SP06 解耦：cupolas 不再反向依赖 gateway 模块。
- * 以下类型定义了通用的 HTTP 端点请求/响应抽象，
- * 由调用方（如 gateway_d）负责适配到具体的 HTTP 服务器实现。 */
+/* SP06 decoupling: cupolas no longer depends on the gateway module.
+ * The types below define a generic HTTP endpoint request/response
+ * abstraction; the caller (e.g. gateway_d) adapts it to a concrete HTTP
+ * server implementation. */
 
 
 typedef struct cupolas_endpoint_request {

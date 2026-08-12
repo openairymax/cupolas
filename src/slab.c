@@ -3,15 +3,18 @@
 
 /**
  * @file slab.c
- * @brief P3.15: Slab 分配器实现 — per-CPU freelist + 全局 partial 链
+ * @brief P3.15: slab allocator implementation -- per-CPU freelist plus a
+ *        global partial chain.
  *
- * 实现细节：
- *   - 每个 Slab 包含多个 slab 页（page），每页包含固定数量对象
- *   - 每页维护一个 freelist（空闲对象链表）
- *   - 页按状态分为：FULL（无空闲对象）、PARTIAL（部分空闲）、EMPTY（全空闲）
- *   - 全局 partial 链表用于 CPU 间负载均衡（steal 机制）
- *   - 分配时优先从当前 CPU 的 partial 页获取，失败时从全局 partial 链 steal
- *
+ * Implementation details:
+ *   - Each slab consists of several slab pages; each page holds a fixed
+ *     number of objects
+ *   - Each page keeps a freelist (linked list of free objects)
+ *   - Pages are classified as FULL (no free objects), PARTIAL (partly
+ *     free), or EMPTY (all free)
+ *   - The global partial chain provides cross-CPU load balancing (steal)
+ *   - Allocation prefers the current CPU's partial page, then steals from
+ *     the global partial chain
  */
 
 #include "slab.h"
@@ -28,19 +31,11 @@
 #include <windows.h>
 #endif
 
-/* ================================================================
- * 常量
- * ================================================================ */
-
 #define SLAB_DEFAULT_OBJS_PER_PAGE(obj_size) ((4096 - sizeof(struct slab_page)) / (obj_size))
 
 #define SLAB_MAX_CPUS 128
 
 #define SLAB_ALIGN(s) (((s) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
-
-/* ================================================================
- * 内部数据结构
- * ================================================================ */
 
 typedef enum {
     SLAB_PAGE_EMPTY = 0,
@@ -89,10 +84,6 @@ struct airy_slab {
     slab_cpu_cache_t cpu_caches[SLAB_MAX_CPUS];
     size_t cpu_count;
 };
-
-/* ================================================================
- * 平台抽象
- * ================================================================ */
 
 static int slab_mutex_init(struct airy_slab *slab)
 {
@@ -151,12 +142,8 @@ static int slab_get_cpu_id(void)
 #endif
 }
 
-/* ================================================================
- * 内部辅助函数
- * ================================================================ */
-
 /**
- * @brief 分配一个新的 slab 页
+ * @brief Allocate a new slab page
  */
 static slab_page_t *slab_page_create(airy_slab_t *slab)
 {
@@ -192,7 +179,7 @@ static slab_page_t *slab_page_create(airy_slab_t *slab)
 }
 
 /**
- * @brief 释放一个 slab 页
+ * @brief Release a slab page
  */
 static void slab_page_destroy(slab_page_t *page)
 {
@@ -200,7 +187,7 @@ static void slab_page_destroy(slab_page_t *page)
 }
 
 /**
- * @brief 从页的 freelist 弹出一个对象
+ * @brief Pop an object from a page's freelist
  */
 static void *slab_page_pop(slab_page_t *page)
 {
@@ -221,7 +208,7 @@ static void *slab_page_pop(slab_page_t *page)
 }
 
 /**
- * @brief 将对象推回页的 freelist
+ * @brief Push an object back onto a page's freelist
  */
 static void slab_page_push(slab_page_t *page, void *obj)
 {
@@ -240,7 +227,7 @@ static void slab_page_push(slab_page_t *page, void *obj)
 }
 
 /**
- * @brief 从全局 partial 链获取一个页（或 steal）
+ * @brief Take a page from the global partial chain (or steal)
  */
 static slab_page_t *slab_get_partial_page(airy_slab_t *slab)
 {
@@ -261,7 +248,7 @@ static slab_page_t *slab_get_partial_page(airy_slab_t *slab)
 }
 
 /**
- * @brief 将页归还到全局 partial 链
+ * @brief Return a page to the global partial chain
  */
 static void slab_return_partial_page(airy_slab_t *slab, slab_page_t *page)
 {
@@ -274,10 +261,6 @@ static void slab_return_partial_page(airy_slab_t *slab, slab_page_t *page)
     slab->partial_count++;
     slab_mutex_unlock(slab);
 }
-
-/* ================================================================
- * 公共 API
- * ================================================================ */
 
 airy_slab_t *airy_slab_create(size_t obj_size, size_t objs_per_slab, airy_slab_ctor_t ctor,
                               airy_slab_dtor_t dtor, void *user_data)
@@ -471,10 +454,6 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
               "(total_frees=%zu, total_allocs=%zu)",
               slab->total_frees, slab->total_allocs);
 }
-
-/* ================================================================
- * 统计与诊断
- * ================================================================ */
 
 int airy_slab_get_stats(airy_slab_t *slab, airy_slab_stats_t *stats)
 {

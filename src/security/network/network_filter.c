@@ -104,25 +104,26 @@ static int match_url_pattern(const char *pattern, const char *url)
 }
 
 /**
- * @brief 检测 IP 地址是否为私有地址 / 回环地址
- * 
- * 符合编码契约要求: 在请求前检测目标 IP 是否为私有地址，防止 SSRF 攻击。
- * 
- * IPv4 私有地址范围:
+ * @brief Detect whether an IP address is private or loopback
+ *
+ * Per the coding contract: detect whether the target IP is private before
+ * the request to prevent SSRF attacks.
+ *
+ * IPv4 private ranges:
  *   - 10.0.0.0/8       (10.0.0.0 - 10.255.255.255)
  *   - 172.16.0.0/12     (172.16.0.0 - 172.31.255.255)
  *   - 192.168.0.0/16    (192.168.0.0 - 192.168.255.255)
- *   - 127.0.0.0/8       (回环地址)
- *   - 169.254.0.0/16    (链路本地地址)
- *   - 0.0.0.0/8         (当前网络)
- * 
- * IPv6 私有地址范围:
- *   - ::1/128           (回环地址)
- *   - fc00::/7          (唯一本地地址)
- *   - fe80::/10         (链路本地地址)
- * 
- * @param ip_addr  IP 地址字符串 (IPv4 或 IPv6)
- * @return 1 如果是私有地址，0 否则
+ *   - 127.0.0.0/8       (loopback)
+ *   - 169.254.0.0/16    (link-local)
+ *   - 0.0.0.0/8         (current network)
+ *
+ * IPv6 private ranges:
+ *   - ::1/128           (loopback)
+ *   - fc00::/7          (unique local)
+ *   - fe80::/10         (link-local)
+ *
+ * @param ip_addr IP address string (IPv4 or IPv6)
+ * @return 1 if private, 0 otherwise
  */
 static int is_private_ip(const char *ip_addr)
 {

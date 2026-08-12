@@ -1,16 +1,9 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-/*
- *
- * permission_engine.c - Permission Engine Implementation
- */
-
 /**
  * @file permission_engine.c
- * @brief Permission Engine Implementation
- * @author SPHARX Ltd. - Airymax Team
- * @date 2024
+ * @brief Permission engine implementation.
  */
 
 #include "permission_engine.h"
@@ -91,8 +84,10 @@ void permission_engine_destroy(permission_engine_t *engine)
     if (!engine)
         return;
 
-    /* sub32 返回递减后的新值：新值 > 0 表示仍有引用，不得销毁；
-     * 原实现 >1 才返回，导致新值 ==1（仍有引用）时过早销毁 —— UAF 竞态。 */
+    /* sub32 returns the new decremented value: > 0 means references remain
+     * and the engine must not be destroyed; the old implementation only
+     * checked > 1, destroying too early when the new value was 1 (still
+     * referenced) -- a UAF race. */
     if (cupolas_atomic_sub32(&engine->ref_count, 1) > 0) {
         return;
     }
@@ -262,9 +257,10 @@ int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    /* agent_id/action 缺省视为通配 "*"（与 YAML 加载路径默认值一致）：
-     * cupolas.add_rule 文档契约中 agent_id/action 为可选字段，
-     * NULL 直接拒绝会导致可选参数无法使用。 */
+    /* Missing agent_id/action default to the wildcard "*" (consistent with
+     * the YAML load path): the cupolas.add_rule documented contract makes
+     * agent_id/action optional, so rejecting NULL outright would make the
+     * optional parameters unusable. */
     const char *agent = agent_id ? agent_id : "*";
     const char *act = action ? action : "*";
 
