@@ -41,7 +41,13 @@ endif()
 
 set(CUPOLAS_SOURCES
     src/cupolas.c
+    # cupolas platform 按功能域拆分：同步原语/进程与管道/时间/文件系统/内存与原子/错误与字符串
     src/platform/platform.c
+    src/platform/platform_process.c
+    src/platform/platform_time.c
+    src/platform/platform_fs.c
+    src/platform/platform_mem.c
+    src/platform/platform_util.c
     src/utils/cupolas_utils.c
     src/cupolas_metrics.c
     src/cupolas_config.c
@@ -57,7 +63,6 @@ set(CUPOLAS_SOURCES
     src/sanitizer/sanitizer_rules.c
     src/sanitizer/sanitizer_cache.c
     src/workbench/workbench.c
-    src/workbench/workbench_process_core.c
     src/workbench/workbench_container.c
     src/workbench/workbench_limits.c
     src/security/cupolas_error.c
@@ -67,7 +72,13 @@ set(CUPOLAS_SOURCES
     src/security/network/network_utils.c
     src/guards/guard_core.c
     src/guards/guard_integration.c
+    # safety_guard 按功能域拆分：生命周期/规则匹配与策略执行/策略管理/配额/审核/回调与紧急停止
     src/guards/safety_guard.c
+    src/guards/safety_guard_check.c
+    src/guards/safety_guard_policy.c
+    src/guards/safety_guard_quota.c
+    src/guards/safety_guard_audit.c
+    src/guards/safety_guard_ctrl.c
     src/circuit_breaker.c
     src/slab.c
     src/mempool.c
@@ -77,9 +88,22 @@ if(AIRY_HAS_OPENSSL)
     list(APPEND CUPOLAS_SOURCES
         src/security/cupolas_signature.c
         src/security/cupolas_vault.c
+        src/security/cupolas_vault_credential.c
+        src/security/cupolas_vault_access.c
+        src/security/cupolas_vault_metadata.c
+        src/security/cupolas_vault_rotation.c
+        src/security/cupolas_vault_crypto.c
+        src/security/cupolas_vault_io.c
         src/security/cupolas_entitlements.c
         src/security/cupolas_runtime_protection.c
+        # cupolas_network_security 按功能域拆分：生命周期+TLS/防火墙规则/包过滤/连接监控/检测引擎/DNS/工具
         src/security/cupolas_network_security.c
+        src/security/cupolas_network_security_firewall.c
+        src/security/cupolas_network_security_filter.c
+        src/security/cupolas_network_security_conn.c
+        src/security/cupolas_network_security_ids.c
+        src/security/cupolas_network_security_dns.c
+        src/security/cupolas_network_security_util.c
         src/security/network/tls_security.c
     )
 endif()
@@ -108,9 +132,11 @@ set(CUPOLAS_HEADERS
     src/workbench/workbench_limits.h
     src/security/cupolas_signature.h
     src/security/cupolas_vault.h
+    src/security/cupolas_vault_internal.h
     src/security/cupolas_entitlements.h
     src/security/cupolas_runtime_protection.h
     src/security/cupolas_network_security.h
+    src/security/cupolas_network_security_internal.h
     src/security/cupolas_error.h
     src/security/network/tls_security.h
     src/security/network/http_security.h
