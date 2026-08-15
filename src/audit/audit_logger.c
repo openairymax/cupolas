@@ -206,7 +206,7 @@ static void *audit_writer_thread(void *arg)
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
                     cupolas_atomic_add64(&logger->total_logged, 1);
                 } else {
-                    LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, "
+                    AIRY_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, "
                               "total_failed=%llu",
                               (int)batch[i]->type,
                               (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
@@ -224,7 +224,7 @@ static void *audit_writer_thread(void *arg)
             if (audit_rotator_write(logger->rotator, entry) == cupolas_OK) {
                 cupolas_atomic_add64(&logger->total_logged, 1);
             } else {
-                LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, "
+                AIRY_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, "
                           "total_failed=%llu",
                           (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
                 cupolas_atomic_add64(&logger->total_failed, 1);
@@ -357,7 +357,7 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
                      const char *action, const char *resource, const char *detail, int result)
 {
     if (!logger) {
-        LOG_ERROR("audit_logger_log: NULL logger parameter");
+        AIRY_LOG_ERROR("audit_logger_log: NULL logger parameter");
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -366,7 +366,7 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
         /* SEC-13: Fallback to pre-allocated audit buffer under OOM */
         void *emergency_buf = airy_prealloc_acquire(AIRY_PREALLOC_AUDIT);
         if (emergency_buf) {
-            LOG_WARN("audit_logger_log: using emergency buffer fallback for type=%d, agent_id=%s, "
+            AIRY_LOG_WARN("audit_logger_log: using emergency buffer fallback for type=%d, agent_id=%s, "
                      "action=%s",
                      (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)");
             /* Write a minimal audit record to the emergency buffer */
@@ -405,7 +405,7 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
 
     int ret = audit_queue_try_push(logger->queue, entry);
     if (ret != cupolas_OK) {
-        LOG_ERROR("[CRITICAL] audit_logger_log: audit queue push failed (buffer overflow), "
+        AIRY_LOG_ERROR("[CRITICAL] audit_logger_log: audit queue push failed (buffer overflow), "
                   "type=%d, agent_id=%s, action=%s, ret=%d",
                   (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)", ret);
         audit_entry_destroy(entry);
@@ -453,7 +453,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
                                const char *first_prev_hash, int *out_invalid_index)
 {
     if (!entries || entry_count == 0 || !first_prev_hash) {
-        LOG_ERROR("audit_logger_verify_chain: NULL/invalid parameter - entries=%p, "
+        AIRY_LOG_ERROR("audit_logger_verify_chain: NULL/invalid parameter - entries=%p, "
                   "entry_count=%zu, first_prev_hash=%p",
                   (void *)entries, entry_count, (void *)first_prev_hash);
         if (out_invalid_index)
@@ -467,14 +467,14 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
     for (size_t i = 0; i < entry_count; i++) {
         const audit_entry_t *entry = entries[i];
         if (!entry) {
-            LOG_ERROR("audit_logger_verify_chain: NULL entry at index=%zu", i);
+            AIRY_LOG_ERROR("audit_logger_verify_chain: NULL entry at index=%zu", i);
             if (out_invalid_index)
                 *out_invalid_index = (int)i;
             return false;
         }
 
         if (memcmp(entry->prev_hash, expected_prev, 65) != 0) {
-            LOG_ERROR("audit_logger_verify_chain: prev_hash mismatch at index=%zu, chain tampered",
+            AIRY_LOG_ERROR("audit_logger_verify_chain: prev_hash mismatch at index=%zu, chain tampered",
                       i);
             if (out_invalid_index)
                 *out_invalid_index = (int)i;
@@ -484,7 +484,7 @@ bool audit_logger_verify_chain(const audit_entry_t **entries, size_t entry_count
         char recomputed_hash[65];
         audit_compute_chain_hash(entry, expected_prev, recomputed_hash);
         if (memcmp(entry->curr_hash, recomputed_hash, 65) != 0) {
-            LOG_ERROR("audit_logger_verify_chain: curr_hash mismatch at index=%zu, entry tampered "
+            AIRY_LOG_ERROR("audit_logger_verify_chain: curr_hash mismatch at index=%zu, entry tampered "
                       "or corrupted",
                       i);
             if (out_invalid_index)

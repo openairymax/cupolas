@@ -139,6 +139,13 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
                 environ = (char **)attr->env;
             }
         }
+        /* S-7 原生沙箱（Landlock + seccomp）：在 exec 前应用；失败则终止
+         * exec（exit 126 = "命令可执行但无法运行"）。非 Linux 为 no-op。 */
+        if (attr->sandbox && attr->sandbox->enabled) {
+            if (cupolas_sandbox_apply(attr->sandbox) != 0) {
+                _exit(126);
+            }
+        }
         if (attr && attr->env) {
             execve(path, argv, (char *const *)attr->env);
         } else {

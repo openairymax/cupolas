@@ -48,7 +48,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
                         const uint8_t *data, size_t data_len, const cupolas_vault_acl_t *acl)
 {
     if (!vault || !cred_id || !data || data_len == 0) {
-        LOG_ERROR("cupolas_vault_store: NULL/invalid parameter - vault=%p, cred_id=%p, data=%p, "
+        AIRY_LOG_ERROR("cupolas_vault_store: NULL/invalid parameter - vault=%p, cred_id=%p, data=%p, "
                   "data_len=%zu",
                   (void *)vault, (void *)cred_id, (void *)data, data_len);
         return AIRY_ERR_UNKNOWN;
@@ -93,7 +93,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
 
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1 || RAND_bytes(entry->salt, SALT_SIZE) != 1) {
-        LOG_ERROR("cupolas_vault_store: RAND_bytes failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_store: RAND_bytes failed for cred_id=%s", cred_id);
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
@@ -105,7 +105,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        LOG_ERROR("cupolas_vault_store: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_store: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
@@ -136,7 +136,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
-        LOG_ERROR("cupolas_vault_store: AES-GCM encryption failed for cred_id=%s, data_len=%zu",
+        AIRY_LOG_ERROR("cupolas_vault_store: AES-GCM encryption failed for cred_id=%s, data_len=%zu",
                   cred_id, data_len);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
@@ -153,7 +153,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        LOG_ERROR("cupolas_vault_store: GCM tag extraction failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_store: GCM tag extraction failed for cred_id=%s", cred_id);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
@@ -241,7 +241,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
                            uint8_t *data_out, size_t *data_len)
 {
     if (!vault || !cred_id || !data_out || !data_len) {
-        LOG_ERROR("cupolas_vault_retrieve: NULL parameter - vault=%p, cred_id=%p, data_out=%p, "
+        AIRY_LOG_ERROR("cupolas_vault_retrieve: NULL parameter - vault=%p, cred_id=%p, data_out=%p, "
                   "data_len=%p",
                   (void *)vault, (void *)cred_id, (void *)data_out, (void *)data_len);
         return AIRY_ERR_UNKNOWN;
@@ -260,7 +260,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
     }
 
     if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_READ)) {
-        LOG_WARN(
+        AIRY_LOG_WARN(
             "cupolas_vault_retrieve: access denied for agent_id=%s, cred_id=%s, operation=READ",
             agent_id ? agent_id : "(null)", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
@@ -282,26 +282,26 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
 
     int len = 0;
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1) {
-        LOG_ERROR("cupolas_vault_retrieve: DecryptInit failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptInit failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptUpdate(ctx, data_out, &len, entry->encrypted_data, entry->encrypted_len) != 1) {
-        LOG_ERROR("cupolas_vault_retrieve: DecryptUpdate failed for cred_id=%s, encrypted_len=%zu",
+        AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptUpdate failed for cred_id=%s, encrypted_len=%zu",
                   cred_id, entry->encrypted_len);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        LOG_ERROR("cupolas_vault_retrieve: GCM tag set failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_retrieve: GCM tag set failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptFinal_ex(ctx, data_out + len, &len) != 1) {
-        LOG_ERROR("cupolas_vault_retrieve: credential decryption failed (tampered/corrupted) for "
+        AIRY_LOG_ERROR("cupolas_vault_retrieve: credential decryption failed (tampered/corrupted) for "
                   "cred_id=%s",
                   cred_id);
         EVP_CIPHER_CTX_free(ctx);
@@ -324,7 +324,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
 int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char *agent_id)
 {
     if (!vault || !cred_id) {
-        LOG_ERROR("cupolas_vault_delete: NULL parameter - vault=%p, cred_id=%p", (void *)vault,
+        AIRY_LOG_ERROR("cupolas_vault_delete: NULL parameter - vault=%p, cred_id=%p", (void *)vault,
                   (void *)cred_id);
         return AIRY_ERR_UNKNOWN;
     }
@@ -375,13 +375,13 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
                          size_t data_len, const char *agent_id)
 {
     if (!vault || !cred_id || !data) {
-        LOG_ERROR("cupolas_vault_update: NULL parameter - vault=%p, cred_id=%p, data=%p",
+        AIRY_LOG_ERROR("cupolas_vault_update: NULL parameter - vault=%p, cred_id=%p, data=%p",
                   (void *)vault, (void *)cred_id, (void *)data);
         return AIRY_ERR_UNKNOWN;
     }
 
     if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_WRITE)) {
-        LOG_WARN("cupolas_vault_update: access denied for agent_id=%s, cred_id=%s, operation=WRITE",
+        AIRY_LOG_WARN("cupolas_vault_update: access denied for agent_id=%s, cred_id=%s, operation=WRITE",
                  agent_id ? agent_id : "(null)", cred_id);
         return cupolas_ERR_INVALID_PARAM;
     }
@@ -400,14 +400,14 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
 
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1) {
-        LOG_ERROR("cupolas_vault_update: RAND_bytes failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_update: RAND_bytes failed for cred_id=%s", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        LOG_ERROR("cupolas_vault_update: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_update: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -423,7 +423,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1 ||
         EVP_EncryptUpdate(ctx, entry->encrypted_data, &len, data, data_len) != 1 ||
         EVP_EncryptFinal_ex(ctx, entry->encrypted_data + len, &len) != 1) {
-        LOG_ERROR("cupolas_vault_update: AES-GCM encryption failed for cred_id=%s, data_len=%zu",
+        AIRY_LOG_ERROR("cupolas_vault_update: AES-GCM encryption failed for cred_id=%s, data_len=%zu",
                   cred_id, data_len);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
@@ -433,7 +433,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
     }
 
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
-        LOG_ERROR("cupolas_vault_update: GCM tag extraction failed for cred_id=%s", cred_id);
+        AIRY_LOG_ERROR("cupolas_vault_update: GCM tag extraction failed for cred_id=%s", cred_id);
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);

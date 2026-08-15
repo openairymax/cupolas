@@ -38,7 +38,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
                                 cupolas_vault_operation_t operation)
 {
     if (!vault || !cred_id || !agent_id) {
-        LOG_ERROR("cupolas_vault_check_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
+        AIRY_LOG_ERROR("cupolas_vault_check_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
                   (void *)vault, (void *)cred_id, (void *)agent_id);
         return false;
     }
@@ -56,7 +56,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
      * the corresponding operation permissions. */
     if (entry->acl.count == 0) {
         cupolas_rwlock_unlock(&vault->lock);
-        LOG_WARN("cupolas_vault_check_access: no ACL entries for cred_id=%s, access denied by "
+        AIRY_LOG_WARN("cupolas_vault_check_access: no ACL entries for cred_id=%s, access denied by "
                  "default (agent_id=%s)",
                  cred_id, agent_id);
         return false;
@@ -66,7 +66,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
         cupolas_vault_acl_entry_t *acl = &entry->acl.entries[i];
         if (strcmp(acl->agent_id, agent_id) == 0) {
             if (acl->expires_at > 0 && (uint64_t)time(NULL) > acl->expires_at) {
-                LOG_WARN("cupolas_vault_check_access: expired credential detected for agent_id=%s, "
+                AIRY_LOG_WARN("cupolas_vault_check_access: expired credential detected for agent_id=%s, "
                          "cred_id=%s, expires_at=%llu",
                          agent_id, cred_id, (unsigned long long)acl->expires_at);
                 cupolas_rwlock_unlock(&vault->lock);
@@ -81,7 +81,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
     }
 
     cupolas_rwlock_unlock(&vault->lock);
-    LOG_WARN("cupolas_vault_check_access: access denied for agent_id=%s, cred_id=%s, operation=%d",
+    AIRY_LOG_WARN("cupolas_vault_check_access: access denied for agent_id=%s, cred_id=%s, operation=%d",
              agent_id, cred_id, (int)operation);
     return false;
 }
@@ -90,7 +90,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
                                uint32_t operations, uint64_t expires_at)
 {
     if (!vault || !cred_id || !agent_id) {
-        LOG_ERROR("cupolas_vault_grant_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
+        AIRY_LOG_ERROR("cupolas_vault_grant_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
                   (void *)vault, (void *)cred_id, (void *)agent_id);
         return AIRY_ERR_UNKNOWN;
     }
@@ -135,7 +135,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
 int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id)
 {
     if (!vault || !cred_id || !agent_id) {
-        LOG_ERROR("cupolas_vault_revoke_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
+        AIRY_LOG_ERROR("cupolas_vault_revoke_access: NULL parameter - vault=%p, cred_id=%p, agent_id=%p",
                   (void *)vault, (void *)cred_id, (void *)agent_id);
         return AIRY_ERR_UNKNOWN;
     }

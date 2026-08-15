@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "sandbox.h" /* cupolas_sandbox_t: 原生沙箱（Landlock + seccomp，S-7） */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -347,6 +349,7 @@ typedef struct cupolas_process_attr {
     cupolas_pipe_t stdin_pipe;
     cupolas_pipe_t stdout_pipe;
     cupolas_pipe_t stderr_pipe;
+    const cupolas_sandbox_t *sandbox; /* 原生沙箱（S-7）；NULL = 不启用 */
 } cupolas_process_attr_t;
 
 /* Process Interface */

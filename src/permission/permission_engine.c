@@ -190,12 +190,12 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
                             const char *resource, const char *context)
 {
     if (!engine) {
-        LOG_ERROR("permission_engine_check: NULL engine parameter");
+        AIRY_LOG_ERROR("permission_engine_check: NULL engine parameter");
         return 0;
     }
 
     if (!agent_id || !action || !resource) {
-        LOG_ERROR("permission_engine_check: NULL parameter - agent_id=%p, action=%p, resource=%p",
+        AIRY_LOG_ERROR("permission_engine_check: NULL parameter - agent_id=%p, action=%p, resource=%p",
                   (void *)agent_id, (void *)action, (void *)resource);
         return 0;
     }
@@ -208,11 +208,11 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
     int result = rule_manager_match(engine->rules, agent_id, action, resource, context);
 
     if (result < 0) {
-        LOG_ERROR("permission_engine_check: policy evaluation error - agent_id=%s, action=%s, "
+        AIRY_LOG_ERROR("permission_engine_check: policy evaluation error - agent_id=%s, action=%s, "
                   "resource=%s, result=%d",
                   agent_id, action, resource, result);
     } else if (result == 0) {
-        LOG_WARN("permission_engine_check: access denied - agent_id=%s, action=%s, resource=%s",
+        AIRY_LOG_WARN("permission_engine_check: access denied - agent_id=%s, action=%s, resource=%s",
                  agent_id, action, resource);
     }
 
@@ -224,7 +224,7 @@ int permission_engine_check(permission_engine_t *engine, const char *agent_id, c
 int permission_engine_reload(permission_engine_t *engine)
 {
     if (!engine) {
-        LOG_ERROR("permission_engine_reload: NULL engine parameter");
+        AIRY_LOG_ERROR("permission_engine_reload: NULL engine parameter");
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -248,12 +248,12 @@ int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id
                                const char *action, const char *resource, int allow, int priority)
 {
     if (!engine) {
-        LOG_ERROR("permission_engine_add_rule: NULL engine parameter");
+        AIRY_LOG_ERROR("permission_engine_add_rule: NULL engine parameter");
         return cupolas_ERROR_INVALID_ARG;
     }
 
     if (!resource) {
-        LOG_ERROR("permission_engine_add_rule: NULL resource parameter");
+        AIRY_LOG_ERROR("permission_engine_add_rule: NULL resource parameter");
         return cupolas_ERROR_INVALID_ARG;
     }
 
@@ -266,7 +266,7 @@ int permission_engine_add_rule(permission_engine_t *engine, const char *agent_id
 
     int ret = rule_manager_add(engine->rules, agent, act, resource, allow, priority);
     if (ret != cupolas_OK) {
-        LOG_WARN("permission_engine_add_rule: rule conflict or error - agent_id=%s, action=%s, "
+        AIRY_LOG_WARN("permission_engine_add_rule: rule conflict or error - agent_id=%s, action=%s, "
                  "resource=%s, allow=%d, priority=%d, ret=%d",
                  agent, act, resource, allow, priority, ret);
     }

@@ -15,7 +15,6 @@
 
 #include "../../src/platform/platform.h"
 #include "../../src/workbench/workbench.h"
-#include "../../src/workbench/workbench_container.h"
 #include "../../src/workbench/workbench_limits.h"
 
 #include <assert.h>

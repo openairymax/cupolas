@@ -84,7 +84,7 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
 
     config_context_t *cfg = config_context_create("safety_policies");
     if (!cfg)
-        return AIRY_ERR_FAIL;
+        return AIRY_ERR_GENERIC_FAIL;
 
     config_memory_source_options_t mem_opts = {.data = policies_json,
                                                .data_len = strlen(policies_json),
@@ -92,7 +92,7 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
     config_source_t *mem_source = config_source_create_memory(&mem_opts);
     if (!mem_source) {
         config_context_destroy(cfg);
-        return AIRY_ERR_FAIL;
+        return AIRY_ERR_GENERIC_FAIL;
     }
     config_error_t err = config_service_load(cfg, &mem_source, 1);
     if (err != CONFIG_SUCCESS) {
@@ -162,7 +162,7 @@ int safety_guard_load_policies(safety_guard_context_t *ctx, const char *policies
 
     config_source_destroy(mem_source);
     config_context_destroy(cfg);
-    return loaded > 0 ? 0 : AIRY_ERR_FAIL;
+    return loaded > 0 ? 0 : AIRY_ERR_GENERIC_FAIL;
 }
 
 int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *policy_a_id,

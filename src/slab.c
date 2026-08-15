@@ -152,7 +152,7 @@ static slab_page_t *slab_page_create(airy_slab_t *slab)
 
     slab_page_t *page = (slab_page_t *)AIRY_CALLOC(1, total_size);
     if (!page) {
-        LOG_ERROR("Slab: OOM creating page (obj_size=%zu, objs_per_page=%zu, "
+        AIRY_LOG_ERROR("Slab: OOM creating page (obj_size=%zu, objs_per_page=%zu, "
                   "total_size=%zu)",
                   slab->obj_size, slab->objs_per_page, total_size);
         return NULL;
@@ -172,7 +172,7 @@ static slab_page_t *slab_page_create(airy_slab_t *slab)
     void **last_ptr = (void **)(obj + (slab->objs_per_page - 1) * slab->obj_size);
     *last_ptr = NULL;
 
-    LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)", slab->obj_size,
+    AIRY_LOG_DEBUG("Slab: created page (obj_size=%zu, objs=%zu, total_pages=%zu)", slab->obj_size,
               slab->objs_per_page, slab->total_pages + 1);
 
     return page;
@@ -266,13 +266,13 @@ airy_slab_t *airy_slab_create(size_t obj_size, size_t objs_per_slab, airy_slab_c
                               airy_slab_dtor_t dtor, void *user_data)
 {
     if (obj_size == 0) {
-        LOG_ERROR("Slab: create called with obj_size=0");
+        AIRY_LOG_ERROR("Slab: create called with obj_size=0");
         return NULL;
     }
 
     airy_slab_t *slab = (airy_slab_t *)AIRY_CALLOC(1, sizeof(*slab));
     if (!slab) {
-        LOG_ERROR("Slab: OOM allocating slab struct");
+        AIRY_LOG_ERROR("Slab: OOM allocating slab struct");
         return NULL;
     }
 
@@ -293,12 +293,12 @@ airy_slab_t *airy_slab_create(size_t obj_size, size_t objs_per_slab, airy_slab_c
     slab->cpu_count = SLAB_MAX_CPUS;
 
     if (slab_mutex_init(slab) != 0) {
-        LOG_ERROR("Slab: mutex init failed");
+        AIRY_LOG_ERROR("Slab: mutex init failed");
         AIRY_FREE(slab);
         return NULL;
     }
 
-    LOG_INFO("Slab: created (obj_size=%zu, aligned=%zu, objs_per_page=%zu, "
+    AIRY_LOG_INFO("Slab: created (obj_size=%zu, aligned=%zu, objs_per_page=%zu, "
              "page_size=%zu, ctor=%s, dtor=%s)",
              obj_size, slab->obj_size, slab->objs_per_page, slab->page_size, ctor ? "yes" : "no",
              dtor ? "yes" : "no");
@@ -311,7 +311,7 @@ void airy_slab_destroy(airy_slab_t *slab)
     if (!slab)
         return;
 
-    LOG_INFO("Slab: destroying (total_pages=%zu, total_allocs=%zu, "
+    AIRY_LOG_INFO("Slab: destroying (total_pages=%zu, total_allocs=%zu, "
              "total_frees=%zu, active=%zu, steals=%zu)",
              slab->total_pages, slab->total_allocs, slab->total_frees,
              slab->total_allocs - slab->total_frees, slab->cpu_steals);
@@ -335,7 +335,7 @@ void airy_slab_destroy(airy_slab_t *slab)
     slab_mutex_destroy(slab);
     AIRY_FREE(slab);
 
-    LOG_INFO("Slab: destroyed (%zu pages freed)", freed_pages);
+    AIRY_LOG_INFO("Slab: destroyed (%zu pages freed)", freed_pages);
 }
 
 void *airy_slab_alloc(airy_slab_t *slab)
@@ -356,11 +356,11 @@ void *airy_slab_alloc(airy_slab_t *slab)
             slab->total_allocs++;
             if (slab->ctor)
                 slab->ctor(obj, slab->ctor_user_data);
-            LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)", cpu, slab->total_allocs);
+            AIRY_LOG_DEBUG("Slab: alloc from CPU%d cache (total_allocs=%zu)", cpu, slab->total_allocs);
             return obj;
         }
 
-        LOG_DEBUG("Slab: CPU%d partial page full, returning to global chain", cpu);
+        AIRY_LOG_DEBUG("Slab: CPU%d partial page full, returning to global chain", cpu);
         slab_return_partial_page(slab, cache->partial);
         cache->partial = NULL;
     }
@@ -373,14 +373,14 @@ void *airy_slab_alloc(airy_slab_t *slab)
             slab->total_allocs++;
             if (slab->ctor)
                 slab->ctor(obj, slab->ctor_user_data);
-            LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)", cpu, slab->cpu_steals);
+            AIRY_LOG_DEBUG("Slab: alloc from stolen page CPU%d (steals=%zu)", cpu, slab->cpu_steals);
             return obj;
         }
     }
 
     slab_page_t *new_page = slab_page_create(slab);
     if (!new_page) {
-        LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)", slab->total_pages);
+        AIRY_LOG_WARN("Slab: page allocation failed, OOM (total_pages=%zu)", slab->total_pages);
         return NULL;
     }
 
@@ -394,11 +394,11 @@ void *airy_slab_alloc(airy_slab_t *slab)
         slab->total_allocs++;
         if (slab->ctor)
             slab->ctor(obj, slab->ctor_user_data);
-        LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)", cpu, slab->total_pages);
+        AIRY_LOG_DEBUG("Slab: alloc from new page CPU%d (total_pages=%zu)", cpu, slab->total_pages);
         return obj;
     }
 
-    LOG_ERROR("Slab: new page created but pop returned NULL");
+    AIRY_LOG_ERROR("Slab: new page created but pop returned NULL");
     slab_page_destroy(new_page);
     slab->total_pages--;
     return NULL;
@@ -424,7 +424,7 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
         slab->total_frees++;
 
         if (cache->partial->state == SLAB_PAGE_EMPTY) {
-            LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain", cpu);
+            AIRY_LOG_DEBUG("Slab: CPU%d partial page empty, returning to global chain", cpu);
             slab_return_partial_page(slab, cache->partial);
             cache->partial = NULL;
         }
@@ -450,7 +450,7 @@ void airy_slab_free(airy_slab_t *slab, void *obj)
         return;
     }
 
-    LOG_ERROR("Slab: cannot allocate new page for free, object leaked! "
+    AIRY_LOG_ERROR("Slab: cannot allocate new page for free, object leaked! "
               "(total_frees=%zu, total_allocs=%zu)",
               slab->total_frees, slab->total_allocs);
 }
@@ -512,9 +512,9 @@ size_t airy_slab_shrink(airy_slab_t *slab)
     slab_mutex_unlock(slab);
 
     if (freed > 0) {
-        LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)", freed, slab->total_pages);
+        AIRY_LOG_INFO("Slab: shrink freed %zu empty pages (total_pages=%zu)", freed, slab->total_pages);
     } else {
-        LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)", slab->total_pages);
+        AIRY_LOG_DEBUG("Slab: shrink found no empty pages (total_pages=%zu)", slab->total_pages);
     }
 
     return freed;

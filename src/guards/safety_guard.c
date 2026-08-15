@@ -97,7 +97,7 @@ int safety_guard_register_guard(safety_guard_context_t *ctx,
     if (!ctx || !descriptor)
         return AIRY_ERR_INVALID_PARAM;
     if (ctx->guard_count >= ctx->guard_capacity)
-        return AIRY_ERR_FAIL;
+        return AIRY_ERR_GENERIC_FAIL;
 
     guard_entry_t *entry = &ctx->guards[ctx->guard_count];
     __builtin_memcpy(&entry->descriptor, descriptor, sizeof(*descriptor));
