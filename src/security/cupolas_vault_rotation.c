@@ -64,20 +64,20 @@ int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_gro
                                     "INVALID";
 
     if (!vault || !cred_group || !selected_id || id_buf_size == 0) {
-        LOG_ERROR("cupolas_vault_rotate: invalid parameter - vault=%p, "
+        AIRY_LOG_ERROR("cupolas_vault_rotate: invalid parameter - vault=%p, "
                   "cred_group=%s, selected_id=%p, id_buf_size=%zu",
                   (void *)vault, cred_group ? cred_group : "(null)", (void *)selected_id,
                   id_buf_size);
         return cupolas_ERR_INVALID_PARAM;
     }
-    LOG_DEBUG("cupolas_vault_rotate: begin - group=%s strategy=%s(%d) id_buf_size=%zu", cred_group,
+    AIRY_LOG_DEBUG("cupolas_vault_rotate: begin - group=%s strategy=%s(%d) id_buf_size=%zu", cred_group,
               strategy_name, (int)strategy, id_buf_size);
 
     cupolas_rwlock_rdlock(&vault->lock);
 
     if (vault->is_locked) {
         cupolas_rwlock_unlock(&vault->lock);
-        LOG_WARN("cupolas_vault_rotate: vault locked, group=%s strategy=%s "
+        AIRY_LOG_WARN("cupolas_vault_rotate: vault locked, group=%s strategy=%s "
                  "— unlock first",
                  cred_group, strategy_name);
         return cupolas_ERR_PERMISSION_DENIED;
@@ -123,13 +123,13 @@ int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_gro
             break;
         default:
             cupolas_rwlock_unlock(&vault->lock);
-            LOG_ERROR("cupolas_vault_rotate: invalid strategy=%d for group=%s", (int)strategy,
+            AIRY_LOG_ERROR("cupolas_vault_rotate: invalid strategy=%d for group=%s", (int)strategy,
                       cred_group);
             return cupolas_ERR_INVALID_PARAM;
         }
 
         candidate_count++;
-        LOG_DEBUG("cupolas_vault_rotate: candidate[%zu] cred_id=%s score=%llu", candidate_count,
+        AIRY_LOG_DEBUG("cupolas_vault_rotate: candidate[%zu] cred_id=%s score=%llu", candidate_count,
                   entry->cred_id, (unsigned long long)score);
         if (!found || score < best_score) {
             best_idx = i;
@@ -141,7 +141,7 @@ int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_gro
     cupolas_rwlock_unlock(&vault->lock);
 
     if (!found) {
-        LOG_WARN("cupolas_vault_rotate: no credential matches group prefix "
+        AIRY_LOG_WARN("cupolas_vault_rotate: no credential matches group prefix "
                  "'%s' (entries=%zu, strategy=%s) — check cred_id prefix",
                  cred_group, vault->entry_count, strategy_name);
         return cupolas_ERR_NOT_FOUND;
@@ -149,13 +149,13 @@ int cupolas_vault_rotate_credential(cupolas_vault_t *vault, const char *cred_gro
 
     const char *selected = vault->entries[best_idx].cred_id;
     if (strlen(selected) >= id_buf_size) {
-        LOG_ERROR("cupolas_vault_rotate: selected_id too long (len=%zu, buf=%zu) "
+        AIRY_LOG_ERROR("cupolas_vault_rotate: selected_id too long (len=%zu, buf=%zu) "
                   "for cred_id=%s group=%s",
                   strlen(selected), id_buf_size, selected, cred_group);
         return cupolas_ERR_OVERFLOW;
     }
     snprintf(selected_id, id_buf_size, "%s", selected);
-    LOG_INFO("cupolas_vault_rotate: selected=%s group=%s strategy=%s "
+    AIRY_LOG_INFO("cupolas_vault_rotate: selected=%s group=%s strategy=%s "
              "candidates=%zu score=%llu",
              selected, cred_group, strategy_name, candidate_count, (unsigned long long)best_score);
     return cupolas_ERR_OK;

@@ -415,46 +415,46 @@ CUPOLAS_API int cupolas_guards_register_hooks(void)
         return CUPOLAS_OK;
     }
 
-    LOG_INFO("[GUARD] Registering safety hooks to Cupolas components...");
+    AIRY_LOG_INFO("[GUARD] Registering safety hooks to Cupolas components...");
 
     int registered_count = 0;
 
 #ifdef CUPOLAS_HAS_PERMISSION_HOOK
     if (permission_register_post_check_hook(permission_guard_hook) == 0) {
         registered_count++;
-        LOG_INFO("[GUARD] Permission post-check hook registered");
+        AIRY_LOG_INFO("[GUARD] Permission post-check hook registered");
     } else {
-        LOG_ERROR("[GUARD] Failed to register permission hook");
+        AIRY_LOG_ERROR("[GUARD] Failed to register permission hook");
     }
 #endif
 
 #ifdef CUPOLAS_HAS_WORKBENCH_HOOK
     if (workbench_register_pre_exec_hook(command_execution_guard_hook) == 0) {
         registered_count++;
-        LOG_INFO("[GUARD] Workbench pre-execution hook registered");
+        AIRY_LOG_INFO("[GUARD] Workbench pre-execution hook registered");
     } else {
-        LOG_ERROR("[GUARD] Failed to register workbench hook");
+        AIRY_LOG_ERROR("[GUARD] Failed to register workbench hook");
     }
 #endif
 
 #ifdef CUPOLAS_HAS_SANITIZER_HOOK
     if (sanitizer_register_post_process_hook(sanitizer_guard_hook) == 0) {
         registered_count++;
-        LOG_INFO("[GUARD] Sanitizer post-process hook registered");
+        AIRY_LOG_INFO("[GUARD] Sanitizer post-process hook registered");
     } else {
-        LOG_ERROR("[GUARD] Failed to register sanitizer hook");
+        AIRY_LOG_ERROR("[GUARD] Failed to register sanitizer hook");
     }
 #endif
 
     if (registered_count > 0) {
         hooks_registered = 1;
         g_guards_enabled = true;
-        LOG_INFO("[GUARD] Successfully registered %d safety hooks", registered_count);
+        AIRY_LOG_INFO("[GUARD] Successfully registered %d safety hooks", registered_count);
         return CUPOLAS_OK;
     }
 
-    LOG_WARN("[GUARD] Warning: No hooks registered (component hook APIs not available)");
-    LOG_INFO("[GUARD] Guards will work in standalone mode (explicit checks only)");
+    AIRY_LOG_WARN("[GUARD] Warning: No hooks registered (component hook APIs not available)");
+    AIRY_LOG_INFO("[GUARD] Guards will work in standalone mode (explicit checks only)");
     return CUPOLAS_OK;
 }
 
@@ -463,23 +463,23 @@ CUPOLAS_API int cupolas_guards_register_hooks(void)
  */
 CUPOLAS_API void cupolas_guards_unregister_hooks(void)
 {
-    LOG_INFO("[GUARD] Unregistering safety hooks from Cupolas components...");
+    AIRY_LOG_INFO("[GUARD] Unregistering safety hooks from Cupolas components...");
 
 #ifdef CUPOLAS_HAS_PERMISSION_HOOK
     permission_unregister_post_check_hook();
-    LOG_INFO("[GUARD] Permission hook unregistered");
+    AIRY_LOG_INFO("[GUARD] Permission hook unregistered");
 #endif
 
 #ifdef CUPOLAS_HAS_WORKBENCH_HOOK
     workbench_unregister_pre_exec_hook();
-    LOG_INFO("[GUARD] Workbench hook unregistered");
+    AIRY_LOG_INFO("[GUARD] Workbench hook unregistered");
 #endif
 
 #ifdef CUPOLAS_HAS_SANITIZER_HOOK
     sanitizer_unregister_post_process_hook();
-    LOG_INFO("[GUARD] Sanitizer hook unregistered");
+    AIRY_LOG_INFO("[GUARD] Sanitizer hook unregistered");
 #endif
 
     g_guards_enabled = false;
-    LOG_INFO("[GUARD] All safety hooks unregistered");
+    AIRY_LOG_INFO("[GUARD] All safety hooks unregistered");
 }

@@ -33,7 +33,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
     }
 
     if (ctx->quota_count >= ctx->quota_capacity)
-        return AIRY_ERR_FAIL;
+        return AIRY_ERR_GENERIC_FAIL;
     safety_quota_t *q = &ctx->quotas[ctx->quota_count];
     snprintf(q->resource_id, sizeof(q->resource_id), "%s", resource_id);
     q->limit = limit;

@@ -25,10 +25,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* GNU ld 提供的段边界符号：仅 Linux 存在（macOS ld64 用 _etext/_edata，
+ * Windows 无这些符号）。非 Linux 平台令 CUPOLAS_HAVE_SEG_SYMBOLS=0，
+ * 哈希计算走下方 dladdr 后备路径，避免链接失败。 */
+#if defined(__linux__)
 extern char __executable_start[];
 extern char __etext[];
 extern char __data_start[];
 extern char __edata[];
+#define CUPOLAS_HAVE_SEG_SYMBOLS 1
+#else
+#define CUPOLAS_HAVE_SEG_SYMBOLS 0
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -723,8 +731,13 @@ int cupolas_integrity_compute_code_hash(uint8_t *hash_out)
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
+#if CUPOLAS_HAVE_SEG_SYMBOLS
     uintptr_t text_start = (uintptr_t)__executable_start;
     uintptr_t text_end = (uintptr_t)__etext;
+#else
+    uintptr_t text_start = 0;
+    uintptr_t text_end = 0;
+#endif
 
     if (text_end > text_start && (text_end - text_start) < 256 * 1024 * 1024) {
         size_t code_size = (size_t)(text_end - text_start);
@@ -774,8 +787,13 @@ int cupolas_integrity_verify_data(const uint8_t *expected_hash)
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
+#if CUPOLAS_HAVE_SEG_SYMBOLS
     uintptr_t data_start = (uintptr_t)__data_start;
     uintptr_t data_end = (uintptr_t)__edata;
+#else
+    uintptr_t data_start = 0;
+    uintptr_t data_end = 0;
+#endif
 
     if (data_end > data_start && (data_end - data_start) < 256 * 1024 * 1024) {
         size_t data_size = (size_t)(data_end - data_start);

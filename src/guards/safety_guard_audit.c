@@ -30,7 +30,7 @@ int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t 
         if (new_cap > SAFETY_MAX_AUDIT_ENTRIES)
             new_cap = SAFETY_MAX_AUDIT_ENTRIES;
         if (ctx->audit_count >= new_cap)
-            return AIRY_ERR_FAIL;
+            return AIRY_ERR_GENERIC_FAIL;
 
         safety_audit_entry_t *new_entries =
             (safety_audit_entry_t *)AIRY_REALLOC(ctx->audit_entries,

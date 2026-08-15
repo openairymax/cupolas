@@ -185,7 +185,7 @@ int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const 
     fclose(f);
 
     if (vault->config.enable_audit) {
-        LOG_INFO("[VAULT] Export completed: %zu credentials to %s", vault->entry_count,
+        AIRY_LOG_INFO("[VAULT] Export completed: %zu credentials to %s", vault->entry_count,
                  export_path);
     }
 
@@ -531,7 +531,7 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
     fclose(f);
 
     if (vault->config.enable_audit) {
-        LOG_INFO("[VAULT] Import completed: %zu credentials from %s", imported, import_path);
+        AIRY_LOG_INFO("[VAULT] Import completed: %zu credentials from %s", imported, import_path);
     }
 
     return (int)imported;

@@ -48,6 +48,7 @@ set(CUPOLAS_SOURCES
     src/platform/platform_fs.c
     src/platform/platform_mem.c
     src/platform/platform_util.c
+    src/platform/sandbox.c
     src/utils/cupolas_utils.c
     src/cupolas_metrics.c
     src/cupolas_config.c
@@ -63,7 +64,6 @@ set(CUPOLAS_SOURCES
     src/sanitizer/sanitizer_rules.c
     src/sanitizer/sanitizer_cache.c
     src/workbench/workbench.c
-    src/workbench/workbench_container.c
     src/workbench/workbench_limits.c
     src/security/cupolas_error.c
     src/security/network/http_security.c
@@ -115,6 +115,7 @@ set(CUPOLAS_HEADERS
     src/cupolas_config.h
     src/cupolas_monitoring.h
     src/platform/platform.h
+    src/platform/sandbox.h
     src/permission/permission.h
     src/permission/permission_engine.h
     src/permission/permission_rule.h
@@ -128,7 +129,6 @@ set(CUPOLAS_HEADERS
     src/sanitizer/sanitizer_cache.h
     src/workbench/workbench.h
     src/workbench/workbench_process.h
-    src/workbench/workbench_container.h
     src/workbench/workbench_limits.h
     src/security/cupolas_signature.h
     src/security/cupolas_vault.h
@@ -241,20 +241,35 @@ else()
         -fvisibility=hidden
     )
 
-    target_link_options(cupolas PRIVATE
-        -Wl,-z,relro
-        -Wl,-z,now
-        -Wl,-z,noexecstack
-    )
+    # 加固链接选项：-Wl,-z,* 为 GNU ld 专有，macOS ld64 报 unknown option，
+    # Apple 平台改用 -Wl,-dead_strip（对齐 coreloopthree 写法）。
+    if(UNIX AND NOT APPLE)
+        target_link_options(cupolas PRIVATE
+            -Wl,-z,relro
+            -Wl,-z,now
+            -Wl,-z,noexecstack
+        )
+    elseif(APPLE)
+        target_link_options(cupolas PRIVATE -Wl,-dead_strip)
+    endif()
 
     if(BUILD_WITH_SANITIZERS)
-        target_compile_options(cupolas PRIVATE
-            -fsanitize=address,undefined,leak
-            -fno-omit-frame-pointer
-        )
-        target_link_options(cupolas PRIVATE
-            -fsanitize=address,undefined,leak
-        )
+        # LSan（leak）仅 Linux 可用：macOS clang 链接期报
+        # "unsupported option '-fsanitize=leak'"（对齐顶层 CMakeLists.txt 处理）
+        if(APPLE)
+            target_compile_options(cupolas PRIVATE
+                -fsanitize=address,undefined -fno-omit-frame-pointer
+            )
+            target_link_options(cupolas PRIVATE -fsanitize=address,undefined)
+        else()
+            target_compile_options(cupolas PRIVATE
+                -fsanitize=address,undefined,leak
+                -fno-omit-frame-pointer
+            )
+            target_link_options(cupolas PRIVATE
+                -fsanitize=address,undefined,leak
+            )
+        endif()
     endif()
 endif()
 
@@ -291,6 +306,17 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_error_code_consistency cupolas)
 
+    # S-7 (0.1.2): 原生沙箱（Landlock + seccomp）单元测试。
+    # 内核不支持 Landlock 时 enabled 用例自动 SKIP，不误报失败。
+    add_executable(test_sandbox tests/unit/test_sandbox.c)
+    target_compile_definitions(test_sandbox PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_sandbox PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_sandbox cupolas)
+
     # test_cupolas_integration disabled: uses deprecated printf which conflicts with global -Werror
     # add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
     # ...
@@ -308,6 +334,7 @@ if(BUILD_TESTS)
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME error_code_consistency_tests COMMAND test_error_code_consistency)
+    add_test(NAME sandbox_tests COMMAND test_sandbox)
     # add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
     # add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
     # add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)  # disabled: requires OpenSSL

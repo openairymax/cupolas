@@ -4,6 +4,15 @@
 /*
  *
  * workbench_container.h - Container Runtime Implementation: Docker/runc-based Isolated Execution
+ *
+ * @attention 实验性备用实现（SSoT 收敛 S-7，2026-08-14）：
+ *   本模块基于外部 docker CLI（exec/run/pull/stop/rm/pause/...），自 0.1.1 起
+ *   无任何生产接线（全仓零调用，仅历史空壳测试引用），且执行后端与
+ *   workbench.c 的进程模式（fork/execvp + workbench_limits）构成双权威。
+ *   按 Unify Design SSoT 单一权威源原则，执行后端的唯一权威为 workbench.c
+ *   进程模式；本模块已从 cupolas 构建中移除（不再编译/安装），源文件保留
+ *   供未来"原生容器运行时（runc/libcontainer）后端"或"Landlock 原生沙箱"
+ *   落地时参考，不作为当前运行时的一部分。
  */
 
 #ifndef CUPOLAS_WORKBENCH_CONTAINER_H

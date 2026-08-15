@@ -186,7 +186,11 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
     }
 
     while (atomic_load(&g_vault_ctx.initialized) != VLT_INIT_COMPLETE) {
+#if defined(_WIN32)
+        SwitchToThread();
+#else
         sched_yield();
+#endif
     }
     return 0;
 }
@@ -204,7 +208,7 @@ void cupolas_vault_cleanup(void)
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault)
 {
     if (!vault_id || !vault) {
-        LOG_ERROR("cupolas_vault_open: NULL parameter - vault_id=%p, vault=%p", (void *)vault_id,
+        AIRY_LOG_ERROR("cupolas_vault_open: NULL parameter - vault_id=%p, vault=%p", (void *)vault_id,
                   (void *)vault);
         return AIRY_ERR_UNKNOWN;
     }
@@ -215,14 +219,14 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
 
     cupolas_vault_t *v = (cupolas_vault_t *)AIRY_CALLOC(1, sizeof(cupolas_vault_t));
     if (!v) {
-        LOG_ERROR("cupolas_vault_open: CALLOC vault failed for vault_id=%s", vault_id);
+        AIRY_LOG_ERROR("cupolas_vault_open: CALLOC vault failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
 
     v->vault_id = AIRY_STRDUP(vault_id);
     if (!v->vault_id) {
         AIRY_FREE(v);
-        LOG_ERROR("cupolas_vault_open: STRDUP vault_id failed for vault_id=%s", vault_id);
+        AIRY_LOG_ERROR("cupolas_vault_open: STRDUP vault_id failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
     v->is_locked = (password == NULL);
@@ -231,7 +235,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     if (!v->entries) {
         AIRY_FREE(v->vault_id);
         AIRY_FREE(v);
-        LOG_ERROR("cupolas_vault_open: CALLOC entries failed for vault_id=%s", vault_id);
+        AIRY_LOG_ERROR("cupolas_vault_open: CALLOC entries failed for vault_id=%s", vault_id);
         return AIRY_ERR_UNKNOWN;
     }
     v->entry_count = 0;
@@ -251,7 +255,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
             AIRY_FREE(v->entries);
             AIRY_FREE(v->vault_id);
             AIRY_FREE(v);
-            LOG_ERROR("cupolas_vault_open: PBKDF2 key derivation failed for vault_id=%s", vault_id);
+            AIRY_LOG_ERROR("cupolas_vault_open: PBKDF2 key derivation failed for vault_id=%s", vault_id);
             return AIRY_ERR_UNKNOWN;
         }
 #else
@@ -303,7 +307,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
 int cupolas_vault_lock(cupolas_vault_t *vault)
 {
     if (!vault) {
-        LOG_ERROR("cupolas_vault_lock: NULL vault parameter");
+        AIRY_LOG_ERROR("cupolas_vault_lock: NULL vault parameter");
         return AIRY_ERR_UNKNOWN;
     }
 
@@ -318,7 +322,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
 int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
 {
     if (!vault || !password) {
-        LOG_ERROR("cupolas_vault_unlock: NULL parameter - vault=%p, password=%p", (void *)vault,
+        AIRY_LOG_ERROR("cupolas_vault_unlock: NULL parameter - vault=%p, password=%p", (void *)vault,
                   (void *)password);
         return AIRY_ERR_UNKNOWN;
     }
@@ -333,13 +337,13 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                           AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);
-        LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s",
+        AIRY_LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s",
                   vault->vault_id ? vault->vault_id : "(null)");
         return AIRY_ERR_UNKNOWN;
     }
 #else
     cupolas_rwlock_unlock(&vault->lock);
-    LOG_ERROR("cupolas_vault_unlock: crypto unavailable for vault_id=%s",
+    AIRY_LOG_ERROR("cupolas_vault_unlock: crypto unavailable for vault_id=%s",
               vault->vault_id ? vault->vault_id : "(null)");
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif

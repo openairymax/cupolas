@@ -60,6 +60,7 @@ typedef struct workbench_config {
     bool redirect_stderr;
     workbench_limits_t limits; /* Resource limits */
     bool enable_limits; /* Enable resource control */
+    cupolas_sandbox_t sandbox; /* 原生沙箱（S-7：Landlock + seccomp）；enabled=0 关闭 */
 } workbench_config_t;
 
 /* Workbench Execution Result */

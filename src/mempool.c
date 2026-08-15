@@ -270,7 +270,7 @@ airy_mempool_t *airy_mempool_create(size_t reserve_size, size_t block_size, size
 {
     airy_mempool_t *pool = (airy_mempool_t *)AIRY_CALLOC(1, sizeof(*pool));
     if (!pool) {
-        LOG_ERROR("Mempool: OOM allocating pool struct");
+        AIRY_LOG_ERROR("Mempool: OOM allocating pool struct");
         return NULL;
     }
 
@@ -278,38 +278,38 @@ airy_mempool_t *airy_mempool_create(size_t reserve_size, size_t block_size, size
     pool->block_size = MEMPOOL_ALIGN(block_size > 0 ? block_size : MEMPOOL_DEFAULT_BLOCK_SIZE);
     pool->block_count = block_count > 0 ? block_count : MEMPOOL_DEFAULT_BLOCK_COUNT;
 
-    LOG_INFO("Mempool: creating (reserve=%zuMB, block_size=%zu, block_count=%zu)",
+    AIRY_LOG_INFO("Mempool: creating (reserve=%zuMB, block_size=%zu, block_count=%zu)",
              pool->reserve_size / (1024 * 1024), pool->block_size, pool->block_count);
 
     pool->reserve_base = AIRY_CALLOC(1, pool->reserve_size);
     if (!pool->reserve_base) {
-        LOG_ERROR("Mempool: OOM allocating reserve pool (%zuMB)",
+        AIRY_LOG_ERROR("Mempool: OOM allocating reserve pool (%zuMB)",
                   pool->reserve_size / (1024 * 1024));
         AIRY_FREE(pool);
         return NULL;
     }
 
-    LOG_INFO("Mempool: reserve pool allocated at %p (%zuMB)", pool->reserve_base,
+    AIRY_LOG_INFO("Mempool: reserve pool allocated at %p (%zuMB)", pool->reserve_base,
              pool->reserve_size / (1024 * 1024));
 
     if (mempool_init_blocks(pool) != 0) {
-        LOG_ERROR("Mempool: failed to init object pool blocks");
+        AIRY_LOG_ERROR("Mempool: failed to init object pool blocks");
         AIRY_FREE(pool->reserve_base);
         AIRY_FREE(pool);
         return NULL;
     }
 
-    LOG_INFO("Mempool: object pool initialized (%zu blocks of %zu bytes)", pool->block_count,
+    AIRY_LOG_INFO("Mempool: object pool initialized (%zu blocks of %zu bytes)", pool->block_count,
              pool->block_size);
 
     if (mempool_mutex_init(pool) != 0) {
-        LOG_ERROR("Mempool: mutex init failed");
+        AIRY_LOG_ERROR("Mempool: mutex init failed");
         AIRY_FREE(pool->reserve_base);
         AIRY_FREE(pool);
         return NULL;
     }
 
-    LOG_INFO("Mempool: created successfully");
+    AIRY_LOG_INFO("Mempool: created successfully");
     return pool;
 }
 
@@ -318,7 +318,7 @@ void airy_mempool_destroy(airy_mempool_t *pool)
     if (!pool)
         return;
 
-    LOG_INFO("Mempool: destroying (total_allocs=%zu, total_frees=%zu, "
+    AIRY_LOG_INFO("Mempool: destroying (total_allocs=%zu, total_frees=%zu, "
              "oom_rejections=%zu, emergency_allocs=%zu, "
              "reserve_used=%zu/%zu, blocks_used=%zu/%zu)",
              pool->total_allocs, pool->total_frees, pool->oom_rejections, pool->emergency_allocs,
@@ -346,13 +346,13 @@ void airy_mempool_destroy(airy_mempool_t *pool)
 
     AIRY_FREE(pool);
 
-    LOG_INFO("Mempool: destroyed (%zu alloc records freed)", alloc_records);
+    AIRY_LOG_INFO("Mempool: destroyed (%zu alloc records freed)", alloc_records);
 }
 
 void *airy_mempool_alloc(airy_mempool_t *pool, size_t size, airy_mempool_priority_t priority)
 {
     if (!pool || size == 0) {
-        LOG_DEBUG("Mempool: alloc called with NULL pool or size=0");
+        AIRY_LOG_DEBUG("Mempool: alloc called with NULL pool or size=0");
         return NULL;
     }
 
@@ -370,7 +370,7 @@ void *airy_mempool_alloc(airy_mempool_t *pool, size_t size, airy_mempool_priorit
         ptr = mempool_block_alloc(pool);
         if (ptr) {
             pool->total_allocs++;
-            LOG_DEBUG("Mempool: alloc from object pool (size=%zu, "
+            AIRY_LOG_DEBUG("Mempool: alloc from object pool (size=%zu, "
                       "priority=%d, free_blocks=%zu)",
                       aligned_size, priority, pool->free_blocks);
             mempool_mutex_unlock(pool);
@@ -391,17 +391,17 @@ void *airy_mempool_alloc(airy_mempool_t *pool, size_t size, airy_mempool_priorit
             pool->alloc_list = record;
         }
 
-        LOG_DEBUG("Mempool: alloc from reserve pool (size=%zu, "
+        AIRY_LOG_DEBUG("Mempool: alloc from reserve pool (size=%zu, "
                   "priority=%d, watermark=%d, reserve_used=%zu/%zu)",
                   aligned_size, priority, wm, pool->reserve_used, pool->reserve_size);
 
         if (priority == MEMPOOL_PRIORITY_CRITICAL) {
-            LOG_WARN("Mempool: emergency allocation (size=%zu, "
+            AIRY_LOG_WARN("Mempool: emergency allocation (size=%zu, "
                      "watermark=%d, reserve_used=%zu/%zu)",
                      aligned_size, wm, pool->reserve_used, pool->reserve_size);
         }
     } else {
-        LOG_WARN("Mempool: alloc rejected (size=%zu, priority=%d, "
+        AIRY_LOG_WARN("Mempool: alloc rejected (size=%zu, priority=%d, "
                  "watermark=%d, reserve_used=%zu/%zu, oom_rejections=%zu)",
                  aligned_size, priority, wm, pool->reserve_used, pool->reserve_size,
                  pool->oom_rejections + 1);
@@ -421,7 +421,7 @@ void airy_mempool_free(airy_mempool_t *pool, void *ptr)
     if (mempool_is_block_ptr(pool, ptr)) {
         mempool_block_free(pool, ptr);
         pool->total_frees++;
-        LOG_DEBUG("Mempool: free to object pool (free_blocks=%zu)", pool->free_blocks);
+        AIRY_LOG_DEBUG("Mempool: free to object pool (free_blocks=%zu)", pool->free_blocks);
         mempool_mutex_unlock(pool);
         return;
     }
@@ -445,9 +445,9 @@ void airy_mempool_free(airy_mempool_t *pool, void *ptr)
             prev = &(*prev)->next;
         }
 
-        LOG_DEBUG("Mempool: free from reserve pool (reserve_used=%zu)", pool->reserve_used);
+        AIRY_LOG_DEBUG("Mempool: free from reserve pool (reserve_used=%zu)", pool->reserve_used);
     } else {
-        LOG_WARN("Mempool: free called with ptr not owned by pool %p", ptr);
+        AIRY_LOG_WARN("Mempool: free called with ptr not owned by pool %p", ptr);
     }
 
     mempool_mutex_unlock(pool);
