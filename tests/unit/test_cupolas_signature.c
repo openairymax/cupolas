@@ -8,6 +8,9 @@
 
 #include "security/cupolas_signature.h"
 
+/* AIRY_MEMSET 等安全内存宏 */
+#include "airy_memory.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
