@@ -92,6 +92,11 @@ TEST(test_vault_store_and_retrieve)
                                            secret_len, NULL);
     ASSERT(store_result == 0, "Store secret should succeed");
 
+    /* vault 默认拒绝无 ACL 的访问：先授予 test_agent READ 权限再检索 */
+    int grant_result = cupolas_vault_grant_access(g_vault, cred_id, "test_agent",
+                                                  CUPOLAS_VAULT_OP_READ, 0);
+    ASSERT(grant_result == 0, "Grant READ access should succeed");
+
     uint8_t retrieved[256];
     size_t retrieved_len = sizeof(retrieved);
     int retrieve_result =
@@ -148,6 +153,11 @@ TEST(test_vault_delete)
     int store_result = cupolas_vault_store(g_vault, cred_id, CUPOLAS_VAULT_CRED_PASSWORD, secret,
                                            strlen((const char *)secret), NULL);
     ASSERT(store_result == 0, "Store should succeed");
+
+    /* 删除受 ACL 保护：先授予 test_agent DELETE 权限 */
+    int grant_result = cupolas_vault_grant_access(g_vault, cred_id, "test_agent",
+                                                  CUPOLAS_VAULT_OP_DELETE, 0);
+    ASSERT(grant_result == 0, "Grant DELETE access should succeed");
 
     int delete_result = cupolas_vault_delete(g_vault, cred_id, "test_agent");
     ASSERT(delete_result == 0, "Delete should succeed");
