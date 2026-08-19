@@ -317,13 +317,49 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_sandbox cupolas)
 
-    # test_cupolas_integration disabled: uses deprecated printf which conflicts with global -Werror
-    # add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
-    # ...
-    # test_cupolas_signature disabled: uses deprecated printf which conflicts with global -Werror
-    # test_cupolas_vault disabled: requires OpenSSL (CUPOLAS_USE_OPENSSL) which is not available
-    # test_stress_concurrent disabled: uses deprecated printf which conflicts with global -Werror
-    # test_yaml_minimal disabled: uses deprecated printf which conflicts with global -Werror
+    # INT-11: 四重防护链集成测试（sanitizer → permission → network → audit）
+    add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
+    target_compile_definitions(test_cupolas_integration PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_cupolas_integration PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_cupolas_integration cupolas)
+
+    # test_stress_concurrent disabled: 压力测试非单元测试，单独手动运行
+
+    # 签名/压力/YAML/凭证库测试：与其余单元测试一致使用 AIRY_COMPLIANCE_IMPL
+    add_executable(test_cupolas_signature tests/unit/test_cupolas_signature.c)
+    target_compile_definitions(test_cupolas_signature PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_cupolas_signature PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_cupolas_signature cupolas)
+
+    add_executable(test_yaml_minimal tests/unit/test_yaml_minimal.c)
+    target_compile_definitions(test_yaml_minimal PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_yaml_minimal PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+        ${COMMON_MODULE_DIR}/utils/config_unified/include
+    )
+    target_link_libraries(test_yaml_minimal cupolas)
+
+    if(AIRY_HAS_OPENSSL)
+        add_executable(test_cupolas_vault tests/unit/test_cupolas_vault.c)
+        target_compile_definitions(test_cupolas_vault PRIVATE
+            AIRY_COMPLIANCE_IMPL AIRY_HAS_OPENSSL=1)
+        target_include_directories(test_cupolas_vault PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${COMMON_INCLUDE_DIRS}
+        )
+        target_link_libraries(test_cupolas_vault cupolas)
+    endif()
 
     if(MSVC)
         add_custom_command(TARGET test_cupolas_core POST_BUILD
@@ -335,11 +371,12 @@ if(BUILD_TESTS)
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME error_code_consistency_tests COMMAND test_error_code_consistency)
     add_test(NAME sandbox_tests COMMAND test_sandbox)
-    # add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
-    # add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
-    # add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)  # disabled: requires OpenSSL
-    # add_test(NAME cupolas_stress_tests COMMAND test_stress_concurrent)
-    # add_test(NAME cupolas_yaml_tests COMMAND test_yaml_minimal)
+    add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
+    add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
+    add_test(NAME cupolas_yaml_tests COMMAND test_yaml_minimal)
+    if(AIRY_HAS_OPENSSL)
+        add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
+    endif()
 endif()
 
 install(TARGETS cupolas

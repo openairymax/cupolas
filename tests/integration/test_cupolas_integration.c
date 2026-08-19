@@ -21,8 +21,20 @@
 #include <string.h>
 #include <time.h>
 
-#define TEST_PASS(name) printf("[PASS] %s\n", name)
-#define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
+#define TEST_PASS(...)                                                       \
+    do {                                                                     \
+        printf("[PASS] ");                                                   \
+        printf(__VA_ARGS__);                                                 \
+        printf("\n");                                                        \
+        g_tests_passed++;                                                    \
+    } while (0)
+#define TEST_FAIL(name, ...)                                                 \
+    do {                                                                     \
+        printf("[FAIL] %s: ", name);                                         \
+        printf(__VA_ARGS__);                                                 \
+        printf("\n");                                                        \
+        g_tests_failed++;                                                    \
+    } while (0)
 
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
@@ -71,7 +83,7 @@ static void test_cupolas_sanitize_integration(void)
     if (ret == AIRY_OK) {
         TEST_PASS("sanitize_integration");
     } else {
-        TEST_PASS("sanitize_integration (rejected as expected)");
+        TEST_FAIL("sanitize_integration", "sanitize failed ret=%d", ret);
     }
 
     cupolas_cleanup();
