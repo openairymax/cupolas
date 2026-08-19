@@ -333,12 +333,22 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
         return cupolas_ERR_INVALID_PARAM;
     }
 
+    /* 删除是破坏性操作，必须与 retrieve(READ)/update(WRITE) 一致执行
+     * ACL 检查，否则任意 agent 可删除任意凭据（安全缺陷）。 */
+    if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_DELETE)) {
+        AIRY_LOG_WARN("cupolas_vault_delete: access denied for agent_id=%s, cred_id=%s, "
+                      "operation=DELETE",
+                      agent_id ? agent_id : "(null)", cred_id);
+        return cupolas_ERR_INVALID_PARAM;
+    }
+
     cupolas_rwlock_wrlock(&vault->lock);
 
     for (size_t i = 0; i < vault->entry_count; i++) {
         if (strcmp(vault->entries[i].cred_id, cred_id) == 0) {
             credential_entry_t *entry = &vault->entries[i];
             AIRY_FREE(entry->cred_id);
+            AIRY_FREE(entry->metadata.cred_id);
             AIRY_FREE(entry->encrypted_data);
             for (size_t j = 0; j < entry->acl.count; j++) {
                 AIRY_FREE(entry->acl.entries[j].agent_id);
