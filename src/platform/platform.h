@@ -39,7 +39,9 @@ extern "C" {
 #elif defined(__linux__) || defined(__APPLE__) || defined(__unix__)
 #define cupolas_PLATFORM_WINDOWS 0
 #define cupolas_PLATFORM_POSIX 1
-#if defined(__x86_64__) || defined(__aarch64__)
+/* SSoT: 与 commons/platform.h 一致，使用 UINTPTR_MAX 判断 64 位，
+ * 覆盖 x86_64/aarch64/riscv64/ppc64/s390x 等全部 64 位架构。 */
+#if UINTPTR_MAX == UINT64_MAX
 #define cupolas_PLATFORM_64BIT 1
 #else
 #define cupolas_PLATFORM_64BIT 0
