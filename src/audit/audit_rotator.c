@@ -20,6 +20,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 #define MAX_PATH_LEN 512
 #define MAX_JSON_ESCAPE_LEN 4096
 
@@ -312,7 +318,15 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
 
     if (written > 0) {
         rotator->current_size += (size_t)written;
-        fflush(rotator->fp);
+        /* P2-5：审计日志是安全追踪证据（哈希链），fflush 只刷到内核页
+         * 缓存；写后 fsync 保证落盘，断电/崩溃不丢审计事件。 */
+        if (fflush(rotator->fp) == 0) {
+#ifdef _WIN32
+            _commit(_fileno(rotator->fp));
+#else
+            fsync(fileno(rotator->fp));
+#endif
+        }
     }
 
     cupolas_mutex_unlock(&rotator->lock);

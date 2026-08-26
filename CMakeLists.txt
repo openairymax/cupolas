@@ -180,8 +180,9 @@ if(BUILD_WITH_LOGGING)
 endif()
 
 target_compile_definitions(cupolas PRIVATE
-    AIRY_CONFIG_DIR="/etc/agentrt"
-    AIRY_LOG_DIR="/var/log/agentrt"
+    # 路径默认值由 platform.h 按平台提供（Windows/macOS/Linux），此处
+    # 不再无条件覆盖为 /etc/agentrt、/var/log/agentrt（会错误覆盖
+    # Windows C:\ProgramData\agentrt 与 macOS 默认路径，跨平台错乱）。
     AIRY_ENABLE_V2_API=1
 )
 
