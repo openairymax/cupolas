@@ -95,6 +95,8 @@ if(AIRY_HAS_OPENSSL)
         src/security/cupolas_vault_crypto.c
         src/security/cupolas_vault_io.c
         src/security/cupolas_entitlements.c
+        src/security/cupolas_entitlements_parse.c
+        src/security/cupolas_entitlements_crypto.c
         src/security/cupolas_runtime_protection.c
         # cupolas_network_security 按功能域拆分：生命周期+TLS/防火墙规则/包过滤/连接监控/检测引擎/DNS/工具
         src/security/cupolas_network_security.c
@@ -134,6 +136,7 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_vault.h
     src/security/cupolas_vault_internal.h
     src/security/cupolas_entitlements.h
+    src/security/cupolas_entitlements_internal.h
     src/security/cupolas_runtime_protection.h
     src/security/cupolas_network_security.h
     src/security/cupolas_network_security_internal.h
