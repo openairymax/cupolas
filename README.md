@@ -54,7 +54,6 @@ cupolas/
     ├── cupolas_metrics.c/.h              # Metric collection
     ├── cupolas_monitoring.c/.h           # Runtime monitoring
     ├── circuit_breaker.c/.h              # Circuit breaker
-    ├── yaml_minimal.c/.h                 # YAML 1.1 parser (fallback)
     ├── slab.c/.h                         # Slab allocator
     ├── mempool.c/.h                      # Memory pool
     ├── platform/
@@ -95,7 +94,6 @@ cupolas/
     ├── workbench/                        # (Layer 1) Sandbox workbench
     │   ├── workbench.c/.h
     │   ├── workbench_process.h           # Process management interface
-    │   ├── workbench_process_core.c      # Process management impl
     │   ├── workbench_container.c/.h      # Container isolation
     │   └── workbench_limits.c/.h         # Resource limits
     └── utils/
@@ -143,7 +141,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 |  | (Layer 4) |  |           |  |  Engine   |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +-----------+  +-----------+  +-----------+                          |
-|  |  Guards   |  |CircuitBrkr|  |YAMLParser |                          |
+|  |  Guards   |  |CircuitBrkr|  | Slab/Pool  |                          |
 |  +-----------+  +-----------+  +-----------+                          |
 |  +----------------------------------------------------------------+   |
 |  |        OpenSSL-conditional (AIRY_HAS_OPENSSL)               |   |
@@ -169,7 +167,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 | **commons** | Yes | Sync primitives, error framework, type definitions (`airy_types.h`), memory management macros (`AIRY_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
 | **atoms** | Yes | Provides the Syscall surface that cupolas enforces (sandbox, seccomp, capability, 4 protection rings), and the CoreKern IPC primitives (`are_ipc.h`) for the audit queue and workbench IPC |
 | OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AIRY_HAS_OPENSSL` |
-| libyaml | No | Full YAML support; built-in `yaml_minimal.c` is the fallback |
+| libyaml | No | Full YAML support |
 | cJSON | No | JSON config parsing |
 
 > **BAN-12**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_YAML`, `AIRY_HAS_CJSON`).

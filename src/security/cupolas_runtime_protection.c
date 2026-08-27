@@ -3,17 +3,22 @@
 
 /*
  *
- * cupolas_runtime_protection.c - Enhanced Runtime Protection: seccomp, CFI Implementation
+ * cupolas_runtime_protection.c - Enhanced Runtime Protection core lifecycle
  */
 
 /**
  * @file cupolas_runtime_protection.c
- * @brief Enhanced Runtime Protection - seccomp, CFI Multi-defense Implementation
+ * @brief Enhanced Runtime Protection - core lifecycle (init / cleanup /
+ *        enable / disable / status) and shared violation recording.
+ *        Policy units split into cupolas_runtime_protection_memory.c,
+ *        cupolas_runtime_protection_check.c and
+ *        cupolas_runtime_protection_integrity.c.
  * @author SPHARX Ltd. - Airymax Team
  * @date 2026
  */
 
 #include "cupolas_runtime_protection.h"
+#include "cupolas_runtime_protection_internal.h"
 
 #include "../platform/platform.h"
 #include "atomic_compat.h"
@@ -25,99 +30,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* GNU ld 提供的段边界符号：仅 Linux 存在（macOS ld64 用 _etext/_edata，
- * Windows 无这些符号）。非 Linux 平台令 CUPOLAS_HAVE_SEG_SYMBOLS=0，
- * 哈希计算走下方 dladdr 后备路径，避免链接失败。 */
-#if defined(__linux__)
-extern char __executable_start[];
-extern char __etext[];
-extern char __data_start[];
-extern char __edata[];
-#define CUPOLAS_HAVE_SEG_SYMBOLS 1
-#else
-#define CUPOLAS_HAVE_SEG_SYMBOLS 0
-#endif
-
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include "airy_mman.h"
-
-#include <dlfcn.h>
-#include <fcntl.h>
+#include <pthread.h>
+#include <sched.h>
 #include <unistd.h>
-#ifdef __linux__
-#include <linux/filter.h>
-#include <linux/seccomp.h>
-#include <sys/prctl.h>
-#include <sys/syscall.h>
-#ifdef HAVE_LIBSECCOMP
-#include <seccomp.h>
 #endif
-#endif
-#endif
-
-#include <openssl/sha.h>
 
 #include "error.h"
 
-#define CUPOLAS_MAX_SECCOMP_RULES 256
-#define CUPOLAS_MAX_CFI_TARGETS 4096
-#define CUPOLAS_MAX_VIOLATION_HISTORY 128
+cupolas_runtime_prot_state_t g_runtime_prot;
 
-typedef struct {
-    char *syscall_name;
-    int action;
-    uint32_t arg_index;
-    uint64_t arg_value;
-    char op[8];
-} seccomp_rule_internal_t;
-
-typedef struct {
-    void *source;
-    void *target;
-    int valid;
-} cfi_target_t;
-
-typedef struct {
-    cupolas_violation_event_t events[CUPOLAS_MAX_VIOLATION_HISTORY];
-    size_t count;
-    size_t head;
-} violation_history_t;
-
-static struct {
-    atomic_int initialized;
-    cupolas_runtime_protect_config_t manager;
-    cupolas_protection_status_t status;
-
-    seccomp_rule_internal_t seccomp_rules[CUPOLAS_MAX_SECCOMP_RULES];
-    size_t seccomp_rule_count;
-    uint64_t seccomp_allowed_count;
-    uint64_t seccomp_denied_count;
-
-    cfi_target_t cfi_targets[CUPOLAS_MAX_CFI_TARGETS];
-    size_t cfi_target_count;
-    uint64_t cfi_check_count;
-    uint64_t cfi_violation_count;
-
-    violation_history_t violations;
-    cupolas_protection_stats_t stats;
-
-    uint8_t code_hash[32];
-    uint8_t data_hash[32];
-    int hashes_computed;
-
-    void (*violation_callback)(const cupolas_violation_event_t *event);
-    void (*integrity_callback)(int result);
-
-#ifdef _WIN32
-    cupolas_mutex_t lock;
-#else
-    cupolas_mutex_t lock;
-#endif
-} g_runtime_prot;
-
-static uint32_t cupolas_get_pid(void)
+uint32_t cupolas_rtp_get_pid(void)
 {
 #ifdef _WIN32
     return GetCurrentProcessId();
@@ -126,7 +51,7 @@ static uint32_t cupolas_get_pid(void)
 #endif
 }
 
-static uint32_t cupolas_get_tid(void)
+uint32_t cupolas_rtp_get_tid(void)
 {
 #ifdef _WIN32
     return GetCurrentThreadId();
@@ -135,8 +60,8 @@ static uint32_t cupolas_get_tid(void)
 #endif
 }
 
-static void cupolas_record_violation(cupolas_violation_type_t type, const char *details,
-                                     const char *syscall_name)
+void cupolas_record_violation(cupolas_violation_type_t type, const char *details,
+                              const char *syscall_name)
 {
     cupolas_mutex_lock(&g_runtime_prot.lock);
 
@@ -154,8 +79,8 @@ static void cupolas_record_violation(cupolas_violation_type_t type, const char *
     cupolas_violation_event_t *event = &g_runtime_prot.violations.events[idx];
     event->type = type;
     event->timestamp = cupolas_time_ms();
-    event->pid = cupolas_get_pid();
-    event->tid = cupolas_get_tid();
+    event->pid = cupolas_rtp_get_pid();
+    event->tid = cupolas_rtp_get_tid();
     if (event->details) {
         AIRY_FREE(event->details);
         event->details = NULL;
@@ -179,10 +104,6 @@ static void cupolas_record_violation(cupolas_violation_type_t type, const char *
     }
 }
 
-#define RTP_INIT_UNINIT 0
-#define RTP_INIT_PROGRESS 1
-#define RTP_INIT_COMPLETE 2
-
 int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *manager)
 {
     if (atomic_load(&g_runtime_prot.initialized) == RTP_INIT_COMPLETE)
@@ -190,7 +111,7 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *manager
 
     int expected = RTP_INIT_UNINIT;
     if (atomic_compare_exchange_strong(&g_runtime_prot.initialized, &expected, RTP_INIT_PROGRESS)) {
-        __builtin_memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
+        AIRY_MEMSET(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 
         cupolas_mutex_init(&g_runtime_prot.lock);
 
@@ -233,7 +154,7 @@ void cupolas_runtime_protect_cleanup(void)
 
     CUPOLAS_MUTEX_DESTROY(&g_runtime_prot.lock);
 
-    __builtin_memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
+    AIRY_MEMSET(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 }
 
 int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *manager)
@@ -304,574 +225,6 @@ int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t *manager
         return AIRY_EINVAL;
     cupolas_mutex_lock(&g_runtime_prot.lock);
     *manager = g_runtime_prot.manager;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    return 0;
-}
-
-int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t *manager)
-{
-    if (!manager)
-        return AIRY_EINVAL;
-
-#ifdef __linux__
-    if (manager->enable_aslr) {
-        int fd = open("/proc/sys/kernel/randomize_va_space", O_RDONLY);
-        if (fd >= 0) {
-            char buf[8] = {0};
-            ssize_t n = read(fd, buf, sizeof(buf) - 1);
-            close(fd);
-            if (n > 0 && buf[0] != '2' && buf[0] != '1') {
-                fd = open("/proc/sys/kernel/randomize_va_space", O_WRONLY);
-                if (fd >= 0) {
-                    ssize_t wr = write(fd, "2", 1);
-                    (void)wr;
-                    close(fd);
-                }
-            }
-        }
-    }
-
-    if (manager->enable_stack_protector) {
-#ifdef PR_SET_PTRACER
-        prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
-#endif
-    }
-#endif
-
-#ifdef _WIN32
-    if (manager->enable_aslr) {
-        HANDLE hProc = GetCurrentProcess();
-        SetProcessDEPPolicy(PROCESS_DEP_ENABLE);
-    }
-#endif
-
-    return 0;
-}
-
-int cupolas_memory_lock(void *addr, size_t len)
-{
-    if (!addr || len == 0)
-        return AIRY_EINVAL;
-
-#ifdef _WIN32
-    return VirtualLock(addr, len) ? 0 : -1;
-#elif defined(__linux__) || defined(__APPLE__)
-    return mlock(addr, len);
-#else
-    return AIRY_EINVAL;
-#endif
-}
-
-int cupolas_memory_unlock(void *addr, size_t len)
-{
-    if (!addr || len == 0)
-        return AIRY_EINVAL;
-
-#ifdef _WIN32
-    return VirtualUnlock(addr, len) ? 0 : -1;
-#elif defined(__linux__) || defined(__APPLE__)
-    return munlock(addr, len);
-#else
-    return AIRY_EINVAL;
-#endif
-}
-
-int cupolas_memory_protect(void *addr, size_t len, int prot)
-{
-    if (!addr || len == 0)
-        return AIRY_EINVAL;
-
-#ifdef _WIN32
-    DWORD old_prot;
-    DWORD new_prot = 0;
-
-    if (prot & 0x1)
-        new_prot |= PAGE_READONLY;
-    if (prot & 0x2)
-        new_prot |= PAGE_READWRITE;
-    if (prot & 0x4)
-        new_prot |= PAGE_EXECUTE_READ;
-    if ((prot & 0x6) == 0x6)
-        new_prot = PAGE_EXECUTE_READWRITE;
-
-    return VirtualProtect(addr, len, new_prot, &old_prot) ? 0 : -1;
-#elif defined(__linux__) || defined(__APPLE__)
-    return mprotect(addr, len, prot);
-#else
-    (void)prot;
-    return AIRY_EINVAL;
-#endif
-}
-
-void *cupolas_memory_alloc_protected(size_t size, int prot)
-{
-    if (size == 0)
-        return NULL;
-
-#ifdef _WIN32
-    DWORD prot_flags = PAGE_READWRITE;
-    if (prot & 0x4)
-        prot_flags = PAGE_EXECUTE_READWRITE;
-
-    void *ptr = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, prot_flags);
-    return ptr;
-#elif defined(__linux__) || defined(__APPLE__)
-    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
-    void *ptr = mmap(NULL, size, prot, flags, -1, 0);
-    return (ptr == MAP_FAILED) ? NULL : ptr;
-#else
-    (void)prot;
-    return AIRY_MALLOC(size);
-#endif
-}
-
-void cupolas_memory_free_protected(void *ptr)
-{
-    if (!ptr)
-        return;
-
-#ifdef _WIN32
-    VirtualFree(ptr, 0, MEM_RELEASE);
-#elif defined(__linux__) || defined(__APPLE__)
-    munmap(ptr, 4096);
-#else
-    AIRY_FREE(ptr);
-#endif
-}
-
-int cupolas_cfi_enable(const cupolas_cfi_config_t *manager)
-{
-    if (!manager)
-        return AIRY_EINVAL;
-
-    g_runtime_prot.cfi_target_count = 0;
-    g_runtime_prot.cfi_check_count = 0;
-    g_runtime_prot.cfi_violation_count = 0;
-
-    return 0;
-}
-
-int cupolas_cfi_register_target(void *source, void *target)
-{
-    if (!source || !target)
-        return AIRY_EINVAL;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    if (g_runtime_prot.cfi_target_count >= CUPOLAS_MAX_CFI_TARGETS) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return AIRY_EINVAL;
-    }
-
-    cfi_target_t *entry = &g_runtime_prot.cfi_targets[g_runtime_prot.cfi_target_count];
-    entry->source = source;
-    entry->target = target;
-    entry->valid = 1;
-    g_runtime_prot.cfi_target_count++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    return 0;
-}
-
-int cupolas_cfi_verify_transfer(void *source, void *target)
-{
-    if (!source || !target)
-        return 0;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    g_runtime_prot.cfi_check_count++;
-    g_runtime_prot.stats.total_checks++;
-
-    for (size_t i = 0; i < g_runtime_prot.cfi_target_count; i++) {
-        cfi_target_t *entry = &g_runtime_prot.cfi_targets[i];
-        if (entry->source == source && entry->target == target && entry->valid) {
-            cupolas_mutex_unlock(&g_runtime_prot.lock);
-            return 1;
-        }
-    }
-
-    g_runtime_prot.cfi_violation_count++;
-    g_runtime_prot.stats.cfi_violations++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    cupolas_record_violation(CUPOLAS_VIOLATION_CONTROL_FLOW, "Invalid control flow transfer", NULL);
-
-    return 0;
-}
-
-int cupolas_cfi_get_stats(uint64_t *checks, uint64_t *violations)
-{
-    if (!checks || !violations)
-        return AIRY_EINVAL;
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    *checks = g_runtime_prot.cfi_check_count;
-    *violations = g_runtime_prot.cfi_violation_count;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    return 0;
-}
-
-int cupolas_seccomp_enable(const cupolas_seccomp_config_t *manager)
-{
-    if (!manager)
-        return AIRY_EINVAL;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    g_runtime_prot.seccomp_rule_count = 0;
-    g_runtime_prot.seccomp_allowed_count = 0;
-    g_runtime_prot.seccomp_denied_count = 0;
-
-    if (manager->allowed_syscalls) {
-        for (size_t i = 0; i < manager->syscall_count &&
-                           g_runtime_prot.seccomp_rule_count < CUPOLAS_MAX_SECCOMP_RULES;
-             i++) {
-            seccomp_rule_internal_t *rule =
-                &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
-            rule->syscall_name = cupolas_strdup(manager->allowed_syscalls[i]);
-            rule->action = 0;
-            rule->arg_index = 0;
-            rule->arg_value = 0;
-            rule->op[0] = '\0';
-            g_runtime_prot.seccomp_rule_count++;
-        }
-    }
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-#ifdef __linux__
-#ifdef PR_SET_NO_NEW_PRIVS
-    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
-        return AIRY_EINVAL;
-    }
-#endif
-#endif
-
-    return 0;
-}
-
-int cupolas_seccomp_allow(const char *syscall_name)
-{
-    if (!syscall_name)
-        return AIRY_EINVAL;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return AIRY_EINVAL;
-    }
-
-    seccomp_rule_internal_t *rule =
-        &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
-    rule->syscall_name = cupolas_strdup(syscall_name);
-    rule->action = 0;
-    rule->arg_index = 0;
-    rule->arg_value = 0;
-    rule->op[0] = '\0';
-    g_runtime_prot.seccomp_rule_count++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    return 0;
-}
-
-int cupolas_seccomp_deny(const char *syscall_name)
-{
-    if (!syscall_name)
-        return AIRY_EINVAL;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return AIRY_EINVAL;
-    }
-
-    seccomp_rule_internal_t *rule =
-        &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
-    rule->syscall_name = cupolas_strdup(syscall_name);
-    rule->action = 1;
-    rule->arg_index = 0;
-    rule->arg_value = 0;
-    rule->op[0] = '\0';
-    g_runtime_prot.seccomp_rule_count++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    return 0;
-}
-
-int cupolas_seccomp_add_rule(const char *syscall_name, uint32_t arg_index, const char *op,
-                             uint64_t value, int action)
-{
-    if (!syscall_name || !op)
-        return AIRY_EINVAL;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return AIRY_EINVAL;
-    }
-
-    seccomp_rule_internal_t *rule =
-        &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
-    rule->syscall_name = cupolas_strdup(syscall_name);
-    rule->action = action;
-    rule->arg_index = arg_index;
-    rule->arg_value = value;
-    AIRY_STRNCPY_TERM(rule->op, op, sizeof(rule->op));
-    rule->op[sizeof(rule->op) - 1] = '\0';
-    g_runtime_prot.seccomp_rule_count++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    return 0;
-}
-
-int cupolas_seccomp_check(const char *syscall_name)
-{
-    if (!syscall_name)
-        return 0;
-
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    g_runtime_prot.stats.total_checks++;
-
-    for (size_t i = 0; i < g_runtime_prot.seccomp_rule_count; i++) {
-        seccomp_rule_internal_t *rule = &g_runtime_prot.seccomp_rules[i];
-        if (strcmp(rule->syscall_name, syscall_name) == 0) {
-            if (rule->action == 0) {
-                g_runtime_prot.seccomp_allowed_count++;
-                cupolas_mutex_unlock(&g_runtime_prot.lock);
-                return 1;
-            } else {
-                g_runtime_prot.seccomp_denied_count++;
-                g_runtime_prot.stats.syscall_denied++;
-                cupolas_mutex_unlock(&g_runtime_prot.lock);
-                cupolas_record_violation(CUPOLAS_VIOLATION_SYSCALL, "Blocked syscall",
-                                         syscall_name);
-                return 0;
-            }
-        }
-    }
-
-    if (g_runtime_prot.manager.seccomp.default_action == 0) {
-        g_runtime_prot.seccomp_allowed_count++;
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return 1;
-    }
-
-    g_runtime_prot.seccomp_denied_count++;
-    g_runtime_prot.stats.syscall_denied++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    cupolas_record_violation(CUPOLAS_VIOLATION_SYSCALL, "Default deny", syscall_name);
-    return 0;
-}
-
-int cupolas_seccomp_get_stats(uint64_t *allowed, uint64_t *denied)
-{
-    if (!allowed || !denied)
-        return AIRY_EINVAL;
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    *allowed = g_runtime_prot.seccomp_allowed_count;
-    *denied = g_runtime_prot.seccomp_denied_count;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    return 0;
-}
-
-int cupolas_integrity_enable(const cupolas_integrity_config_t *manager)
-{
-    if (!manager)
-        return AIRY_EINVAL;
-
-    g_runtime_prot.stats.integrity_checks = 0;
-    g_runtime_prot.stats.integrity_failures = 0;
-
-    if (manager->enable_code_integrity) {
-        cupolas_integrity_compute_code_hash(g_runtime_prot.code_hash);
-    }
-
-    g_runtime_prot.hashes_computed = 1;
-
-    return 0;
-}
-
-int cupolas_integrity_check(void)
-{
-    if (!g_runtime_prot.hashes_computed)
-        return 0;
-
-    g_runtime_prot.stats.integrity_checks++;
-
-    uint8_t current_hash[32] = {0};
-    if (cupolas_integrity_compute_code_hash(current_hash) != 0) {
-        g_runtime_prot.stats.integrity_failures++;
-        cupolas_record_violation(CUPOLAS_VIOLATION_INTEGRITY, "Failed to compute code hash", NULL);
-        return AIRY_EINVAL;
-    }
-
-    if (memcmp(current_hash, g_runtime_prot.code_hash, 32) != 0) {
-        g_runtime_prot.stats.integrity_failures++;
-        g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_COMPROMISED;
-        cupolas_record_violation(CUPOLAS_VIOLATION_INTEGRITY, "Code integrity violation detected",
-                                 NULL);
-
-        if (g_runtime_prot.integrity_callback) {
-            g_runtime_prot.integrity_callback(-1);
-        }
-
-        return AIRY_EINVAL;
-    }
-
-    if (g_runtime_prot.integrity_callback) {
-        g_runtime_prot.integrity_callback(0);
-    }
-
-    return 0;
-}
-
-int cupolas_integrity_compute_code_hash(uint8_t *hash_out)
-{
-    if (!hash_out)
-        return AIRY_EINVAL;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wpedantic"
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-
-#if CUPOLAS_HAVE_SEG_SYMBOLS
-    uintptr_t text_start = (uintptr_t)__executable_start;
-    uintptr_t text_end = (uintptr_t)__etext;
-#else
-    uintptr_t text_start = 0;
-    uintptr_t text_end = 0;
-#endif
-
-    if (text_end > text_start && (text_end - text_start) < 256 * 1024 * 1024) {
-        size_t code_size = (size_t)(text_end - text_start);
-        const uint8_t *code_ptr = (const uint8_t *)text_start;
-
-        size_t sample_step = code_size > 65536 ? code_size / 16384 : 1;
-        for (size_t i = 0; i < code_size; i += sample_step) {
-            SHA256_Update(&ctx, &code_ptr[i], 1);
-        }
-    } else {
-        Dl_info info;
-        if (dladdr((void *)&cupolas_integrity_compute_code_hash, &info) && info.dli_fbase) {
-            const uint8_t *base = (const uint8_t *)info.dli_fbase;
-            size_t hash_len = 4096;
-            SHA256_Update(&ctx, base, hash_len);
-        } else {
-            const uint8_t *fn_ptr = (const uint8_t *)&cupolas_integrity_compute_code_hash;
-            SHA256_Update(&ctx, fn_ptr, 256);
-        }
-    }
-
-    SHA256_Final(hash_out, &ctx);
-#pragma GCC diagnostic pop
-    return 0;
-}
-
-int cupolas_integrity_verify_code(const uint8_t *expected_hash)
-{
-    if (!expected_hash)
-        return AIRY_EINVAL;
-
-    uint8_t current_hash[32] = {0};
-    if (cupolas_integrity_compute_code_hash(current_hash) != 0)
-        return AIRY_EINVAL;
-
-    return memcmp(current_hash, expected_hash, 32) == 0 ? 0 : -1;
-}
-
-int cupolas_integrity_verify_data(const uint8_t *expected_hash)
-{
-    if (!expected_hash)
-        return AIRY_EINVAL;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wpedantic"
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-
-#if CUPOLAS_HAVE_SEG_SYMBOLS
-    uintptr_t data_start = (uintptr_t)__data_start;
-    uintptr_t data_end = (uintptr_t)__edata;
-#else
-    uintptr_t data_start = 0;
-    uintptr_t data_end = 0;
-#endif
-
-    if (data_end > data_start && (data_end - data_start) < 256 * 1024 * 1024) {
-        size_t data_size = (size_t)(data_end - data_start);
-        const uint8_t *data_ptr = (const uint8_t *)data_start;
-
-        size_t sample_step = data_size > 65536 ? data_size / 16384 : 1;
-        for (size_t i = 0; i < data_size; i += sample_step) {
-            SHA256_Update(&ctx, &data_ptr[i], 1);
-        }
-    } else {
-        Dl_info info;
-        if (dladdr((void *)&cupolas_integrity_verify_data, &info) && info.dli_fbase) {
-            const uint8_t *base = (const uint8_t *)info.dli_fbase;
-            SHA256_Update(&ctx, base, 4096);
-        } else {
-            const uint8_t *fn_ptr = (const uint8_t *)&cupolas_integrity_verify_data;
-            SHA256_Update(&ctx, fn_ptr, 256);
-        }
-    }
-
-    uint8_t current_hash[32] = {0};
-    SHA256_Final(current_hash, &ctx);
-#pragma GCC diagnostic pop
-
-    return memcmp(current_hash, expected_hash, 32) == 0 ? 0 : -1;
-}
-
-int cupolas_integrity_set_callback(void (*callback)(int result))
-{
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    g_runtime_prot.integrity_callback = callback;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    return 0;
-}
-
-int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t *event))
-{
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    g_runtime_prot.violation_callback = callback;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-    return 0;
-}
-
-int cupolas_violation_get_last(cupolas_violation_event_t *event)
-{
-    if (!event)
-        return AIRY_EINVAL;
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    if (g_runtime_prot.violations.count == 0) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
-        return AIRY_EINVAL;
-    }
-
-    size_t idx = (g_runtime_prot.violations.head + g_runtime_prot.violations.count - 1) %
-                 CUPOLAS_MAX_VIOLATION_HISTORY;
-    *event = g_runtime_prot.violations.events[idx];
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-
-    return 0;
-}
-
-void cupolas_violation_clear(void)
-{
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    for (size_t i = 0; i < CUPOLAS_MAX_VIOLATION_HISTORY; i++) {
-        AIRY_FREE(g_runtime_prot.violations.events[i].details);
-        AIRY_FREE(g_runtime_prot.violations.events[i].syscall_name);
-    }
-    __builtin_memset(&g_runtime_prot.violations, 0, sizeof(g_runtime_prot.violations));
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
-}
-
-int cupolas_violation_get_stats(cupolas_protection_stats_t *stats)
-{
-    if (!stats)
-        return AIRY_EINVAL;
-    cupolas_mutex_lock(&g_runtime_prot.lock);
-    *stats = g_runtime_prot.stats;
     cupolas_mutex_unlock(&g_runtime_prot.lock);
     return 0;
 }
