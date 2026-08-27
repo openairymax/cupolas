@@ -52,7 +52,11 @@ set(CUPOLAS_SOURCES
     src/utils/cupolas_utils.c
     src/cupolas_metrics.c
     src/cupolas_config.c
+    # cupolas_monitoring 按功能域拆分：生命周期/采集与线程/导出/健康检查与端点
     src/cupolas_monitoring.c
+    src/cupolas_monitoring_sys.c
+    src/cupolas_monitoring_export.c
+    src/cupolas_monitoring_service.c
     src/permission/permission_engine.c
     src/permission/permission_rule.c
     src/permission/permission_cache.c
@@ -116,6 +120,7 @@ set(CUPOLAS_HEADERS
     src/cupolas_metrics.h
     src/cupolas_config.h
     src/cupolas_monitoring.h
+    src/cupolas_monitoring_internal.h
     src/platform/platform.h
     src/platform/sandbox.h
     src/permission/permission.h
