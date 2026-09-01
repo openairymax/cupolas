@@ -386,6 +386,18 @@ if(BUILD_TESTS)
     if(AIRY_HAS_OPENSSL)
         add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
     endif()
+
+    # M2-S1 前置基准：权限检查延迟 p50/p99 + PEP 缓存命中率基线。
+    # 非断言型基准（性能观测用），默认跳过；--run-benchmark 参数显式运行。
+    add_executable(benchmark_permission tests/benchmark/benchmark_permission.c)
+    target_include_directories(benchmark_permission PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(benchmark_permission cupolas)
+    add_test(NAME cupolas_benchmark_permission COMMAND benchmark_permission 20000)
+    set_tests_properties(cupolas_benchmark_permission PROPERTIES RUN_SERIAL TRUE)
 endif()
 
 install(TARGETS cupolas
