@@ -165,10 +165,10 @@ set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/commons)
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/include
-    ${COMMON_MODULE_DIR}/utils/error/include
-    ${COMMON_MODULE_DIR}/utils/memory/include
-    ${COMMON_MODULE_DIR}/utils/observability/include
-    ${COMMON_MODULE_DIR}/utils/types/include
+    ${COMMON_MODULE_DIR}/utils/error
+    ${COMMON_MODULE_DIR}/utils/memory
+    ${COMMON_MODULE_DIR}/utils/observability
+    ${COMMON_MODULE_DIR}/utils/types
 )
 
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
@@ -354,7 +354,7 @@ if(BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMON_INCLUDE_DIRS}
-        ${COMMON_MODULE_DIR}/utils/config_unified/include
+        ${COMMON_MODULE_DIR}/utils/config_unified
     )
     target_link_libraries(test_yaml_minimal cupolas)
 
