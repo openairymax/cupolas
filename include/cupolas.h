@@ -28,7 +28,7 @@
 #define CUPOLAS_H
 
 #include "../../commons/include/airy_types.h"
-#include "../../commons/utils/error/include/error.h"
+#include "../../commons/utils/error/error.h"
 
 #include <stddef.h>
 

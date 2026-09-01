@@ -4,7 +4,7 @@
 /*
  */
 
-#include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/include/ */
+#include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
