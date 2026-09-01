@@ -128,6 +128,9 @@ int dpolicy_engine_validate_compliance(dpolicy_engine_t *engine, const char *sta
 size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine);
 size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine);
 
+uint64_t dpolicy_engine_get_epoch(dpolicy_engine_t *engine);
+dpolicy_conflict_strategy_t dpolicy_engine_get_strategy(dpolicy_engine_t *engine);
+
 #endif /* AIRY_ENABLE_V2_API */
 #ifdef __cplusplus
 }
