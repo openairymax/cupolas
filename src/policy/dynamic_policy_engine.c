@@ -706,3 +706,13 @@ size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine)
 {
     return engine ? engine->version_count : 0;
 }
+
+uint64_t dpolicy_engine_get_epoch(dpolicy_engine_t *engine)
+{
+    return engine ? engine->epoch : 0;
+}
+
+dpolicy_conflict_strategy_t dpolicy_engine_get_strategy(dpolicy_engine_t *engine)
+{
+    return engine ? engine->strategy : DPOLICY_CONFLICT_DENY_WINS;
+}
