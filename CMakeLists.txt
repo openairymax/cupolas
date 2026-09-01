@@ -86,6 +86,8 @@ set(CUPOLAS_SOURCES
     src/circuit_breaker.c
     src/slab.c
     src/mempool.c
+    # M2-S2 (0.1.9 §3.2 PDP): 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
+    src/policy/dynamic_policy_engine.c
 )
 # OpenSSL-dependent sources
 if(AIRY_HAS_OPENSSL)
@@ -156,6 +158,7 @@ set(CUPOLAS_HEADERS
     src/circuit_breaker.h
     src/slab.h
     src/mempool.h
+    include/dynamic_policy_engine.h
 )
 
 # commons 模块路径
@@ -386,6 +389,20 @@ if(BUILD_TESTS)
     if(AIRY_HAS_OPENSSL)
         add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
     endif()
+
+    # M2-S2 (0.1.9 §3.2 PDP): DP 引擎单元测试
+    # 需要 AIRY_ENABLE_V2_API 暴露 dpolicy_* API；cJSON 用于 JSON 往返断言
+    add_executable(test_dynamic_policy_engine tests/unit/test_dynamic_policy_engine.c)
+    target_compile_definitions(test_dynamic_policy_engine PRIVATE
+        AIRY_COMPLIANCE_IMPL AIRY_ENABLE_V2_API=1)
+    target_include_directories(test_dynamic_policy_engine PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+        ${CJSON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_dynamic_policy_engine cupolas ${CJSON_LIBRARIES})
+    add_test(NAME cupolas_dpolicy_engine_tests COMMAND test_dynamic_policy_engine)
 
     # M2-S1 前置基准：权限检查延迟 p50/p99 + PEP 缓存命中率基线。
     # 非断言型基准（性能观测用），默认跳过；--run-benchmark 参数显式运行。

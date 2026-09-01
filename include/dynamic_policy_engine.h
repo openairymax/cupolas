@@ -46,6 +46,7 @@ typedef enum {
     DPOLICY_CHANGE_ADD = 0,
     DPOLICY_CHANGE_REMOVE,
     DPOLICY_CHANGE_UPDATE,
+    DPOLICY_CHANGE_COMMIT,
     DPOLICY_CHANGE_ROLLBACK
 } dpolicy_change_type_t;
 
@@ -56,7 +57,8 @@ typedef struct {
     char subject_pattern[256];
     char action_pattern[128];
     char resource_pattern[256];
-    char condition_json[512];
+    /* 条件表达式 JSON（预留扩展槽），NULL 表示无条件；引擎持有所有权 */
+    char *condition_json;
     safety_priority_t priority;
     uint64_t valid_from;
     uint64_t valid_until;
