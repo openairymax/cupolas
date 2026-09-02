@@ -382,6 +382,18 @@ if(BUILD_TESTS)
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME error_code_consistency_tests COMMAND test_error_code_consistency)
+
+    # M2-S5 (0.1.9 §3.2 PEP)：cupolas_init_pep 语义单测——不构造本地
+    # permission 引擎（策略由 PDP cupolas_d 持有），sanitizer 层保留
+    add_executable(test_cupolas_pep_init tests/unit/test_cupolas_pep_init.c)
+    target_compile_definitions(test_cupolas_pep_init PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_cupolas_pep_init PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_cupolas_pep_init cupolas)
+    add_test(NAME cupolas_pep_init_tests COMMAND test_cupolas_pep_init)
     add_test(NAME sandbox_tests COMMAND test_sandbox)
     add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
     add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
