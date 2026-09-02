@@ -110,7 +110,7 @@ dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *s
 
 /* M2-S2 overlay：评估并报告是否命中。matched=1 表示有规则命中（效果为
  * 权威裁决，含显式 DENY）；matched=0 表示无匹配——调用方回退基础 ACL。 */
-dpolicy_effect_t dpolicy_engine_eval_match(dpolicy_engine_t *engine, const char *subject,
+dpolicy_effect_t dpolicy_eval_match(dpolicy_engine_t *engine, const char *subject,
                                            const char *action, const char *resource,
                                            const char *context_json, int *matched);
 
@@ -118,7 +118,7 @@ int dpolicy_engine_detect_conflicts(dpolicy_engine_t *engine, dpolicy_conflict_t
                                     size_t *conflict_count);
 
 /* 冲突报告针对暂存集（policy.load 后、activate 前给客户端决策依据） */
-int dpolicy_engine_detect_staged_conflicts(dpolicy_engine_t *engine,
+int dpolicy_stage_check(dpolicy_engine_t *engine,
                                            dpolicy_conflict_t **conflicts,
                                            size_t *conflict_count);
 
@@ -133,8 +133,8 @@ int dpolicy_engine_export_policies_json(dpolicy_engine_t *engine, char **json);
 /* M2-S2 两段式生效（0.1.9 §3.3.1）：stage_json 装载入暂存集（运行裁决与
  * epoch 不变）；activate 将暂存集原子提交为运行集并版本固化 + epoch+1。
  * activate 前置需 stage_json（无暂存返回 -5）。 */
-int dpolicy_engine_stage_json(dpolicy_engine_t *engine, const char *json);
-int dpolicy_engine_activate(dpolicy_engine_t *engine, const char *description);
+int dpolicy_stage_json(dpolicy_engine_t *engine, const char *json);
+int dpolicy_activate(dpolicy_engine_t *engine, const char *description);
 
 int dpolicy_engine_set_change_callback(dpolicy_engine_t *engine, dpolicy_change_callback_t callback,
                                        void *user_data);
@@ -143,8 +143,8 @@ int dpolicy_engine_validate_compliance(dpolicy_engine_t *engine, const char *sta
                                        char **report_json);
 
 size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine);
-size_t dpolicy_engine_get_staged_count(dpolicy_engine_t *engine);
-int dpolicy_engine_has_staged(dpolicy_engine_t *engine);
+size_t dpolicy_staged_count(dpolicy_engine_t *engine);
+int dpolicy_has_staged(dpolicy_engine_t *engine);
 size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine);
 
 uint64_t dpolicy_engine_get_epoch(dpolicy_engine_t *engine);
