@@ -107,6 +107,17 @@ extern "C" {
 int cupolas_init(const char *config_path, airy_err_t *error);
 
 /**
+ * @brief Initialize the cupolas module in PEP (minimal-guard) mode.
+ *
+ * Same lifecycle and thread-safety as cupolas_init() but the local
+ * permission engine is not constructed: policies are owned solely by the
+ * PDP (cupolas_d, 0.1.9 M2-S5 §3.2). The sanitizer, workbench and audit
+ * layers stay available for local PEP enforcement. cupolas_cleanup()
+ * releases either flavour.
+ */
+int cupolas_init_pep(const char *config_path, airy_err_t *error);
+
+/**
  * @brief Cleanup cupolas module
  * @pre cupolas_init() must have been called
  * @post All resources are released, no further API calls safe except init

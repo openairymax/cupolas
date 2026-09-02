@@ -82,10 +82,10 @@ static cupolas_atomic32_t g_cupolas_init_state = 0;
 
 #define CUPOLAS_INIT_SPIN_MAX_RETRIES 10000000UL
 
-int cupolas_init(const char *config_path, airy_err_t *error)
+static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_perm)
 {
-    CUPOLAS_LOG_INFO("cupolas_init: initializing security dome (config=%s)",
-                     config_path ? config_path : "default");
+    CUPOLAS_LOG_INFO("cupolas_init%s: initializing security dome (config=%s)",
+                     with_perm ? "" : "_pep", config_path ? config_path : "default");
 
     if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
         return CUPOLAS_OK;
@@ -161,30 +161,37 @@ int cupolas_init(const char *config_path, airy_err_t *error)
         }
     }
 
-    g_cupolas.perm = permission_engine_create(
-        g_cupolas.config.permission_rules_path[0] ? g_cupolas.config.permission_rules_path : NULL);
-    if (!g_cupolas.perm) {
-        if (error)
-            *error = AIRY_ERR_OUT_OF_MEMORY;
-        if (g_cupolas.config_mgr) {
-            cupolas_config_destroy(g_cupolas.config_mgr);
-            g_cupolas.config_mgr = NULL;
+    /* M2-S5（0.1.9 §3.2）：pep 模式不构造本地 permission 引擎——策略
+     * 唯一持有者为 PDP（cupolas_d）；本地仅保留 sanitizer/workbench/audit。 */
+    if (with_perm) {
+        g_cupolas.perm = permission_engine_create(
+            g_cupolas.config.permission_rules_path[0] ? g_cupolas.config.permission_rules_path :
+                                                        NULL);
+        if (!g_cupolas.perm) {
+            if (error)
+                *error = AIRY_ERR_OUT_OF_MEMORY;
+            if (g_cupolas.config_mgr) {
+                cupolas_config_destroy(g_cupolas.config_mgr);
+                g_cupolas.config_mgr = NULL;
+            }
+
+            cupolas_mutex_unlock(&g_cupolas.lock);
+            cupolas_mutex_destroy(&g_cupolas.lock);
+
+            cupolas_atomic_store32(&g_cupolas_init_state, 0);
+            CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
+            return cupolas_ERR_OUT_OF_MEMORY;
         }
-
-        cupolas_mutex_unlock(&g_cupolas.lock);
-        cupolas_mutex_destroy(&g_cupolas.lock);
-
-        cupolas_atomic_store32(&g_cupolas_init_state, 0);
-        CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
-        return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     g_cupolas.san = sanitizer_create(NULL);
     if (!g_cupolas.san) {
         if (error)
             *error = AIRY_ERR_OUT_OF_MEMORY;
-        permission_engine_destroy(g_cupolas.perm);
-        g_cupolas.perm = NULL;
+        if (g_cupolas.perm) {
+            permission_engine_destroy(g_cupolas.perm);
+            g_cupolas.perm = NULL;
+        }
         if (g_cupolas.config_mgr) {
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
@@ -210,8 +217,10 @@ int cupolas_init(const char *config_path, airy_err_t *error)
             *error = AIRY_ERR_OUT_OF_MEMORY;
         sanitizer_destroy(g_cupolas.san);
         g_cupolas.san = NULL;
-        permission_engine_destroy(g_cupolas.perm);
-        g_cupolas.perm = NULL;
+        if (g_cupolas.perm) {
+            permission_engine_destroy(g_cupolas.perm);
+            g_cupolas.perm = NULL;
+        }
         if (g_cupolas.config_mgr) {
             cupolas_config_destroy(g_cupolas.config_mgr);
             g_cupolas.config_mgr = NULL;
@@ -233,9 +242,24 @@ int cupolas_init(const char *config_path, airy_err_t *error)
      * consistently. */
     cupolas_atomic_store32(&g_cupolas_init_state, 1);
 
-    CUPOLAS_LOG_INFO(
-        "cupolas_init: security dome initialized (4 layers: permission+sanitizer+workbench+audit)");
+    if (with_perm)
+        CUPOLAS_LOG_INFO(
+            "cupolas_init: security dome ready (permission+sanitizer+workbench+audit)");
+    else
+        CUPOLAS_LOG_INFO(
+            "cupolas_init_pep: security dome ready (sanitizer+workbench+audit; "
+            "permission owned by PDP)");
     return CUPOLAS_OK;
+}
+
+int cupolas_init(const char *config_path, airy_err_t *error)
+{
+    return cupolas_init_ex(config_path, error, 1);
+}
+
+int cupolas_init_pep(const char *config_path, airy_err_t *error)
+{
+    return cupolas_init_ex(config_path, error, 0);
 }
 
 void cupolas_cleanup(void)
@@ -267,8 +291,10 @@ void cupolas_cleanup(void)
     }
 
     if (g_cupolas.perm) {
-        permission_engine_destroy(g_cupolas.perm);
-        g_cupolas.perm = NULL;
+        if (g_cupolas.perm) {
+            permission_engine_destroy(g_cupolas.perm);
+            g_cupolas.perm = NULL;
+        }
         CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] permission engine destroyed");
     }
 
