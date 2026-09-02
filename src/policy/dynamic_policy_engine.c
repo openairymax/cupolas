@@ -409,7 +409,7 @@ dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *s
     return result;
 }
 
-dpolicy_effect_t dpolicy_engine_eval_match(dpolicy_engine_t *engine, const char *subject,
+dpolicy_effect_t dpolicy_eval_match(dpolicy_engine_t *engine, const char *subject,
                                            const char *action, const char *resource,
                                            const char *context_json, int *matched)
 {
@@ -466,7 +466,7 @@ int dpolicy_engine_detect_conflicts(dpolicy_engine_t *engine, dpolicy_conflict_t
     return rc;
 }
 
-int dpolicy_engine_detect_staged_conflicts(dpolicy_engine_t *engine,
+int dpolicy_stage_check(dpolicy_engine_t *engine,
                                            dpolicy_conflict_t **conflicts,
                                            size_t *conflict_count)
 {
@@ -756,7 +756,7 @@ int dpolicy_engine_load_policies_json(dpolicy_engine_t *engine, const char *json
 /* M2-S2 两段式生效（0.1.9 §3.3.1）：policy.load 仅装载入暂存集——运行
  * 裁决与 epoch 不变，冲突报告针对暂存文档；activate 才原子提交运行集并
  * 版本固化 + epoch+1（PEP 缓存失效键由此单调推进）。 */
-int dpolicy_engine_stage_json(dpolicy_engine_t *engine, const char *json)
+int dpolicy_stage_json(dpolicy_engine_t *engine, const char *json)
 {
     if (!engine || !json)
         return -1;
@@ -779,7 +779,7 @@ int dpolicy_engine_stage_json(dpolicy_engine_t *engine, const char *json)
     return 0;
 }
 
-int dpolicy_engine_activate(dpolicy_engine_t *engine, const char *description)
+int dpolicy_activate(dpolicy_engine_t *engine, const char *description)
 {
     if (!engine)
         return -1;
@@ -896,12 +896,12 @@ size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine)
     return engine ? engine->rule_count : 0;
 }
 
-size_t dpolicy_engine_get_staged_count(dpolicy_engine_t *engine)
+size_t dpolicy_staged_count(dpolicy_engine_t *engine)
 {
     return engine ? engine->staged_count : 0;
 }
 
-int dpolicy_engine_has_staged(dpolicy_engine_t *engine)
+int dpolicy_has_staged(dpolicy_engine_t *engine)
 {
     return engine ? engine->staged_valid : 0;
 }

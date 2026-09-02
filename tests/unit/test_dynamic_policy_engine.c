@@ -383,22 +383,22 @@ static void t_eval_match(void)
 
     /* 空集：matched=0 且 fail-closed DENY（供 overlay 回退判定） */
     int matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "s", "a", "r", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(NULL, "s", "a", "r", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(NULL, "s", "a", "r", NULL, &matched) ==
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
 
     CHECK(dpolicy_engine_add_rule(e, &r) == 0);
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
           DPOLICY_EFFECT_ALLOW);
     CHECK(matched == 1);
     /* action 不匹配：无命中 → DENY + matched=0（区别于显式 DENY） */
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "llm.chat", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "llm.chat", "f", NULL, &matched) ==
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
 
@@ -410,44 +410,44 @@ static void t_stage_activate(void)
 {
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
     /* activate 前置需 load：无暂存拒绝 */
-    CHECK(dpolicy_engine_activate(e, "x") == -5);
-    CHECK(dpolicy_engine_has_staged(e) == 0);
+    CHECK(dpolicy_activate(e, "x") == -5);
+    CHECK(dpolicy_has_staged(e) == 0);
 
     const char *doc = "{"
                       "\"rules\":["
                       "{\"id\":\"s1\",\"effect\":\"allow\",\"subject\":\"agent-*\","
                       "\"action\":\"tool.exec\",\"resource\":\"*\",\"enabled\":true}"
                       "]}";
-    CHECK(dpolicy_engine_stage_json(e, doc) == 0);
-    CHECK(dpolicy_engine_has_staged(e) == 1);
-    CHECK(dpolicy_engine_get_staged_count(e) == 1);
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    CHECK(dpolicy_has_staged(e) == 1);
+    CHECK(dpolicy_staged_count(e) == 1);
     /* load 不影响运行裁决与 epoch */
     CHECK(dpolicy_engine_get_rule_count(e) == 0);
     CHECK(dpolicy_engine_get_epoch(e) == 0);
     int matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
 
-    CHECK(dpolicy_engine_activate(e, "v1") == 0);
+    CHECK(dpolicy_activate(e, "v1") == 0);
     CHECK(dpolicy_engine_get_rule_count(e) == 1);
     CHECK(dpolicy_engine_get_epoch(e) == 1);
     CHECK(dpolicy_engine_get_version_count(e) == 1);
-    CHECK(dpolicy_engine_has_staged(e) == 0);
-    CHECK(dpolicy_engine_get_staged_count(e) == 0);
+    CHECK(dpolicy_has_staged(e) == 0);
+    CHECK(dpolicy_staged_count(e) == 0);
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
           DPOLICY_EFFECT_ALLOW);
     CHECK(matched == 1);
 
     /* 显式清空：load 空集 + activate → 运行集归零（回退基础），epoch 单调 */
-    CHECK(dpolicy_engine_stage_json(e, "{\"rules\":[]}") == 0);
-    CHECK(dpolicy_engine_has_staged(e) == 1);
-    CHECK(dpolicy_engine_activate(e, "clear") == 0);
+    CHECK(dpolicy_stage_json(e, "{\"rules\":[]}") == 0);
+    CHECK(dpolicy_has_staged(e) == 1);
+    CHECK(dpolicy_activate(e, "clear") == 0);
     CHECK(dpolicy_engine_get_rule_count(e) == 0);
     CHECK(dpolicy_engine_get_epoch(e) == 2);
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
 
@@ -456,7 +456,7 @@ static void t_stage_activate(void)
     CHECK(dpolicy_engine_get_rule_count(e) == 1);
     CHECK(dpolicy_engine_get_epoch(e) == 3);
     matched = -1;
-    CHECK(dpolicy_engine_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
+    CHECK(dpolicy_eval_match(e, "agent-1", "tool.exec", "f", NULL, &matched) ==
           DPOLICY_EFFECT_ALLOW);
     CHECK(matched == 1);
 
@@ -472,12 +472,12 @@ static void t_stage_conflicts(void)
                       "{\"id\":\"ca\",\"effect\":\"allow\",\"action\":\"tool.exec\"},"
                       "{\"id\":\"cd\",\"effect\":\"deny\",\"action\":\"tool.exec\"}"
                       "]}";
-    CHECK(dpolicy_engine_stage_json(e, doc) == 0);
-    CHECK(dpolicy_engine_get_staged_count(e) == 2);
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    CHECK(dpolicy_staged_count(e) == 2);
     /* 冲突报告针对暂存集（load 后、activate 前） */
     dpolicy_conflict_t *conflicts = NULL;
     size_t n = 0;
-    CHECK(dpolicy_engine_detect_staged_conflicts(e, &conflicts, &n) == 0);
+    CHECK(dpolicy_stage_check(e, &conflicts, &n) == 0);
     CHECK(n == 1);
     AIRY_FREE(conflicts);
     conflicts = NULL;
@@ -486,7 +486,7 @@ static void t_stage_conflicts(void)
     CHECK(n == 0);
     AIRY_FREE(conflicts);
 
-    CHECK(dpolicy_engine_activate(e, "conflict-set") == 0);
+    CHECK(dpolicy_activate(e, "conflict-set") == 0);
     CHECK(dpolicy_engine_detect_conflicts(e, &conflicts, &n) == 0);
     CHECK(n == 1); /* 激活后 deny-wins 生效 */
     AIRY_FREE(conflicts);
