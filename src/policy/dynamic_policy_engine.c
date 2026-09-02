@@ -29,9 +29,16 @@
 
 struct dpolicy_engine_s {
     dpolicy_conflict_strategy_t strategy;
+    /* 运行集：check_permission 评估的唯一规则源（epoch SSoT 保护其变更） */
     dpolicy_rule_t *rules;
     size_t rule_count;
     size_t rule_cap;
+    /* 暂存集（两段式生效）：policy.load 装载、policy.activate 提交到运行集。
+     * load 不改变运行裁决与 epoch；activate 原子替换 + 版本固化 + epoch+1。 */
+    dpolicy_rule_t *staged;
+    size_t staged_count;
+    size_t staged_cap;
+    int staged_valid;
     /* 版本历史：每 commit/rollback 深拷贝快照，[0] 为最早，最近在尾 */
     dpolicy_version_t versions[DPOLICY_MAX_VERSIONS];
     size_t version_count;
@@ -233,6 +240,9 @@ void dpolicy_engine_destroy(dpolicy_engine_t *engine)
     for (size_t i = 0; i < engine->rule_count; i++)
         rule_free(&engine->rules[i]);
     AIRY_FREE(engine->rules);
+    for (size_t i = 0; i < engine->staged_count; i++)
+        rule_free(&engine->staged[i]);
+    AIRY_FREE(engine->staged);
     for (size_t i = 0; i < engine->version_count; i++)
         version_free(&engine->versions[i]);
     airy_mtx_unlock(&engine->lock);
@@ -256,7 +266,8 @@ int dpolicy_engine_add_rule(dpolicy_engine_t *engine, const dpolicy_rule_t *rule
         return -4;
     }
     if (engine->rule_count >= engine->rule_cap) {
-        size_t nc = engine->rule_cap * 2;
+        /* 运行集可能被 activate(空暂存) 清空为 NULL/cap=0：首次增长兜底 64 */
+        size_t nc = engine->rule_cap > 0 ? engine->rule_cap * 2 : 64;
         dpolicy_rule_t *nr = AIRY_REALLOC(engine->rules, nc * sizeof(dpolicy_rule_t));
         if (!nr) {
             airy_mtx_unlock(&engine->lock);
@@ -330,17 +341,12 @@ int dpolicy_engine_update_rule(dpolicy_engine_t *engine, const char *rule_id,
 
 /* ── 评估（fail-closed：无匹配默认 DENY） ─────────────────────────── */
 
-dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *subject,
-                                         const char *action, const char *resource,
-                                         const char *context_json)
+/* 锁内评估：返回效果；matched 输出是否命中（可 NULL，服务层 overlay 用） */
+static dpolicy_effect_t eval_locked(const dpolicy_engine_t *engine, const char *subject,
+                                    const char *action, const char *resource, int *matched)
 {
-    (void)context_json; /* 条件表达式求值暂未启用，预留扩展槽 */
-    if (!engine || !subject || !action || !resource)
-        return DPOLICY_EFFECT_DENY;
-
-    airy_mtx_lock(&engine->lock);
     dpolicy_effect_t result = DPOLICY_EFFECT_DENY;
-    int matched = 0;
+    int matched_any = 0;
     int best_prio = -1;
     dpolicy_effect_t best_effect = DPOLICY_EFFECT_DENY;
     int has_deny = 0, has_allow = 0, has_cond = 0;
@@ -349,7 +355,7 @@ dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *s
         const dpolicy_rule_t *r = &engine->rules[i];
         if (!rule_matches(r, subject, action, resource))
             continue;
-        matched = 1;
+        matched_any = 1;
         if (r->effect == DPOLICY_EFFECT_DENY)
             has_deny = 1;
         else if (r->effect == DPOLICY_EFFECT_ALLOW)
@@ -362,7 +368,7 @@ dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *s
         }
     }
 
-    if (matched) {
+    if (matched_any) {
         switch (engine->strategy) {
         case DPOLICY_CONFLICT_DENY_WINS:
             result = has_deny ? DPOLICY_EFFECT_DENY : (has_cond ? DPOLICY_EFFECT_CONDITIONAL :
@@ -384,11 +390,69 @@ dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *s
             break;
         }
     }
+    if (matched)
+        *matched = matched_any;
+    return result;
+}
+
+dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *subject,
+                                         const char *action, const char *resource,
+                                         const char *context_json)
+{
+    (void)context_json; /* 条件表达式求值暂未启用，预留扩展槽 */
+    if (!engine || !subject || !action || !resource)
+        return DPOLICY_EFFECT_DENY;
+
+    airy_mtx_lock(&engine->lock);
+    dpolicy_effect_t result = eval_locked(engine, subject, action, resource, NULL);
+    airy_mtx_unlock(&engine->lock);
+    return result;
+}
+
+dpolicy_effect_t dpolicy_engine_eval_match(dpolicy_engine_t *engine, const char *subject,
+                                           const char *action, const char *resource,
+                                           const char *context_json, int *matched)
+{
+    (void)context_json;
+    if (matched)
+        *matched = 0;
+    if (!engine || !subject || !action || !resource)
+        return DPOLICY_EFFECT_DENY;
+
+    airy_mtx_lock(&engine->lock);
+    dpolicy_effect_t result = eval_locked(engine, subject, action, resource, matched);
     airy_mtx_unlock(&engine->lock);
     return result;
 }
 
 /* ── 冲突检测与消解 ───────────────────────────────────────────────── */
+
+/* 锁内收集给定规则集的重叠异效对（live / staged 共用） */
+static int overlaps_collect(const dpolicy_rule_t *rules, size_t n,
+                            dpolicy_conflict_strategy_t strategy,
+                            dpolicy_conflict_t **conflicts, size_t *conflict_count)
+{
+    size_t cap = n * n + 1;
+    dpolicy_conflict_t *out = AIRY_CALLOC(cap, sizeof(dpolicy_conflict_t));
+    if (!out)
+        return -3;
+    size_t c = 0;
+    for (size_t i = 0; i < n && c < DPOLICY_MAX_CONFLICTS; i++) {
+        for (size_t j = i + 1; j < n && c < DPOLICY_MAX_CONFLICTS; j++) {
+            if (!rules_overlap(&rules[i], &rules[j]))
+                continue;
+            AIRY_STRNCPY_TERM(out[c].rule_a_id, rules[i].id, sizeof(out[c].rule_a_id));
+            AIRY_STRNCPY_TERM(out[c].rule_b_id, rules[j].id, sizeof(out[c].rule_b_id));
+            out[c].resolution = strategy;
+            snprintf(out[c].reason, sizeof(out[c].reason),
+                     "overlapping scope with divergent effects");
+            c++;
+        }
+    }
+    *conflicts = out;
+    *conflict_count = c;
+    return 0;
+}
 
 int dpolicy_engine_detect_conflicts(dpolicy_engine_t *engine, dpolicy_conflict_t **conflicts,
                                     size_t *conflict_count)
@@ -396,29 +460,23 @@ int dpolicy_engine_detect_conflicts(dpolicy_engine_t *engine, dpolicy_conflict_t
     if (!engine || !conflicts || !conflict_count)
         return -1;
     airy_mtx_lock(&engine->lock);
-    size_t cap = engine->rule_count * engine->rule_count;
-    dpolicy_conflict_t *out = AIRY_CALLOC(cap + 1, sizeof(dpolicy_conflict_t));
-    if (!out) {
-        airy_mtx_unlock(&engine->lock);
-        return -3;
-    }
-    size_t n = 0;
-    for (size_t i = 0; i < engine->rule_count && n < DPOLICY_MAX_CONFLICTS; i++) {
-        for (size_t j = i + 1; j < engine->rule_count && n < DPOLICY_MAX_CONFLICTS; j++) {
-            if (!rules_overlap(&engine->rules[i], &engine->rules[j]))
-                continue;
-            AIRY_STRNCPY_TERM(out[n].rule_a_id, engine->rules[i].id, sizeof(out[n].rule_a_id));
-            AIRY_STRNCPY_TERM(out[n].rule_b_id, engine->rules[j].id, sizeof(out[n].rule_b_id));
-            out[n].resolution = engine->strategy;
-            snprintf(out[n].reason, sizeof(out[n].reason),
-                     "overlapping scope with divergent effects");
-            n++;
-        }
-    }
+    int rc = overlaps_collect(engine->rules, engine->rule_count, engine->strategy, conflicts,
+                              conflict_count);
     airy_mtx_unlock(&engine->lock);
-    *conflicts = out;
-    *conflict_count = n;
-    return 0;
+    return rc;
+}
+
+int dpolicy_engine_detect_staged_conflicts(dpolicy_engine_t *engine,
+                                           dpolicy_conflict_t **conflicts,
+                                           size_t *conflict_count)
+{
+    if (!engine || !conflicts || !conflict_count)
+        return -1;
+    airy_mtx_lock(&engine->lock);
+    int rc = overlaps_collect(engine->staged, engine->staged_count, engine->strategy, conflicts,
+                              conflict_count);
+    airy_mtx_unlock(&engine->lock);
+    return rc;
 }
 
 int dpolicy_engine_resolve_conflict(dpolicy_engine_t *engine, const dpolicy_conflict_t *conflict)
@@ -435,31 +493,37 @@ int dpolicy_engine_resolve_conflict(dpolicy_engine_t *engine, const dpolicy_conf
 
 /* ── 版本管理（epoch SSoT） ───────────────────────────────────────── */
 
+/* 锁内版本固化：快照当前运行集 → 版本历史 + epoch+1（commit/activate 共用） */
+static int commit_locked(dpolicy_engine_t *e, const char *description)
+{
+    if (e->version_count >= DPOLICY_MAX_VERSIONS) {
+        /* 超出 32 版：丢弃最旧，保留最近 31 + 新 1 */
+        version_free(&e->versions[0]);
+        for (size_t i = 1; i < e->version_count; i++)
+            e->versions[i - 1] = e->versions[i];
+        e->version_count--;
+    }
+    dpolicy_version_t v;
+    if (version_snapshot(e, &v, description, NULL) != 0)
+        return -3;
+    char vtag[32];
+    snprintf(vtag, sizeof(vtag), "v%llu", (unsigned long long)(e->epoch + 1));
+    AIRY_STRNCPY_TERM(v.version, vtag, sizeof(v.version));
+    e->versions[e->version_count++] = v;
+    e->epoch++;
+    return 0;
+}
+
 int dpolicy_engine_commit_version(dpolicy_engine_t *engine, const char *description)
 {
     if (!engine)
         return -1;
     airy_mtx_lock(&engine->lock);
-    if (engine->version_count >= DPOLICY_MAX_VERSIONS) {
-        /* 超出 32 版：丢弃最旧，保留最近 31 + 新 1 */
-        version_free(&engine->versions[0]);
-        for (size_t i = 1; i < engine->version_count; i++)
-            engine->versions[i - 1] = engine->versions[i];
-        engine->version_count--;
-    }
-    dpolicy_version_t v;
-    if (version_snapshot(engine, &v, description, NULL) != 0) {
-        airy_mtx_unlock(&engine->lock);
-        return -3;
-    }
-    char vtag[32];
-    snprintf(vtag, sizeof(vtag), "v%llu", (unsigned long long)(engine->epoch + 1));
-    AIRY_STRNCPY_TERM(v.version, vtag, sizeof(v.version));
-    engine->versions[engine->version_count++] = v;
-    engine->epoch++;
+    int rc = commit_locked(engine, description);
     airy_mtx_unlock(&engine->lock);
-    fire_change(engine, DPOLICY_CHANGE_COMMIT, NULL, NULL, NULL, description);
-    return 0;
+    if (rc == 0)
+        fire_change(engine, DPOLICY_CHANGE_COMMIT, NULL, NULL, NULL, description);
+    return rc;
 }
 
 int dpolicy_engine_rollback(dpolicy_engine_t *engine, const char *version)
@@ -511,20 +575,12 @@ int dpolicy_engine_rollback(dpolicy_engine_t *engine, const char *version)
 
 /* ── JSON 导入导出 ────────────────────────────────────────────────── */
 
-/* 锁内清空规则集（load 整体替换用） */
-static void clear_rules_locked(dpolicy_engine_t *e)
-{
-    for (size_t i = 0; i < e->rule_count; i++)
-        rule_free(&e->rules[i]);
-    __builtin_memset(e->rules, 0, e->rule_cap * sizeof(dpolicy_rule_t));
-    e->rule_count = 0;
-}
-
-static int rule_from_json(dpolicy_engine_t *e, cJSON *j)
+/* 纯解析：单条规则 JSON → dpolicy_rule_t（condition_json 深拷贝） */
+static int rule_from_json(const cJSON *j, dpolicy_rule_t *out)
 {
     dpolicy_rule_t r;
     __builtin_memset(&r, 0, sizeof(r));
-    cJSON *v;
+    const cJSON *v;
     v = cJSON_GetObjectItem(j, "id");
     if (cJSON_IsString(v) && v->valuestring && v->valuestring[0])
         AIRY_STRNCPY_TERM(r.id, v->valuestring, sizeof(r.id));
@@ -574,37 +630,175 @@ static int rule_from_json(dpolicy_engine_t *e, cJSON *j)
         r.enabled = cJSON_IsTrue(v) ? 1 : 0;
     else
         r.enabled = 1;
-    int rc = dpolicy_engine_add_rule(e, &r) == 0 ? 0 : -1;
-    AIRY_FREE(r.condition_json); /* add_rule 内已深拷贝，栈临时指针即刻释放 */
-    return rc;
+    *out = r;
+    return 0;
+}
+
+/* 规则集容器（文档解析目标：先于引擎锁完整构建，再整体迁移，事务式） */
+typedef struct {
+    dpolicy_rule_t *items;
+    size_t count;
+    size_t cap;
+} rule_array_t;
+
+static void rule_array_free(rule_array_t *a)
+{
+    if (!a)
+        return;
+    for (size_t i = 0; i < a->count; i++)
+        rule_free(&a->items[i]);
+    AIRY_FREE(a->items);
+    __builtin_memset(a, 0, sizeof(*a));
+}
+
+static int rule_array_append(rule_array_t *a, const dpolicy_rule_t *r)
+{
+    if (!a || !r)
+        return -1;
+    if (a->count >= a->cap) {
+        size_t nc = a->cap > 0 ? a->cap * 2 : 8;
+        dpolicy_rule_t *ni = AIRY_REALLOC(a->items, nc * sizeof(dpolicy_rule_t));
+        if (!ni)
+            return -3;
+        a->items = ni;
+        a->cap = nc;
+    }
+    rule_copy(&a->items[a->count], r);
+    if ((r->condition_json && r->condition_json[0]) && !a->items[a->count].condition_json)
+        return -3;
+    a->count++;
+    return 0;
+}
+
+/* 解析策略文档 → 规则数组。事务式：任一行非法或 id 重复即整体失败（-2），
+ * 目标集保持不动——杜绝“半套应用后拒绝”的撕裂状态（load/stage 共用）。 */
+static int doc_to_array(const char *json, rule_array_t *out)
+{
+    if (!json || !out)
+        return -1;
+    cJSON *root = cJSON_Parse(json);
+    if (!root)
+        return -1;
+    const cJSON *rules = cJSON_GetObjectItem(root, "rules");
+    if (!cJSON_IsArray(rules)) {
+        cJSON_Delete(root);
+        return -2;
+    }
+    rule_array_t tmp = {0};
+    int rc = 0;
+    int n = cJSON_GetArraySize(rules);
+    for (int i = 0; i < n; i++) {
+        const cJSON *r = cJSON_GetArrayItem(rules, i);
+        if (!cJSON_IsObject(r)) {
+            rc = -2;
+            break;
+        }
+        dpolicy_rule_t parsed;
+        if (rule_from_json(r, &parsed) != 0) {
+            rc = -2;
+            break;
+        }
+        for (size_t k = 0; k < tmp.count; k++) {
+            if (strcmp(tmp.items[k].id, parsed.id) == 0) {
+                AIRY_FREE(parsed.condition_json);
+                rc = -2;
+                break;
+            }
+        }
+        if (rc == 0) {
+            if (rule_array_append(&tmp, &parsed) != 0)
+                rc = -3;
+            AIRY_FREE(parsed.condition_json); /* append 已深拷贝 */
+        }
+        if (rc != 0)
+            break;
+    }
+    cJSON_Delete(root);
+    if (rc != 0) {
+        rule_array_free(&tmp);
+        return rc;
+    }
+    *out = tmp;
+    return 0;
+}
+
+/* 锁内以 src 整体替换运行集（迁移所有权）。始终保证 rules 非 NULL 且
+ * cap>=8：activate(空暂存) 清空运行集后 add_rule 仍可直接写入。 */
+static void live_replace_locked(dpolicy_engine_t *e, rule_array_t *src)
+{
+    for (size_t i = 0; i < e->rule_count; i++)
+        rule_free(&e->rules[i]);
+    AIRY_FREE(e->rules);
+    e->rules = src->items;
+    e->rule_count = src->count;
+    e->rule_cap = src->cap > 0 ? src->cap : 8;
+    if (src->cap == 0)
+        e->rules = AIRY_CALLOC(e->rule_cap, sizeof(dpolicy_rule_t));
+    src->items = NULL;
+    src->count = src->cap = 0;
 }
 
 int dpolicy_engine_load_policies_json(dpolicy_engine_t *engine, const char *json)
 {
     if (!engine || !json)
         return -1;
-    cJSON *root = cJSON_Parse(json);
-    if (!root)
-        return -1;
-    cJSON *rules = cJSON_GetObjectItem(root, "rules");
-    if (!cJSON_IsArray(rules)) {
-        cJSON_Delete(root);
-        return -2;
-    }
-    /* 整体替换语义：先清空现有规则集，再逐条导入（load 幂等） */
+    rule_array_t doc;
+    __builtin_memset(&doc, 0, sizeof(doc));
+    int rc = doc_to_array(json, &doc);
+    if (rc != 0)
+        return rc;
     airy_mtx_lock(&engine->lock);
-    clear_rules_locked(engine);
+    live_replace_locked(engine, &doc);
     airy_mtx_unlock(&engine->lock);
-    int rc = 0;
-    int n = cJSON_GetArraySize(rules);
-    for (int i = 0; i < n; i++) {
-        cJSON *r = cJSON_GetArrayItem(rules, i);
-        if (cJSON_IsObject(r)) {
-            if (rule_from_json(engine, r) != 0)
-                rc = -2;
-        }
+    return 0;
+}
+
+/* M2-S2 两段式生效（0.1.9 §3.3.1）：policy.load 仅装载入暂存集——运行
+ * 裁决与 epoch 不变，冲突报告针对暂存文档；activate 才原子提交运行集并
+ * 版本固化 + epoch+1（PEP 缓存失效键由此单调推进）。 */
+int dpolicy_engine_stage_json(dpolicy_engine_t *engine, const char *json)
+{
+    if (!engine || !json)
+        return -1;
+    rule_array_t doc;
+    __builtin_memset(&doc, 0, sizeof(doc));
+    int rc = doc_to_array(json, &doc);
+    if (rc != 0)
+        return rc;
+    airy_mtx_lock(&engine->lock);
+    for (size_t i = 0; i < engine->staged_count; i++)
+        rule_free(&engine->staged[i]);
+    AIRY_FREE(engine->staged);
+    engine->staged = doc.items;
+    engine->staged_count = doc.count;
+    engine->staged_cap = doc.cap;
+    doc.items = NULL;
+    doc.count = doc.cap = 0;
+    engine->staged_valid = 1;
+    airy_mtx_unlock(&engine->lock);
+    return 0;
+}
+
+int dpolicy_engine_activate(dpolicy_engine_t *engine, const char *description)
+{
+    if (!engine)
+        return -1;
+    airy_mtx_lock(&engine->lock);
+    if (!engine->staged_valid) {
+        airy_mtx_unlock(&engine->lock);
+        return -5; /* 无暂存文档：policy.activate 前置需 policy.load */
     }
-    cJSON_Delete(root);
+    /* 暂存 → 运行原子提交（同一临界区，evaluate 观察不到撕裂状态） */
+    rule_array_t staged_doc = {.items = engine->staged, .count = engine->staged_count,
+                               .cap = engine->staged_cap};
+    engine->staged = NULL;
+    engine->staged_count = engine->staged_cap = 0;
+    engine->staged_valid = 0;
+    live_replace_locked(engine, &staged_doc);
+    int rc = commit_locked(engine, description);
+    airy_mtx_unlock(&engine->lock);
+    if (rc == 0)
+        fire_change(engine, DPOLICY_CHANGE_COMMIT, NULL, NULL, NULL, description);
     return rc;
 }
 
@@ -700,6 +894,16 @@ int dpolicy_engine_validate_compliance(dpolicy_engine_t *engine, const char *sta
 size_t dpolicy_engine_get_rule_count(dpolicy_engine_t *engine)
 {
     return engine ? engine->rule_count : 0;
+}
+
+size_t dpolicy_engine_get_staged_count(dpolicy_engine_t *engine)
+{
+    return engine ? engine->staged_count : 0;
+}
+
+int dpolicy_engine_has_staged(dpolicy_engine_t *engine)
+{
+    return engine ? engine->staged_valid : 0;
 }
 
 size_t dpolicy_engine_get_version_count(dpolicy_engine_t *engine)
