@@ -10,10 +10,13 @@ option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
 
 # 使用根级依赖检测结果 (BAN-12: 单一依赖检测点)
-# 所有 find_package 已在根 CMakeLists.txt 中完成，此处仅引用缓存变量
-
-if(PkgConfig_FOUND)
+# 所有 find_package 已在根 CMakeLists.txt 中完成，此处仅引用缓存变量。
+# YAML 仅在根未检出时兜底自检（libyaml keg-only：根已把 ${YAML_LIBRARIES}
+# 提升为绝对路径，重查会覆盖成裸名 "-lyaml"，macOS 链接行再失败）。
+if(PkgConfig_FOUND AND NOT YAML_FOUND)
     pkg_check_modules(YAML QUIET libyaml)
+endif()
+if(PkgConfig_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 
