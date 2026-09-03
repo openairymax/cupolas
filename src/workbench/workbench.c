@@ -291,16 +291,13 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
      * closed its inherited copies at exec via FD_CLOEXEC, so the parent now
      * holds the only write ends. */
     if (wb->manager.redirect_stdout) {
-        close(wb->stdout_pipe[1]);
-        wb->stdout_pipe[1] = -1;
+        cupolas_pipe_close_write_end(&wb->stdout_pipe);
     }
     if (wb->manager.redirect_stderr) {
-        close(wb->stderr_pipe[1]);
-        wb->stderr_pipe[1] = -1;
+        cupolas_pipe_close_write_end(&wb->stderr_pipe);
     }
     if (wb->manager.redirect_stdin) {
-        close(wb->stdin_pipe[0]);
-        wb->stdin_pipe[0] = -1;
+        cupolas_pipe_close_read_end(&wb->stdin_pipe);
     }
 
     uint32_t timeout_ms = wb->manager.timeout_ms > 0 ? wb->manager.timeout_ms : 0;
@@ -376,16 +373,13 @@ int workbench_execute_async(workbench_t *wb, const char *command, char *const ar
      * read_output sees EOF (stdin_pipe[1] is kept for
      * workbench_write_stdin). */
     if (wb->manager.redirect_stdout) {
-        close(wb->stdout_pipe[1]);
-        wb->stdout_pipe[1] = -1;
+        cupolas_pipe_close_write_end(&wb->stdout_pipe);
     }
     if (wb->manager.redirect_stderr) {
-        close(wb->stderr_pipe[1]);
-        wb->stderr_pipe[1] = -1;
+        cupolas_pipe_close_write_end(&wb->stderr_pipe);
     }
     if (wb->manager.redirect_stdin) {
-        close(wb->stdin_pipe[0]);
-        wb->stdin_pipe[0] = -1;
+        cupolas_pipe_close_read_end(&wb->stdin_pipe);
     }
 
     return cupolas_OK;
