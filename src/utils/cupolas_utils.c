@@ -10,7 +10,11 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+/* <strings.h>（strcasecmp 等）为 POSIX 专有；MSVC 无此头（C1083），
+ * 大小写不敏感比较统一走 cupolas_strcasecmp（platform_util.c）。 */
+#if !defined(_WIN32)
 #include <strings.h>
+#endif
 
 #include "logging.h"
 

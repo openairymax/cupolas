@@ -249,8 +249,8 @@ int cupolas_pipe_create(cupolas_pipe_t *pfd)
 
     if (!CreatePipe(&readHandle, &writeHandle, &sa, 0))
         return cupolas_ERROR_IO;
-    pfd[0] = readHandle;
-    pfd[1] = writeHandle;
+    (*pfd)[0] = readHandle;
+    (*pfd)[1] = writeHandle;
     return 0;
 #else
     return pipe(*pfd) == 0 ? 0 : cupolas_ERROR_IO;
@@ -260,12 +260,12 @@ int cupolas_pipe_create(cupolas_pipe_t *pfd)
 int cupolas_pipe_close(cupolas_pipe_t *pipe)
 {
 #if cupolas_PLATFORM_WINDOWS
-    if (pipe[0] != INVALID_HANDLE_VALUE)
-        CloseHandle(pipe[0]);
-    if (pipe[1] != INVALID_HANDLE_VALUE)
-        CloseHandle(pipe[1]);
-    pipe[0] = INVALID_HANDLE_VALUE;
-    pipe[1] = INVALID_HANDLE_VALUE;
+    if ((*pipe)[0] != INVALID_HANDLE_VALUE)
+        CloseHandle((*pipe)[0]);
+    if ((*pipe)[1] != INVALID_HANDLE_VALUE)
+        CloseHandle((*pipe)[1]);
+    (*pipe)[0] = INVALID_HANDLE_VALUE;
+    (*pipe)[1] = INVALID_HANDLE_VALUE;
     return 0;
 #else
     if ((*pipe)[0] >= 0)
@@ -281,9 +281,9 @@ int cupolas_pipe_close(cupolas_pipe_t *pipe)
 int cupolas_pipe_close_read_end(cupolas_pipe_t *pipe)
 {
 #if cupolas_PLATFORM_WINDOWS
-    if (pipe[0] != INVALID_HANDLE_VALUE) {
-        CloseHandle(pipe[0]);
-        pipe[0] = INVALID_HANDLE_VALUE;
+    if ((*pipe)[0] != INVALID_HANDLE_VALUE) {
+        CloseHandle((*pipe)[0]);
+        (*pipe)[0] = INVALID_HANDLE_VALUE;
     }
 #else
     if ((*pipe)[0] >= 0) {
@@ -297,9 +297,9 @@ int cupolas_pipe_close_read_end(cupolas_pipe_t *pipe)
 int cupolas_pipe_close_write_end(cupolas_pipe_t *pipe)
 {
 #if cupolas_PLATFORM_WINDOWS
-    if (pipe[1] != INVALID_HANDLE_VALUE) {
-        CloseHandle(pipe[1]);
-        pipe[1] = INVALID_HANDLE_VALUE;
+    if ((*pipe)[1] != INVALID_HANDLE_VALUE) {
+        CloseHandle((*pipe)[1]);
+        (*pipe)[1] = INVALID_HANDLE_VALUE;
     }
 #else
     if ((*pipe)[1] >= 0) {
@@ -314,7 +314,7 @@ int cupolas_pipe_read(cupolas_pipe_t *pipe, void *buf, size_t count, size_t *byt
 {
 #if cupolas_PLATFORM_WINDOWS
     DWORD bytesRead = 0;
-    BOOL ok = ReadFile(pipe[0], buf, (DWORD)count, &bytesRead, NULL);
+    BOOL ok = ReadFile((*pipe)[0], buf, (DWORD)count, &bytesRead, NULL);
     if (bytes_read)
         *bytes_read = bytesRead;
     return ok ? 0 : cupolas_ERROR_IO;
@@ -332,7 +332,7 @@ int cupolas_pipe_write(cupolas_pipe_t *pipe, const void *buf, size_t count, size
 {
 #if cupolas_PLATFORM_WINDOWS
     DWORD written = 0;
-    BOOL ok = WriteFile(pipe[1], buf, (DWORD)count, &written, NULL);
+    BOOL ok = WriteFile((*pipe)[1], buf, (DWORD)count, &written, NULL);
     if (bytes_written)
         *bytes_written = written;
     return ok ? 0 : cupolas_ERROR_IO;
