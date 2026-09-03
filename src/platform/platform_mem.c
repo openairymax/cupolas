@@ -211,16 +211,16 @@ bool cupolas_atomic_cas64(volatile int64_t *ptr, int64_t expected, int64_t desir
 
 void *cupolas_atomic_load_ptr(volatile void **ptr)
 {
-    return atomic_load_ptr((_Atomic void **)ptr, memory_order_seq_cst);
+    return atomic_load_ptr((atomic_void_ptr_t *)ptr, memory_order_seq_cst);
 }
 
 void cupolas_atomic_store_ptr(volatile void **ptr, void *val)
 {
-    atomic_store_ptr((_Atomic void **)ptr, val, memory_order_seq_cst);
+    atomic_store_ptr((atomic_void_ptr_t *)ptr, val, memory_order_seq_cst);
 }
 
 bool cupolas_atomic_cas_ptr(volatile void **ptr, void *expected, void *desired)
 {
-    return atomic_compare_exchange_strong_ptr((_Atomic void **)ptr, &expected, desired,
+    return atomic_compare_exchange_strong_ptr((atomic_void_ptr_t *)ptr, &expected, desired,
                                               memory_order_seq_cst, memory_order_seq_cst);
 }
