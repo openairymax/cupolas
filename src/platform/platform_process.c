@@ -73,12 +73,14 @@ int cupolas_process_spawn(cupolas_process_t *proc, const char *path, char *const
     si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
     if (attr) {
-        if (attr->redirect_stdin && attr->stdin_pipe != INVALID_HANDLE_VALUE)
-            si.hStdInput = attr->stdin_pipe;
-        if (attr->redirect_stdout && attr->stdout_pipe != INVALID_HANDLE_VALUE)
-            si.hStdOutput = attr->stdout_pipe;
-        if (attr->redirect_stderr && attr->stderr_pipe != INVALID_HANDLE_VALUE)
-            si.hStdError = attr->stderr_pipe;
+        /* cupolas_pipe_t 在 Windows 下为 HANDLE[2]：{read, write}。
+         * 子进程 stdin 用读端 [0]；stdout/stderr 用写端 [1]。 */
+        if (attr->redirect_stdin && attr->stdin_pipe[0] != INVALID_HANDLE_VALUE)
+            si.hStdInput = attr->stdin_pipe[0];
+        if (attr->redirect_stdout && attr->stdout_pipe[1] != INVALID_HANDLE_VALUE)
+            si.hStdOutput = attr->stdout_pipe[1];
+        if (attr->redirect_stderr && attr->stderr_pipe[1] != INVALID_HANDLE_VALUE)
+            si.hStdError = attr->stderr_pipe[1];
     }
 
     PROCESS_INFORMATION pi = {0};
@@ -258,14 +260,54 @@ int cupolas_pipe_create(cupolas_pipe_t *pfd)
 int cupolas_pipe_close(cupolas_pipe_t *pipe)
 {
 #if cupolas_PLATFORM_WINDOWS
-    CloseHandle(pipe[0]);
-    CloseHandle(pipe[1]);
+    if (pipe[0] != INVALID_HANDLE_VALUE)
+        CloseHandle(pipe[0]);
+    if (pipe[1] != INVALID_HANDLE_VALUE)
+        CloseHandle(pipe[1]);
+    pipe[0] = INVALID_HANDLE_VALUE;
+    pipe[1] = INVALID_HANDLE_VALUE;
     return 0;
 #else
-    close((*pipe)[0]);
-    close((*pipe)[1]);
+    if ((*pipe)[0] >= 0)
+        close((*pipe)[0]);
+    if ((*pipe)[1] >= 0)
+        close((*pipe)[1]);
+    (*pipe)[0] = -1;
+    (*pipe)[1] = -1;
     return 0;
 #endif
+}
+
+int cupolas_pipe_close_read_end(cupolas_pipe_t *pipe)
+{
+#if cupolas_PLATFORM_WINDOWS
+    if (pipe[0] != INVALID_HANDLE_VALUE) {
+        CloseHandle(pipe[0]);
+        pipe[0] = INVALID_HANDLE_VALUE;
+    }
+#else
+    if ((*pipe)[0] >= 0) {
+        close((*pipe)[0]);
+        (*pipe)[0] = -1;
+    }
+#endif
+    return 0;
+}
+
+int cupolas_pipe_close_write_end(cupolas_pipe_t *pipe)
+{
+#if cupolas_PLATFORM_WINDOWS
+    if (pipe[1] != INVALID_HANDLE_VALUE) {
+        CloseHandle(pipe[1]);
+        pipe[1] = INVALID_HANDLE_VALUE;
+    }
+#else
+    if ((*pipe)[1] >= 0) {
+        close((*pipe)[1]);
+        (*pipe)[1] = -1;
+    }
+#endif
+    return 0;
 }
 
 int cupolas_pipe_read(cupolas_pipe_t *pipe, void *buf, size_t count, size_t *bytes_read)

@@ -24,7 +24,10 @@ extern "C" {
 #if cupolas_PLATFORM_WINDOWS
 typedef HANDLE cupolas_process_t;
 typedef DWORD cupolas_pid_t;
-typedef HANDLE cupolas_pipe_t;
+/* Windows 下与 POSIX int[2] 对齐：{read, write} 两端相邻存放。
+ * （此前 typedef HANDLE 单值，cupolas_pipe_create 却写入两把 HANDLE，
+ * 会越界覆盖相邻结构体字段，MSVC 下还报 C2036。） */
+typedef HANDLE cupolas_pipe_t[2];
 #else
 typedef pid_t cupolas_pid_t;
 typedef int cupolas_process_t;
@@ -126,6 +129,26 @@ int cupolas_pipe_create(cupolas_pipe_t *pipe);
  * @reentrant Yes
  */
 int cupolas_pipe_close(cupolas_pipe_t *pipe);
+
+/**
+ * @brief Close the read end of a pipe, keep the write end usable
+ * @param[in] pipe Pipe handles
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @note Parent 在 spawn 后关闭自己持有的子进程写入端/读取端副本时使用
+ *       （见 workbench.c P2-5：只关一端才能让 read 看到 EOF）。
+ */
+int cupolas_pipe_close_read_end(cupolas_pipe_t *pipe);
+
+/**
+ * @brief Close the write end of a pipe, keep the read end usable
+ * @param[in] pipe Pipe handles
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ */
+int cupolas_pipe_close_write_end(cupolas_pipe_t *pipe);
 
 /**
  * @brief Read from pipe
