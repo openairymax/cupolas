@@ -5,13 +5,13 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/cupolas)
+[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/cupolas)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
 - **仓库地址：** `git@atomgit.com:openairymax/cupolas.git`
-- **分支：** `feature/official-hubs-01`
-- **版本：** 0.1.1（Airymax 奠基版本）
+- **分支：** `develop/hubs-01`（`main` 为发布快照）
+- **版本：** 0.1.9
 
 ---
 
@@ -26,7 +26,9 @@
 
 cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于身份与上下文授权、完全可审计、最小权限、动态可扩展的 guard 框架。它构建单一静态库 `airy_cupolas`，聚合所有安全子系统，OpenSSL 条件的 iOS 级模块（签名、密钥库、entitlements、运行时保护、网络/TLS 安全）由 `AIRY_HAS_OPENSSL` 门控。
 
-在 Airymax 0.1.1 发行版中，工作区被拆分为 **38 个仓库**（1 umbrella + 5 management + 29 leaf + 3 top-level）；`cupolas` 是 [agentrt](../) 管理仓聚合的 7 个叶子仓之一，在循环分层架构中位于内核层（`atoms`）与服务/组合层（`gateway`、`daemons`）之间。
+自 0.1.9 起，cupolas 在四层内生安全之上承担**策略决策点（PDP）**职责：`src/policy/` 的动态策略引擎（接口见 `dynamic_policy_engine.h`）统一负责安全策略的加载、暂存（staging）校验、冲突检测与解决、激活生效与版本回滚（JSON 规则集，支持按版本回退）；生效策略下发至各守护进程，由守护进程本地的**策略执行点（PEP）**以缓存方式就近执行——策略变更秒级生效，可随时回滚。
+
+`cupolas` 是 [agentrt](../) 管理仓聚合的 7 个叶子仓之一，在循环分层架构中位于内核层（`atoms`）与服务/组合层（`gateway`、`daemons`）之间。
 
 ## 模块分类
 
@@ -48,15 +50,23 @@ cupolas/
 │   ├── zero_trust_integration.h          # 零信任集成接口
 │   ├── dynamic_policy_engine.h           # 动态策略引擎
 │   └── safety_guard.h                    # 安全 guard 接口
+├── tests/                                # 测试套件
+│   ├── unit/                             # 单元测试
+│   ├── integration/                      # 集成测试
+│   ├── stress/                           # 压力测试
+│   ├── fuzz/                             # 模糊测试
+│   ├── benchmark/                        # 基准测试
+│   └── test_protection_chain.c           # 安全链路端到端测试
 └── src/
     ├── cupolas.c                         # Cupolas 核心实现
     ├── cupolas_config.c/.h               # 配置管理
     ├── cupolas_metrics.c/.h              # 指标采集
     ├── cupolas_monitoring.c/.h           # 运行时监控
     ├── circuit_breaker.c/.h              # 熔断器
-    ├── yaml_minimal.c/.h                 # YAML 1.1 解析器（回退）
     ├── slab.c/.h                         # Slab 分配器
     ├── mempool.c/.h                      # 内存池
+    ├── policy/                           #（PDP）动态安全策略引擎
+    │   └── dynamic_policy_engine.c       # 策略加载/staging/冲突检测/激活/回滚
     ├── platform/
     │   └── platform.c/.h                 # 平台安全适配
     ├── sanitizer/                        #（第 3 层）输入净化器
@@ -91,11 +101,10 @@ cupolas/
     ├── guards/                           # 可扩展 guard 框架
     │   ├── guard_core.c/.h
     │   ├── guard_integration.c/.h
-    │   └── safety_guard.c/.h
+    │   └── safety_guard.c                # 另含 safety_guard_{audit,check,ctrl,internal,policy,quota}.*
     ├── workbench/                        #（第 1 层）沙箱 workbench
     │   ├── workbench.c/.h
     │   ├── workbench_process.h           # 进程管理接口
-    │   ├── workbench_process_core.c      # 进程管理实现
     │   ├── workbench_container.c/.h      # 容器隔离
     │   └── workbench_limits.c/.h         # 资源限制
     └── utils/
