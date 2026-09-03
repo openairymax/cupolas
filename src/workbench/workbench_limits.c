@@ -436,7 +436,11 @@ int limits_get_stats(limit_context_t *ctx, resource_stats_t *stats)
         stats->cpu_time_ns = (uint64_t)tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
     }
 
-    stats->file_descriptors_current = (uint32_t)getdtablesize();
+    /* getdtablesize() is legacy BSD and is not declared by the macOS SDK
+     * under strict _POSIX_C_SOURCE; sysconf(_SC_OPEN_MAX) is the POSIX
+     * standard equivalent (same RLIMIT_NOFILE semantics). */
+    long open_max = sysconf(_SC_OPEN_MAX);
+    stats->file_descriptors_current = (open_max > 0) ? (uint32_t)open_max : 0u;
 #endif
 
     stats->processes_limit = ctx->processes_limit;
