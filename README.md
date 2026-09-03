@@ -5,13 +5,13 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/cupolas)
+[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/cupolas)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
 - **Repository:** `git@atomgit.com:openairymax/cupolas.git`
-- **Branch:** `feature/official-hubs-01`
-- **Version:** 0.1.1 (Airymax foundational release)
+- **Branch:** `develop/hubs-01` (`main` is the release snapshot)
+- **Version:** 0.1.9
 
 ---
 
@@ -26,7 +26,9 @@
 
 cupolas follows defense-in-depth and zero-trust principles: default-deny, identity-and-context-based authorization per call, full auditability, least privilege, and a dynamically-extensible guard framework. It builds a single static library `airy_cupolas` aggregating all security subsystems, with OpenSSL-conditional iOS-grade modules (signature, vault, entitlements, runtime protection, network/TLS security) gated by `AIRY_HAS_OPENSSL`.
 
-Within the Airymax 0.1.1 release, the workspace is partitioned into **38 repositories** (1 umbrella + 5 management + 29 leaf + 3 top-level); `cupolas` is one of the 7 leaf repositories aggregated by the [agentrt](../) management repo, sitting between the kernel layer (`atoms`) and the service/composition layer (`gateway`, `daemons`) in the cyclic layered architecture.
+Since 0.1.9, cupolas also acts as the **Policy Decision Point (PDP)** on top of the four-layer inherent security: the dynamic policy engine in `src/policy/` (interface in `dynamic_policy_engine.h`) centrally handles policy loading, staging validation, conflict detection and resolution, activation, and version rollback (JSON rule sets, revertible by version); once active, policies are distributed to the daemons and enforced locally by each daemon's **Policy Enforcement Point (PEP)** through a local cache — changes take effect within seconds and can be rolled back at any time.
+
+`cupolas` is one of the 7 leaf repositories aggregated by the [agentrt](../) management repo, sitting between the kernel layer (`atoms`) and the service/composition layer (`gateway`, `daemons`) in the cyclic layered architecture.
 
 ## Module Classification
 
@@ -48,6 +50,13 @@ cupolas/
 │   ├── zero_trust_integration.h          # Zero-trust integration interface
 │   ├── dynamic_policy_engine.h           # Dynamic policy engine
 │   └── safety_guard.h                    # Safety guard interface
+├── tests/                                # Test suite
+│   ├── unit/                             # Unit tests
+│   ├── integration/                      # Integration tests
+│   ├── stress/                           # Stress tests
+│   ├── fuzz/                             # Fuzz tests
+│   ├── benchmark/                        # Benchmark tests
+│   └── test_protection_chain.c           # End-to-end protection-chain test
 └── src/
     ├── cupolas.c                         # Cupolas core implementation
     ├── cupolas_config.c/.h               # Configuration management
@@ -56,6 +65,8 @@ cupolas/
     ├── circuit_breaker.c/.h              # Circuit breaker
     ├── slab.c/.h                         # Slab allocator
     ├── mempool.c/.h                      # Memory pool
+    ├── policy/                           # (PDP) Dynamic policy engine
+    │   └── dynamic_policy_engine.c       # Policy load/staging/conflict/activate/rollback
     ├── platform/
     │   └── platform.c/.h                 # Platform security adaptation
     ├── sanitizer/                        # (Layer 3) Input sanitizer
@@ -90,7 +101,7 @@ cupolas/
     ├── guards/                           # Extensible guard framework
     │   ├── guard_core.c/.h
     │   ├── guard_integration.c/.h
-    │   └── safety_guard.c/.h
+    │   └── safety_guard.c                # plus safety_guard_{audit,check,ctrl,internal,policy,quota}.*
     ├── workbench/                        # (Layer 1) Sandbox workbench
     │   ├── workbench.c/.h
     │   ├── workbench_process.h           # Process management interface
