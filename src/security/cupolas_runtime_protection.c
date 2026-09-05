@@ -133,7 +133,11 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *manager
     }
 
     while (atomic_load(&g_runtime_prot.initialized) != RTP_INIT_COMPLETE) {
+#if defined(_WIN32)
+        SwitchToThread();
+#else
         sched_yield();
+#endif
     }
     return 0;
 }

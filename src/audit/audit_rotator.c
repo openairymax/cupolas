@@ -22,6 +22,9 @@
 
 #ifdef _WIN32
 #include <io.h>
+/* UCRT <io.h> is shadowed by commons/utils/io/io.h (PUBLIC -I leakage);
+ * declare the needed CRT prototype locally until the shadow is removed. */
+int _commit(int fd);
 #else
 #include <unistd.h>
 #endif
