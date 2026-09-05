@@ -20,6 +20,10 @@
 #include <sys/types.h>
 #include <time.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#endif
+
 #include "error.h"
 
 #define DEFAULT_OVERFLOW_DIR AIRY_LOG_DIR "/cupolas"
