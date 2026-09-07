@@ -5,6 +5,7 @@
  */
 
 #include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/ */
+#include "airy_memory.h"  /* AIRY_FREE：yaml_serialize 返回 AIRY 分配器内存 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -147,13 +148,13 @@ static void test_dump_scalar(void)
     int rc = yaml_parse_string(doc, yaml, strlen(yaml));
     ASSERT(rc == 0, "parse scalar");
 
-    char buf[4096];
+    char buf[4096] = {0};
     yaml_dump(doc->root, buf, sizeof(buf), 0);
     ASSERT(strlen(buf) > 0, "dump should produce output");
 
     char *serialized = yaml_serialize(doc);
     ASSERT(serialized != NULL, "serialize should produce output");
-    free(serialized);
+    AIRY_FREE(serialized);
 
     yaml_destroy(doc);
     PASS();
@@ -167,13 +168,13 @@ static void test_dump_sequence(void)
     int rc = yaml_parse_string(doc, yaml, strlen(yaml));
     ASSERT(rc == 0, "parse sequence");
 
-    char buf[4096];
+    char buf[4096] = {0};
     yaml_dump(doc->root, buf, sizeof(buf), 0);
     ASSERT(strlen(buf) > 0, "dump should produce output");
 
     char *serialized = yaml_serialize(doc);
     ASSERT(serialized != NULL, "serialize should produce output");
-    free(serialized);
+    AIRY_FREE(serialized);
 
     yaml_destroy(doc);
     PASS();
