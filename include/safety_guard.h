@@ -29,6 +29,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Boundary-crossing event/result contract shared with atoms (ARC-02/ARC-04).
+ * Canonical definition lives in commons/utils/types so the atoms layer can
+ * consume it without including this upper-layer header. */
+#include "safety_guard_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,29 +43,6 @@ extern "C" {
 #define SAFETY_MAX_POLICIES 128
 #define SAFETY_MAX_RESOURCES 256
 #define SAFETY_MAX_AUDIT_ENTRIES 10000
-#define SAFETY_MAX_SUBJECT_LEN 128
-#define SAFETY_MAX_ACTION_LEN 64
-#define SAFETY_MAX_RESOURCE_LEN 256
-
-typedef enum {
-    SAFETY_EVENT_ACCESS_REQUEST = 0,
-    SAFETY_EVENT_RESOURCE_ALLOCATE,
-    SAFETY_EVENT_DATA_FLOW,
-    SAFETY_EVENT_EXECUTION_START,
-    SAFETY_EVENT_EXECUTION_COMPLETE,
-    SAFETY_EVENT_POLICY_CHANGE,
-    SAFETY_EVENT_QUOTA_EXCEEDED,
-    SAFETY_EVENT_VIOLATION_DETECTED,
-    SAFETY_EVENT_EMERGENCY_STOP
-} safety_event_type_t;
-
-typedef enum {
-    SAFETY_DECISION_ALLOW = 0,
-    SAFETY_DECISION_DENY,
-    SAFETY_DECISION_CONDITIONAL,
-    SAFETY_DECISION_DEFER,
-    SAFETY_DECISION_ABORT
-} safety_decision_t;
 
 typedef enum {
     SAFETY_GUARD_PERMISSION = 0,
@@ -94,34 +76,6 @@ typedef enum {
     SAFETY_PRIORITY_HIGH = 75,
     SAFETY_PRIORITY_CRITICAL = 100
 } safety_priority_t;
-
-typedef enum {
-    SAFETY_SEVERITY_INFO = 0,
-    SAFETY_SEVERITY_WARNING,
-    SAFETY_SEVERITY_ERROR,
-    SAFETY_SEVERITY_CRITICAL,
-    SAFETY_SEVERITY_FATAL
-} safety_severity_t;
-
-typedef struct {
-    safety_event_type_t type;
-    char subject[SAFETY_MAX_SUBJECT_LEN];
-    char action[SAFETY_MAX_ACTION_LEN];
-    char resource[SAFETY_MAX_RESOURCE_LEN];
-    const void *context;
-    size_t context_size;
-    uint64_t timestamp;
-    uint32_t flags;
-} safety_event_t;
-
-typedef struct {
-    safety_decision_t decision;
-    char reason[256];
-    safety_severity_t severity;
-    uint32_t conditions;
-    void *modified_context;
-    size_t modified_context_size;
-} safety_result_t;
 
 typedef struct {
     char name[64];
@@ -171,7 +125,7 @@ typedef struct {
     uint64_t timestamp;
 } safety_audit_entry_t;
 
-typedef struct safety_guard_context_s safety_guard_context_t;
+/* safety_guard_context_t is forward-declared in safety_guard_types.h. */
 
 typedef void (*safety_violation_callback_t)(const safety_event_t *event,
                                             const safety_result_t *result, void *user_data);
