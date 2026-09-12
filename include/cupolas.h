@@ -19,7 +19,8 @@
  * Error Handling:
  * - All functions return airy_err_t error codes
  * - Success returns AIRY_OK (0)
- * - Error codes are defined in agentrt/atoms/corekern/include/error.h
+ * - Error codes follow the shared contract in commons/utils/error/error_codes.h
+ *   (mirrored by corekern's error.h per 8.0.2)
  *
  * @note For backward compatibility, cupolas_ERROR_* aliases are preserved
  */

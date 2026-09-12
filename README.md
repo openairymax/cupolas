@@ -34,7 +34,7 @@ Since 0.1.9, cupolas also acts as the **Policy Decision Point (PDP)** on top of 
 
 **Class B — Behavioral / Safety.**
 
-Unlike Class-A foundational modules (atoms, commons), cupolas is a behavioral module: it does not provide primitives that other modules build *on*, but rather enforces policies that other modules must *pass through*. It depends on `atoms` (for the Syscall sandbox/seccomp/capability surface and CoreKern IPC primitives for the audit queue) and `commons` (for sync, error framework, types, memory macros). Its consumers — `gateway` and `daemons` — invoke cupolas at every security boundary (request authentication, input sanitization, permission checks, audit emission).
+Unlike Class-A foundational modules (atoms, commons), cupolas is a behavioral module: it does not provide primitives that other modules build *on*, but rather enforces policies that other modules must *pass through*. It depends on `commons` (for sync, error framework, types, memory macros) and has no dependency on `atoms`: its sandbox/seccomp/capability enforcement is built directly on Linux kernel primitives (Landlock, seccomp BPF), and error codes come from the commons error framework. Its consumers — `gateway` and `daemons` — invoke cupolas at every security boundary (request authentication, input sanitization, permission checks, audit emission).
 
 ## Directory Structure
 
@@ -171,12 +171,11 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 
 ## Upstream Dependencies
 
-> `commons` is the foundation for all agentrt modules; cupolas consumes it directly. cupolas also depends on `atoms` for the enforcement substrate.
+> `commons` is the foundation for all agentrt modules; cupolas consumes it directly. cupolas has no build-time dependency on `atoms` (verified 2026-09-12: zero include/link references).
 
 | Dependency | Required | Purpose |
 |------------|----------|---------|
 | **commons** | Yes | Sync primitives, error framework, type definitions (`airy_types.h`), memory management macros (`AIRY_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
-| **atoms** | Yes | Provides the Syscall surface that cupolas enforces (sandbox, seccomp, capability, 4 protection rings), and the CoreKern IPC primitives (`are_ipc.h`) for the audit queue and workbench IPC |
 | OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AIRY_HAS_OPENSSL` |
 | libyaml | No | Full YAML support |
 | cJSON | No | JSON config parsing |
