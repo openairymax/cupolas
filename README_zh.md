@@ -34,7 +34,7 @@ cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于
 
 **B 类 —— 行为 / 安全。**
 
-与 A 类基础模块（atoms、commons）不同，cupolas 是行为模块：它不提供其他模块构建*其上*的原语，而是强制执行其他模块必须*穿过*的策略。它依赖 `atoms`（提供 Syscall 沙箱/seccomp/capability 接口和用于审计队列的 CoreKern IPC 原语）和 `commons`（提供同步、错误框架、类型、内存宏）。其消费者——`gateway` 和 `daemons`——在每个安全边界（请求认证、输入净化、权限检查、审计发射）调用 cupolas。
+与 A 类基础模块（atoms、commons）不同，cupolas 是行为模块：它不提供其他模块构建*其上*的原语，而是强制执行其他模块必须*穿过*的策略。它依赖 `commons`（提供同步、错误框架、类型、内存宏），不依赖 `atoms`：沙箱/seccomp/capability 强制直接构建于 Linux 内核原语（Landlock、seccomp BPF）之上，错误码来自 commons 错误框架。其消费者——`gateway` 和 `daemons`——在每个安全边界（请求认证、输入净化、权限检查、审计发射）调用 cupolas。
 
 ## 目录结构
 
@@ -171,12 +171,11 @@ cupolas/
 
 ## 上游依赖
 
-> `commons` 是所有 agentrt 模块的基础库；cupolas 直接消费它。cupolas 还依赖 `atoms` 作为强制执行基底。
+> `commons` 是所有 agentrt 模块的基础库；cupolas 直接消费它。cupolas 不依赖 `atoms`（2026-09-12 复核：构建期零 include/零链接引用）。
 
 | 依赖 | 是否必需 | 用途 |
 |------|----------|------|
 | **commons** | 是 | 同步原语、错误框架、类型定义（`airy_types.h`）、内存管理宏（`AIRY_MALLOC`/`FREE`）、security/resource 工具——直接消费基础层 |
-| **atoms** | 是 | 提供 cupolas 强制执行的 Syscall 接口（沙箱、seccomp、capability、4 级保护环），以及用于审计队列和 workbench IPC 的 CoreKern IPC 原语（`are_ipc.h`） |
 | OpenSSL | 否 | 数字签名、密钥库、entitlements、运行时保护、TLS——由 `AIRY_HAS_OPENSSL` 门控 |
 | libyaml | 否 | 完整 YAML 支持；内置 `yaml_minimal.c` 为回退 |
 | cJSON | 否 | JSON 配置解析 |
