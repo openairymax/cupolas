@@ -80,6 +80,36 @@ error:
     return NULL;
 }
 
+/*
+ * Schema alias: the shipped permission_rules.yaml uses the ACL-style keys
+ * {agent, tool, effect} because it is shared with the daemon_security loader
+ * (daemons/common/src/security/daemon_security_acl.c). This PDP loader
+ * natively reads {agent, action, resource, allow}. Without the alias,
+ * "resource" falls back to "*" and "allow" to false, silently turning every
+ * rule into a fail-closed deny (R-6). Resolve tool->resource and
+ * effect->allow so both consumers agree on the same file.
+ */
+static const char *cupolas_permission_rule_resource(struct yaml_node *entry)
+{
+    struct yaml_node *node = yaml_get(entry, "resource");
+    if (!node)
+        node = yaml_get(entry, "tool");
+    return yaml_as_string(node, "*");
+}
+
+static int cupolas_permission_rule_allow(struct yaml_node *entry, int default_allow)
+{
+    struct yaml_node *node = yaml_get(entry, "allow");
+    if (node)
+        return (int)yaml_as_bool(node, default_allow != 0);
+
+    const char *effect = yaml_as_string(yaml_get(entry, "effect"), NULL);
+    if (effect)
+        return strcmp(effect, "allow") == 0 ? 1 : 0;
+
+    return default_allow;
+}
+
 static int cupolas_permission_match_pattern(const char *pattern, const char *str)
 {
     if (!pattern || !str)
@@ -197,8 +227,8 @@ int rule_manager_reload(rule_manager_t *mgr)
 
                 const char *agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
                 const char *action = yaml_as_string(yaml_get(entry, "action"), "*");
-                const char *resource = yaml_as_string(yaml_get(entry, "resource"), "*");
-                int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), true);
+                const char *resource = cupolas_permission_rule_resource(entry);
+                int allow = cupolas_permission_rule_allow(entry, 1);
                 int priority = (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);
 
                 permission_rule_t *rule =
@@ -222,9 +252,9 @@ int rule_manager_reload(rule_manager_t *mgr)
 
                     const char *agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
                     const char *action = yaml_as_string(yaml_get(entry, "action"), "*");
-                    const char *resource = yaml_as_string(yaml_get(entry, "resource"), "*");
+                    const char *resource = cupolas_permission_rule_resource(entry);
 
-                    int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), false);
+                    int allow = cupolas_permission_rule_allow(entry, 0);
                     int priority =
                         (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);
 
