@@ -45,14 +45,21 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t *cfg
     if (!cfg)
         return;
     __builtin_memset(cfg, 0, sizeof(*cfg));
+    /* R-6 根因修复：默认路径必须走运行期 AIRY_HOME 路径系统
+     * （airy_config_dir()/airy_log_dir()，由 airy_paths_init() 依
+     * $AIRY_HOME 解析并导出 $AIRY_CONFIG_DIR/$AIRY_LOG_DIR），而非
+     * 编译期宏 AIRY_CONFIG_DIR/AIRY_LOG_DIR（= /etc/agentrt、
+     * /var/log/agentrt）。此前 PDP permission_engine 按编译期路径
+     * 加载 permission_rules.yaml，部署到 $AIRY_HOME 下时该文件不存在
+     * → 规则为空 → fail-closed 拒绝所有工具（社区「工具不可用」）。 */
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             AIRY_CONFIG_DIR "\\cupolas\\permission_rules.yaml");
-    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AIRY_LOG_DIR "\\cupolas");
+             "%s\\cupolas\\permission_rules.yaml", airy_config_dir());
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), "%s\\cupolas", airy_log_dir());
 #else
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
-             AIRY_CONFIG_DIR "/cupolas/permission_rules.yaml");
-    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), AIRY_LOG_DIR "/cupolas");
+             "%s/cupolas/permission_rules.yaml", airy_config_dir());
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir), "%s/cupolas", airy_log_dir());
 #endif
 }
 
