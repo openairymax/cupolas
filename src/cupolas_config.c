@@ -114,10 +114,13 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
     if (config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
     } else {
+        /* R-6 同族缺陷：默认配置目录必须走运行期 AIRY_HOME 路径系统，
+         * 而非编译期宏 AIRY_CONFIG_DIR（= /etc/agentrt）。 */
 #if cupolas_PLATFORM_WINDOWS
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AIRY_CONFIG_DIR "\\cupolas\\conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s\\cupolas\\conf",
+                 airy_config_dir());
 #else
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AIRY_CONFIG_DIR "/cupolas/conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s/cupolas/conf", airy_config_dir());
 #endif
     }
 

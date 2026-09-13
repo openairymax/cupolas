@@ -26,7 +26,6 @@
 
 #include "error.h"
 
-#define DEFAULT_OVERFLOW_DIR AIRY_LOG_DIR "/cupolas"
 #define DEFAULT_MAX_FILE_SIZE_MB 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
 #define MAX_FILENAME_LEN 256
@@ -219,8 +218,11 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
 
     __builtin_memset(handler, 0, sizeof(overflow_handler_t));
 
+    /* R-6 同族缺陷：默认溢出目录走运行期 AIRY_HOME 路径系统。 */
+    char default_overflow_dir[512];
+    snprintf(default_overflow_dir, sizeof(default_overflow_dir), "%s/cupolas", airy_log_dir());
     snprintf(handler->overflow_dir, sizeof(handler->overflow_dir), "%s",
-             overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
+             overflow_dir ? overflow_dir : default_overflow_dir);
     handler->max_file_size_bytes =
         (max_file_size_mb > 0 ? max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB) * 1024 * 1024;
     handler->flush_interval_ms =
