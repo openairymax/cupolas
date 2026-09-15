@@ -23,8 +23,10 @@ int safety_guard_set_violation_callback(safety_guard_context_t *ctx,
 {
     if (!ctx)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     ctx->violation_callback = callback;
     ctx->violation_user_data = user_data;
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -34,8 +36,10 @@ int safety_guard_set_policy_change_callback(safety_guard_context_t *ctx,
 {
     if (!ctx)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     ctx->policy_change_callback = callback;
     ctx->policy_change_user_data = user_data;
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -43,12 +47,14 @@ int safety_guard_emergency_stop(safety_guard_context_t *ctx, const char *reason)
 {
     if (!ctx)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     ctx->emergency_stopped = true;
     if (reason) {
         snprintf(ctx->emergency_reason, sizeof(ctx->emergency_reason), "%s", reason);
     } else {
         snprintf(ctx->emergency_reason, sizeof(ctx->emergency_reason), "Manual emergency stop");
     }
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -56,7 +62,9 @@ int safety_guard_emergency_release(safety_guard_context_t *ctx)
 {
     if (!ctx)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     ctx->emergency_stopped = false;
     ctx->emergency_reason[0] = '\0';
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }

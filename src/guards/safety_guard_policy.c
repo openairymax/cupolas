@@ -22,13 +22,21 @@ int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *
 {
     if (!ctx || !policy)
         return AIRY_ERR_INVALID_PARAM;
+
+    /* 回调须在锁外调用：用户回调可能重入本模块公有 API。 */
+    safety_policy_change_callback_t change_cb = NULL;
+    void *change_ud = NULL;
+
+    airy_mtx_lock(&ctx->lock);
     if (ctx->policy_count >= ctx->policy_capacity) {
 
         size_t new_cap = ctx->policy_capacity * 2;
         safety_policy_t *new_policies =
             (safety_policy_t *)AIRY_REALLOC(ctx->policies, new_cap * sizeof(safety_policy_t));
-        if (!new_policies)
+        if (!new_policies) {
+            airy_mtx_unlock(&ctx->lock);
             return AIRY_ERR_OUT_OF_MEMORY;
+        }
         ctx->policies = new_policies;
         ctx->policy_capacity = new_cap;
     }
@@ -38,8 +46,12 @@ int safety_guard_add_policy(safety_guard_context_t *ctx, const safety_policy_t *
     }
     ctx->policy_count++;
 
-    if (ctx->policy_change_callback) {
-        ctx->policy_change_callback(policy->id, "added", ctx->policy_change_user_data);
+    change_cb = ctx->policy_change_callback;
+    change_ud = ctx->policy_change_user_data;
+    airy_mtx_unlock(&ctx->lock);
+
+    if (change_cb) {
+        change_cb(policy->id, "added", change_ud);
     }
     return 0;
 }
@@ -48,6 +60,7 @@ int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_i
 {
     if (!ctx || !policy_id)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
             AIRY_FREE(ctx->policies[i].rules_json);
@@ -56,9 +69,11 @@ int safety_guard_remove_policy(safety_guard_context_t *ctx, const char *policy_i
                                   (ctx->policy_count - i - 1) * sizeof(safety_policy_t));
             }
             ctx->policy_count--;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
@@ -67,13 +82,16 @@ int safety_guard_update_policy(safety_guard_context_t *ctx, const char *policy_i
 {
     if (!ctx || !policy_id || !new_rules_json)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->policy_count; i++) {
         if (__builtin_strcmp(ctx->policies[i].id, policy_id) == 0) {
             AIRY_FREE(ctx->policies[i].rules_json);
             ctx->policies[i].rules_json = AIRY_STRDUP(new_rules_json);
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
@@ -171,24 +189,35 @@ int safety_guard_resolve_conflict(safety_guard_context_t *ctx, const char *polic
     if (!ctx || !policy_a_id || !policy_b_id || !resolved_decision)
         return AIRY_ERR_INVALID_PARAM;
 
-    safety_policy_t *policy_a = NULL, *policy_b = NULL;
-    for (size_t i = 0; i < ctx->policy_count; i++) {
-        if (__builtin_strcmp(ctx->policies[i].id, policy_a_id) == 0)
-            policy_a = &ctx->policies[i];
-        if (__builtin_strcmp(ctx->policies[i].id, policy_b_id) == 0)
-            policy_b = &ctx->policies[i];
-    }
+    safety_decision_t decision_a = SAFETY_DECISION_DENY, decision_b = SAFETY_DECISION_DENY;
+    int priority_a = 0, priority_b = 0;
+    bool found_a = false, found_b = false;
 
-    if (policy_a && policy_b) {
-        if (policy_a->priority >= policy_b->priority) {
-            *resolved_decision = policy_a->default_decision;
-        } else {
-            *resolved_decision = policy_b->default_decision;
+    airy_mtx_lock(&ctx->lock);
+    for (size_t i = 0; i < ctx->policy_count; i++) {
+        if (__builtin_strcmp(ctx->policies[i].id, policy_a_id) == 0) {
+            decision_a = ctx->policies[i].default_decision;
+            priority_a = (int)ctx->policies[i].priority;
+            found_a = true;
         }
-    } else if (policy_a) {
-        *resolved_decision = policy_a->default_decision;
-    } else if (policy_b) {
-        *resolved_decision = policy_b->default_decision;
+        if (__builtin_strcmp(ctx->policies[i].id, policy_b_id) == 0) {
+            decision_b = ctx->policies[i].default_decision;
+            priority_b = (int)ctx->policies[i].priority;
+            found_b = true;
+        }
+    }
+    airy_mtx_unlock(&ctx->lock);
+
+    if (found_a && found_b) {
+        if (priority_a >= priority_b) {
+            *resolved_decision = decision_a;
+        } else {
+            *resolved_decision = decision_b;
+        }
+    } else if (found_a) {
+        *resolved_decision = decision_a;
+    } else if (found_b) {
+        *resolved_decision = decision_b;
     } else {
         /* Neither policy ID is registered in the context, so the conflict
          * cannot be resolved. The security dome is fail-closed: deny rather

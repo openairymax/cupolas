@@ -24,19 +24,24 @@ int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t 
     if (!ctx || !event)
         return AIRY_ERR_INVALID_PARAM;
 
+    airy_mtx_lock(&ctx->lock);
     if (ctx->audit_count >= ctx->audit_capacity) {
 
         size_t new_cap = ctx->audit_capacity * 2;
         if (new_cap > SAFETY_MAX_AUDIT_ENTRIES)
             new_cap = SAFETY_MAX_AUDIT_ENTRIES;
-        if (ctx->audit_count >= new_cap)
+        if (ctx->audit_count >= new_cap) {
+            airy_mtx_unlock(&ctx->lock);
             return AIRY_ERR_GENERIC_FAIL;
+        }
 
         safety_audit_entry_t *new_entries =
             (safety_audit_entry_t *)AIRY_REALLOC(ctx->audit_entries,
                                                  new_cap * sizeof(safety_audit_entry_t));
-        if (!new_entries)
+        if (!new_entries) {
+            airy_mtx_unlock(&ctx->lock);
             return AIRY_ERR_OUT_OF_MEMORY;
+        }
         ctx->audit_entries = new_entries;
         ctx->audit_capacity = new_cap;
     }
@@ -57,6 +62,7 @@ int safety_guard_record_audit(safety_guard_context_t *ctx, const safety_event_t 
     entry->timestamp = event->timestamp;
 
     ctx->audit_count++;
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -72,6 +78,8 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
         return AIRY_ERR_INVALID_PARAM;
     }
 
+    airy_mtx_lock(&ctx->lock);
+
     size_t match_count = 0;
     for (size_t i = 0; i < ctx->audit_count; i++) {
         safety_audit_entry_t *e = &ctx->audit_entries[i];
@@ -85,6 +93,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
     }
 
     if (match_count == 0) {
+        airy_mtx_unlock(&ctx->lock);
         if (entries)
             *entries = NULL;
         if (entry_count)
@@ -94,8 +103,10 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
 
     safety_audit_entry_t *result =
         (safety_audit_entry_t *)AIRY_CALLOC(match_count, sizeof(safety_audit_entry_t));
-    if (!result)
+    if (!result) {
+        airy_mtx_unlock(&ctx->lock);
         return AIRY_ERR_OUT_OF_MEMORY;
+    }
 
     size_t idx = 0;
     for (size_t i = 0; i < ctx->audit_count; i++) {
@@ -109,6 +120,7 @@ int safety_guard_query_audit(safety_guard_context_t *ctx, const char *subject,
         __builtin_memcpy(&result[idx], e, sizeof(*e));
         idx++;
     }
+    airy_mtx_unlock(&ctx->lock);
 
     if (entries)
         *entries = result;

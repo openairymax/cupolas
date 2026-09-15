@@ -279,20 +279,37 @@ safety_decision_t safety_guard_check(safety_guard_context_t *ctx, const safety_e
         return SAFETY_DECISION_DENY;
     }
 
+    /* 锁内仅做紧急停机判定与守卫表快照；守卫检查、record_audit 与
+     * violation_callback 均在锁外执行，避免重入本模块公有 API 自死锁。 */
+    airy_mtx_lock(&ctx->lock);
     if (ctx->emergency_stopped) {
+        char reason[sizeof(ctx->emergency_reason)];
+        snprintf(reason, sizeof(reason), "%s", ctx->emergency_reason);
+        airy_mtx_unlock(&ctx->lock);
         if (result) {
             result->decision = SAFETY_DECISION_ABORT;
-            snprintf(result->reason, sizeof(result->reason), "Emergency stop: %s",
-                     ctx->emergency_reason);
+            snprintf(result->reason, sizeof(result->reason), "Emergency stop: %s", reason);
             result->severity = SAFETY_SEVERITY_FATAL;
         }
         return SAFETY_DECISION_ABORT;
     }
 
+    size_t guard_count = ctx->guard_count;
+    guard_entry_t *snapshot = NULL;
+    if (guard_count > 0) {
+        snapshot = (guard_entry_t *)AIRY_CALLOC(guard_count, sizeof(*snapshot));
+        if (!snapshot) {
+            airy_mtx_unlock(&ctx->lock);
+            return SAFETY_DECISION_ALLOW;
+        }
+        __builtin_memcpy(snapshot, ctx->guards, guard_count * sizeof(*snapshot));
+    }
+    airy_mtx_unlock(&ctx->lock);
+
     safety_decision_t final_decision = SAFETY_DECISION_ALLOW;
 
-    for (size_t i = 0; i < ctx->guard_count; i++) {
-        guard_entry_t *entry = &ctx->guards[i];
+    for (size_t i = 0; i < guard_count; i++) {
+        guard_entry_t *entry = &snapshot[i];
         if (!entry->descriptor.enabled)
             continue;
 
@@ -334,6 +351,8 @@ safety_decision_t safety_guard_check(safety_guard_context_t *ctx, const safety_e
         }
     }
 
+    AIRY_FREE(snapshot);
+
     if (result && final_decision != SAFETY_DECISION_DENY &&
         final_decision != SAFETY_DECISION_ABORT) {
         __builtin_memset(result, 0, sizeof(*result));
@@ -355,7 +374,10 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const sa
         return SAFETY_DECISION_DENY;
     }
 
+    /* 与 safety_guard_check 相同：锁内快照、锁外执行，防止重入自死锁。 */
+    airy_mtx_lock(&ctx->lock);
     if (ctx->emergency_stopped) {
+        airy_mtx_unlock(&ctx->lock);
         if (results && result_count) {
             *result_count = 0;
             *results = NULL;
@@ -365,6 +387,7 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const sa
 
     size_t count = ctx->guard_count;
     if (count == 0) {
+        airy_mtx_unlock(&ctx->lock);
         if (results && result_count) {
             *result_count = 0;
             *results = NULL;
@@ -372,8 +395,21 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const sa
         return SAFETY_DECISION_ALLOW;
     }
 
+    guard_entry_t *snapshot = (guard_entry_t *)AIRY_CALLOC(count, sizeof(*snapshot));
+    if (!snapshot) {
+        airy_mtx_unlock(&ctx->lock);
+        if (results && result_count) {
+            *result_count = 0;
+            *results = NULL;
+        }
+        return SAFETY_DECISION_ALLOW;
+    }
+    __builtin_memcpy(snapshot, ctx->guards, count * sizeof(*snapshot));
+    airy_mtx_unlock(&ctx->lock);
+
     safety_result_t *out_results = (safety_result_t *)AIRY_CALLOC(count, sizeof(safety_result_t));
     if (!out_results) {
+        AIRY_FREE(snapshot);
         if (results && result_count) {
             *result_count = 0;
             *results = NULL;
@@ -385,8 +421,8 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const sa
     size_t actual_count = 0;
 
     for (int prio = SAFETY_PRIORITY_CRITICAL; prio >= SAFETY_PRIORITY_LOWEST; prio--) {
-        for (size_t i = 0; i < ctx->guard_count; i++) {
-            guard_entry_t *entry = &ctx->guards[i];
+        for (size_t i = 0; i < count; i++) {
+            guard_entry_t *entry = &snapshot[i];
             if (!entry->descriptor.enabled)
                 continue;
             if ((int)entry->descriptor.priority != prio)
@@ -434,6 +470,8 @@ safety_decision_t safety_guard_check_chain(safety_guard_context_t *ctx, const sa
     }
 
 chain_done:
+    AIRY_FREE(snapshot);
+
     if (results) {
         *results = out_results;
     } else {
