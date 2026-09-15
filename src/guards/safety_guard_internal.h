@@ -14,6 +14,7 @@
 #include "airy_memory.h"
 #include "string_compat.h"
 #include "config_unified.h"
+#include "platform_sync.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +26,12 @@ typedef struct {
 } guard_entry_t;
 
 struct safety_guard_context_s {
+    /* 保护 guards/audit/policies/quotas/紧急停机/回调等全部共享状态。
+     * 检查路径（check/check_chain）先在锁内做守卫表快照再放锁执行，
+     * 因此守卫回调与 record_audit 等公有 API 不会在持锁期间重入，
+     * 普通非递归锁即可，无自死锁风险。 */
+    airy_mtx_t lock;
+
     guard_entry_t *guards;
     size_t guard_count;
     size_t guard_capacity;

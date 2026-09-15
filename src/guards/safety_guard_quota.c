@@ -24,16 +24,20 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
     if (!ctx || !resource_id)
         return AIRY_ERR_INVALID_PARAM;
 
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].limit = limit;
             ctx->quotas[i].reset_interval_ms = reset_interval_ms;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
 
-    if (ctx->quota_count >= ctx->quota_capacity)
+    if (ctx->quota_count >= ctx->quota_capacity) {
+        airy_mtx_unlock(&ctx->lock);
         return AIRY_ERR_GENERIC_FAIL;
+    }
     safety_quota_t *q = &ctx->quotas[ctx->quota_count];
     snprintf(q->resource_id, sizeof(q->resource_id), "%s", resource_id);
     q->limit = limit;
@@ -42,6 +46,7 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
     q->reset_interval_ms = reset_interval_ms;
     q->last_reset = 0;
     ctx->quota_count++;
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -51,12 +56,15 @@ int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_i
     if (!ctx || !resource_id || !allowed)
         return AIRY_ERR_INVALID_PARAM;
 
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             *allowed = (ctx->quotas[i].current_usage + requested) <= ctx->quotas[i].limit;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     *allowed = true;
     return 0;
 }
@@ -65,12 +73,15 @@ int safety_guard_consume_quota(safety_guard_context_t *ctx, const char *resource
 {
     if (!ctx || !resource_id)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage += amount;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
@@ -78,13 +89,16 @@ int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource
 {
     if (!ctx || !resource_id)
         return AIRY_ERR_INVALID_PARAM;
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->quota_count; i++) {
         if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
             ctx->quotas[i].current_usage -= amount;
             if (ctx->quotas[i].current_usage < 0)
                 ctx->quotas[i].current_usage = 0;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }

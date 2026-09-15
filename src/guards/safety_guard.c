@@ -70,6 +70,15 @@ safety_guard_context_t *safety_guard_create(void)
         return NULL;
     }
 
+    if (airy_mtx_init(&ctx->lock) != 0) {
+        AIRY_FREE(ctx->quotas);
+        AIRY_FREE(ctx->policies);
+        AIRY_FREE(ctx->audit_entries);
+        AIRY_FREE(ctx->guards);
+        AIRY_FREE(ctx);
+        return NULL;
+    }
+
     ctx->initialized = true;
     ctx->emergency_stopped = false;
     return ctx;
@@ -79,6 +88,7 @@ void safety_guard_destroy(safety_guard_context_t *ctx)
 {
     if (!ctx)
         return;
+    airy_mtx_destroy(&ctx->lock);
     AIRY_FREE(ctx->quotas);
 
     for (size_t i = 0; i < ctx->policy_count; i++) {
@@ -96,14 +106,19 @@ int safety_guard_register_guard(safety_guard_context_t *ctx,
 {
     if (!ctx || !descriptor)
         return AIRY_ERR_INVALID_PARAM;
-    if (ctx->guard_count >= ctx->guard_capacity)
+
+    airy_mtx_lock(&ctx->lock);
+    if (ctx->guard_count >= ctx->guard_capacity) {
+        airy_mtx_unlock(&ctx->lock);
         return AIRY_ERR_GENERIC_FAIL;
+    }
 
     guard_entry_t *entry = &ctx->guards[ctx->guard_count];
     __builtin_memcpy(&entry->descriptor, descriptor, sizeof(*descriptor));
     entry->check_fn = check_fn;
     entry->user_data = user_data;
     ctx->guard_count++;
+    airy_mtx_unlock(&ctx->lock);
     return 0;
 }
 
@@ -111,6 +126,8 @@ int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
 {
     if (!ctx || !name)
         return AIRY_ERR_INVALID_PARAM;
+
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             if (i < ctx->guard_count - 1) {
@@ -118,9 +135,11 @@ int safety_guard_unregister_guard(safety_guard_context_t *ctx, const char *name)
                                   (ctx->guard_count - i - 1) * sizeof(guard_entry_t));
             }
             ctx->guard_count--;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
@@ -128,12 +147,16 @@ int safety_guard_enable_guard(safety_guard_context_t *ctx, const char *name)
 {
     if (!ctx || !name)
         return AIRY_ERR_INVALID_PARAM;
+
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = true;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
@@ -141,26 +164,45 @@ int safety_guard_disable_guard(safety_guard_context_t *ctx, const char *name)
 {
     if (!ctx || !name)
         return AIRY_ERR_INVALID_PARAM;
+
+    airy_mtx_lock(&ctx->lock);
     for (size_t i = 0; i < ctx->guard_count; i++) {
         if (__builtin_strcmp(ctx->guards[i].descriptor.name, name) == 0) {
             ctx->guards[i].descriptor.enabled = false;
+            airy_mtx_unlock(&ctx->lock);
             return 0;
         }
     }
+    airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
 
 size_t safety_guard_get_guard_count(safety_guard_context_t *ctx)
 {
-    return ctx ? ctx->guard_count : 0;
+    if (!ctx)
+        return 0;
+    airy_mtx_lock(&ctx->lock);
+    size_t count = ctx->guard_count;
+    airy_mtx_unlock(&ctx->lock);
+    return count;
 }
 
 size_t safety_guard_get_policy_count(safety_guard_context_t *ctx)
 {
-    return ctx ? ctx->policy_count : 0;
+    if (!ctx)
+        return 0;
+    airy_mtx_lock(&ctx->lock);
+    size_t count = ctx->policy_count;
+    airy_mtx_unlock(&ctx->lock);
+    return count;
 }
 
 size_t safety_guard_get_audit_count(safety_guard_context_t *ctx)
 {
-    return ctx ? ctx->audit_count : 0;
+    if (!ctx)
+        return 0;
+    airy_mtx_lock(&ctx->lock);
+    size_t count = ctx->audit_count;
+    airy_mtx_unlock(&ctx->lock);
+    return count;
 }
