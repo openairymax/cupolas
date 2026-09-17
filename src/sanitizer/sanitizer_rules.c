@@ -10,7 +10,6 @@
  * @file sanitizer_rules.c
  * @brief Sanitizer Rules Manager Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "sanitizer_rules.h"

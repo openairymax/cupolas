@@ -239,7 +239,7 @@ static void *audit_writer_thread(void *arg)
 
 /* Restore the hash-chain tail from existing audit logs: after a process
  * restart, starting g_last_hash from all zeros would break the link to the
- * historical chain. Tamper-evident auditing (BAN-129) requires the chain
+ * historical chain. Tamper-evident auditing requires the chain
  * state to be persisted to disk and restored at startup
  * (audit_rotator_write already persists prev_hash/curr_hash). */
 static void audit_logger_restore_last_hash(audit_logger_t *logger)
@@ -437,7 +437,7 @@ int audit_logger_log_workbench(audit_logger_t *logger, const char *agent_id, con
 }
 
 /**
- * @brief Verify the integrity of the audit hash chain (BAN-129 contract)
+ * @brief Verify the integrity of the audit hash chain
  *
  * Recomputes the chain from the given entry list and checks each entry's
  * curr_hash against the SHA-256 hash derived from prev_hash plus the entry

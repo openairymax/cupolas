@@ -1,7 +1,6 @@
 # Sanitizer — 输入清洗器
 
 **模块路径**: `agentrt/cupolas/src/sanitizer/`
-**版本**: v0.1.0
 
 ## 概述
 

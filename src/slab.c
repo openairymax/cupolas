@@ -3,7 +3,7 @@
 
 /**
  * @file slab.c
- * @brief P3.15: slab allocator implementation -- per-CPU freelist plus a
+ * @brief slab allocator implementation -- per-CPU freelist plus a
  *        global partial chain.
  *
  * Implementation details:

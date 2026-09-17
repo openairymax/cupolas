@@ -10,7 +10,6 @@
  * @file fuzz_permission.c
  * @brief Permission System Fuzz Testing
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  *
  * Fuzz testing for permission system using libFuzzer, covering:
  * - Permission decision boundary conditions

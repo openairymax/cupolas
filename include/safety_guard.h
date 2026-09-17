@@ -29,7 +29,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Boundary-crossing event/result contract shared with atoms (ARC-02/ARC-04).
+/* Boundary-crossing event/result contract shared with atoms.
  * Canonical definition lives in commons/utils/types so the atoms layer can
  * consume it without including this upper-layer header. */
 #include "safety_guard_types.h"

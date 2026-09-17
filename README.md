@@ -5,13 +5,13 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/cupolas)
+[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/cupolas)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
 - **Repository:** `git@atomgit.com:openairymax/cupolas.git`
 - **Branch:** `develop/hubs-01` (`main` is the release snapshot)
-- **Version:** 0.1.9
+- **Version:** 0.1.16
 
 ---
 
@@ -26,7 +26,7 @@
 
 cupolas follows defense-in-depth and zero-trust principles: default-deny, identity-and-context-based authorization per call, full auditability, least privilege, and a dynamically-extensible guard framework. It builds a single static library `airy_cupolas` aggregating all security subsystems, with OpenSSL-conditional iOS-grade modules (signature, vault, entitlements, runtime protection, network/TLS security) gated by `AIRY_HAS_OPENSSL`.
 
-Since 0.1.9, cupolas also acts as the **Policy Decision Point (PDP)** on top of the four-layer inherent security: the dynamic policy engine in `src/policy/` (interface in `dynamic_policy_engine.h`) centrally handles policy loading, staging validation, conflict detection and resolution, activation, and version rollback (JSON rule sets, revertible by version); once active, policies are distributed to the daemons and enforced locally by each daemon's **Policy Enforcement Point (PEP)** through a local cache — changes take effect within seconds and can be rolled back at any time.
+cupolas also acts as the **Policy Decision Point (PDP)** on top of the four-layer inherent security: the dynamic policy engine in `src/policy/` (interface in `dynamic_policy_engine.h`) centrally handles policy loading, staging validation, conflict detection and resolution, activation, and version rollback (JSON rule sets, revertible by version); once active, policies are distributed to the daemons and enforced locally by each daemon's **Policy Enforcement Point (PEP)** through a local cache — changes take effect within seconds and can be rolled back at any time.
 
 `cupolas` is one of the 7 leaf repositories aggregated by the [agentrt](../) management repo, sitting between the kernel layer (`atoms`) and the service/composition layer (`gateway`, `daemons`) in the cyclic layered architecture.
 
@@ -171,7 +171,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 
 ## Upstream Dependencies
 
-> `commons` is the foundation for all agentrt modules; cupolas consumes it directly. cupolas has no build-time dependency on `atoms` (verified 2026-09-12: zero include/link references).
+> `commons` is the foundation for all agentrt modules; cupolas consumes it directly. cupolas has no build-time dependency on `atoms` (zero include/link references).
 
 | Dependency | Required | Purpose |
 |------------|----------|---------|
@@ -180,7 +180,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 | libyaml | No | Full YAML support |
 | cJSON | No | JSON config parsing |
 
-> **BAN-12**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_YAML`, `AIRY_HAS_CJSON`).
+> **Dependency detection**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_YAML`, `AIRY_HAS_CJSON`).
 
 ## Downstream Consumers
 
@@ -193,7 +193,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 ## Build
 
 ```bash
-# Standard build (out-of-source, enforced by BAN-33)
+# Standard build (out-of-source)
 cmake -S . -B /tmp/cupolas-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build /tmp/cupolas-build --parallel $(nproc)
 

@@ -10,7 +10,6 @@
  * @file test_cupolas_core.c
  * @brief cupolas Module Unit Tests
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "../include/cupolas.h"
@@ -161,14 +160,11 @@ static void test_audit_queue(void)
         audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
     assert(entry1 != NULL);
 
-    /* v0.1.1 修复（BAN-318 测试反模式）：
-     * 此前 audit_queue_push 被包裹在 assert() 中，在 -DNDEBUG（Release）构建下
-     * 整个表达式不求值，导致 entry1 既未入队也未释放。audit_queue_destroy 仅释放
-     * 队列内条目，entry1 因此泄漏 210 字节（entry 结构体 + agent_id/action/resource
-     * 三个字符串），是全量测试套件中唯一失败的用例。
-     *
-     * 修复方式：将 push 从 assert 中拆出，确保 NDEBUG 下仍执行；push 失败时显式
-     * 释放 entry1 避免悬挂。同理拆出 try_pop，确保 entry2 始终被正确释放。 */
+    /* audit_queue_push 必须从 assert() 中拆出：-DNDEBUG（Release）构建下
+     * assert 展开为 ((void)0)，整个表达式不求值，entry1 既未入队也未释放，
+     * 而 audit_queue_destroy 仅释放队列内条目，entry1 因此泄漏。
+     * push 失败时显式释放 entry1 避免悬挂。同理拆出 try_pop，
+     * 确保 entry2 始终被正确释放。 */
     int push_ret = audit_queue_push(queue, entry1);
     assert(push_ret == cupolas_OK);
     if (push_ret != cupolas_OK) {
@@ -267,7 +263,11 @@ static void test_workbench_create_destroy(void)
 static void test_cupolas_init_cleanup(void)
 {
     assert(cupolas_init(NULL, NULL) == cupolas_OK);
-    assert(strcmp(cupolas_version(), "0.1.1") == 0);
+    const char *ver = cupolas_version();
+    assert(ver != NULL && ver[0] != '\0');
+#ifdef AIRYRT_VERSION
+    assert(strcmp(ver, AIRYRT_VERSION) == 0);
+#endif
     cupolas_cleanup();
 
     TEST_PASS("cupolas_init_cleanup");

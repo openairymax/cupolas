@@ -3,15 +3,15 @@
 
 /**
  * @file benchmark_permission.c
- * @brief Permission check performance baseline (M2-S1, 0.1.9 §3.4 前置).
+ * @brief Permission check performance baseline.
  *
- * 为 cupolas PDP 化（M2）建立权限检查延迟与 PEP 缓存命中率基线：
+ * 建立权限检查延迟与 PEP 缓存命中率基线：
  *   - 冷路径：不同 key 首次检查（规则匹配 + 缓存写入）
  *   - 热路径：同 key 重复检查（缓存命中，零延迟热路径）
  *   - 混合负载：80% 热 key + 20% 冷 key 的命中率与平均延迟基线
  *
- * 基准输出 p50/p99，供 M2-S5 PEP 缓存（epoch 失效键）落地后对比
- * 验收（策略变更 runtime 生效 < 1s；热路径命中率 ≥ 覆盖）。
+ * 基准输出 p50/p99，用于对比 PEP 缓存（epoch 失效键）的
+ * 验收指标（策略变更 runtime 生效 < 1s；热路径命中率 ≥ 覆盖）。
  *
  * STRICT 合规模式毒化 printf/fprintf，输出统一走 fputs + vsnprintf。
  */
@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
 
     permission_engine_destroy(e);
     out("========================================\n");
-    out("  Baseline complete (M2-S1)\n");
+    out("  Baseline complete\n");
     out("========================================\n");
     return 0;
 }

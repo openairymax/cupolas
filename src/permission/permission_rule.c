@@ -10,7 +10,6 @@
  * @file permission_rule.c
  * @brief Permission Rule Manager Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "permission_rule.h"

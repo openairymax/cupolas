@@ -7,8 +7,6 @@
  *
  * @brief Unified abstraction layer for Cupolas security module
  * @author SPHARX Ltd. - Airymax Team
- * @date 2026-04-05
- * @version 0.1.0
  *
  * This header provides platform-independent macros and utility functions
  * that eliminate code duplication across all Cupolas submodules.
@@ -30,7 +28,7 @@
  *     CUPOLAS_MUTEX_INIT(&lock);
  *
  *     my_data_t* data = CUPOLAS_ALLOC_STRUCT(my_data_t);
- *     if (!data) return AIRY_ERR_OUT_OF_MEMORY;  BAN-073
+ *     if (!data) return AIRY_ERR_OUT_OF_MEMORY;
  *
  *     CUPOLAS_MUTEX_LOCK(&lock);
  *     // Critical section...

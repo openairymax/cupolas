@@ -11,7 +11,6 @@
  * @file cupolas_metrics.c
  * @brief Metrics Export - Prometheus Format
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  *
  * This module implements metrics collection and export:
  * - Prometheus exposition format support

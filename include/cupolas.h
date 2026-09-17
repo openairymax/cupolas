@@ -112,7 +112,7 @@ int cupolas_init(const char *config_path, airy_err_t *error);
  *
  * Same lifecycle and thread-safety as cupolas_init() but the local
  * permission engine is not constructed: policies are owned solely by the
- * PDP (cupolas_d, 0.1.9 M2-S5 §3.2). The sanitizer, workbench and audit
+ * PDP (cupolas_d). The sanitizer, workbench and audit
  * layers stay available for local PEP enforcement. cupolas_cleanup()
  * releases either flavour.
  */

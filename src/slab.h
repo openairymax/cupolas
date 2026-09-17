@@ -3,7 +3,7 @@
 
 /**
  * @file slab.h
- * @brief P3.15: slab allocator -- per-CPU freelist, global partial chain,
+ * @brief slab allocator -- per-CPU freelist, global partial chain,
  *        and ctor/dtor callbacks.
  *
  * Slab allocator for high-frequency allocation/free of fixed-size objects.

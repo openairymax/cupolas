@@ -134,7 +134,7 @@ int cupolas_dns_verify_dnssec(const char *domain)
     if (!valid)
         return 0;
 
-    /* BAN-211/235: execvp dig directly (no shell) to eliminate command
+    /* execvp dig directly (no shell) to eliminate command
      * injection risk. domain passed the whitelist check above, so it only
      * contains alnum/-/./_. */
     const char *const argv[] = {"dig", "+dnssec", "+short", domain, "DNSKEY", NULL};

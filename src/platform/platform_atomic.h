@@ -3,7 +3,7 @@
 
 /*
  * Atomic operations (32/64/pointer, cross-platform).
- * Split from platform.h (0.1.6 大文件拆分).
+ * Split from platform.h.
  */
 
 #ifndef cupolas_PLATFORM_ATOMIC_H

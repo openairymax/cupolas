@@ -136,7 +136,7 @@ void audit_logger_flush(audit_logger_t *logger);
 void audit_logger_stats(audit_logger_t *logger, uint64_t *total_logged, uint64_t *total_failed);
 
 /**
- * @brief Verify the integrity of the audit hash chain (BAN-129 contract)
+ * @brief Verify the integrity of the audit hash chain
  *
  * Recomputes the SHA-256 hash chain from the given entry list and checks
  * each entry's curr_hash against the hash recomputed from prev_hash plus

@@ -3,7 +3,7 @@
 
 /*
  *
- * test_error_code_consistency.c - P0.25.6 (ACC-STD06) 错误码一致性测试
+ * test_error_code_consistency.c - 错误码一致性测试
  *
  * 验证全项目错误码数值无冲突：
  *   1. cupolas_ERR_* enum 与 AIRY_ERR_* commons 宏核心数值一致（语义对齐）
@@ -12,14 +12,12 @@
  *   4. 各模块错误码段区间互不重叠（通用/系统/内核/服务/LLM/执行/记忆/安全/Cupolas/协调）
  *   5. cupolas_error_string / 转换函数基本可用性
  *
- * 已知差异（非 bug，0.1.1 内保留 cupolas enum 数值不变以避免破坏 ABI）：
+ * 已知差异（非 bug，保留 cupolas enum 数值不变以避免破坏 ABI）：
  *   - cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
  *     （cupolas_ERROR_WOULD_BLOCK 别名映射到 cupolas_ERR_TRY_AGAIN=-15）
- *     留待 1.0.1+ 统一为 commons 权威值。
+ *     后续统一为 commons 权威值。
  *
  * @author SPHARX Ltd. - Airymax Team
- * @date 2026-07-05
- * @version 1.0  P0.25.6 初始版本
  */
 
 #include "../src/security/cupolas_error.h"
@@ -134,7 +132,7 @@ static void test_cupolas_alias_macros(void)
 /* ============================================================================
  * 测试 3: AIRY_ERR_CUPOLAS_* 段与 AIRY_ERR_SEC_* 段不冲突
  *
- * 设计意图：P0.25.4 新增 AIRY_ERR_CUPOLAS_* 段（-712~-723），必须与
+ * 设计意图：AIRY_ERR_CUPOLAS_* 段（-712~-723）必须与
  * 已有的 AIRY_ERR_SEC_* 段（-700~-711）不重叠。若冲突，调用方无法
  * 区分错误来源是通用安全违规还是 Cupolas 专属决策。
  *
@@ -256,7 +254,7 @@ static void test_error_segments_disjoint(void)
  * 测试 5: cupolas_error_string / 转换函数基本可用性
  *
  * 设计意图：验证 cupolas 模块的错误码转换函数（cupolas_error_string 等）
- * 对核心错误码返回非空字符串，确保 P0.25 错误码统一未破坏现有 API。
+ * 对核心错误码返回非空字符串，确保错误码统一未破坏现有 API。
  *
  * 注意：cupolas_ERROR_IS_FATAL(e) 定义为 (e) < cupolas_ERR_OUT_OF_MEMORY
  * （即 e < -49），所以 cupolas_ERR_OUT_OF_MEMORY=-49 本身不是 fatal
@@ -317,7 +315,7 @@ static void test_cupolas_error_string_api(void)
 
 int main(void)
 {
-    printf("=== P0.25.6 Error Code Consistency Tests ===\n");
+    printf("=== Error Code Consistency Tests ===\n");
 
     RUN_TEST(test_cupolas_enum_matches_commons);
     RUN_TEST(test_cupolas_alias_macros);
