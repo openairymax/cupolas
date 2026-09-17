@@ -9,7 +9,7 @@ option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
 option(BUILD_WITH_LOGGING "Enable detailed logging" ON)
 
-# 使用根级依赖检测结果 (BAN-12: 单一依赖检测点)
+# 使用根级依赖检测结果（单一依赖检测点）
 # 所有 find_package 已在根 CMakeLists.txt 中完成，此处仅引用缓存变量。
 # YAML 仅在根未检出时兜底自检（libyaml keg-only：根已把 ${YAML_LIBRARIES}
 # 提升为绝对路径，重查会覆盖成裸名 "-lyaml"，macOS 链接行再失败）。
@@ -89,8 +89,11 @@ set(CUPOLAS_SOURCES
     src/circuit_breaker.c
     src/slab.c
     src/mempool.c
-    # M2-S2 (0.1.9 §3.2 PDP): 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
+    # 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
+    # 按功能域拆分：核心评估与 CRUD / 版本管理 / JSON 导入导出与两段式生效
     src/policy/dynamic_policy_engine.c
+    src/policy/dpolicy_version.c
+    src/policy/dpolicy_json.c
 )
 # OpenSSL-dependent sources
 if(AIRY_HAS_OPENSSL)
@@ -162,6 +165,7 @@ set(CUPOLAS_HEADERS
     src/slab.h
     src/mempool.h
     include/dynamic_policy_engine.h
+    src/policy/dpolicy_internal.h
 )
 
 # commons 模块路径
@@ -308,7 +312,7 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_cupolas_core cupolas)
 
-    # P0.25.6 (ACC-STD06): 错误码一致性测试
+    # 错误码一致性测试
     # 验证 cupolas enum 与 commons AIRY_ERR_* 宏数值一致、CUPOLAS_* 段
     # 与 SEC_* 段不冲突、各模块错误码段区间互不重叠。该测试仅依赖头文件
     # （cupolas_error.h + error.h），但链接 cupolas 库以覆盖转换函数实现。
@@ -321,7 +325,7 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_error_code_consistency cupolas)
 
-    # S-7 (0.1.2): 原生沙箱（Landlock + seccomp）单元测试。
+    # 原生沙箱（Landlock + seccomp）单元测试。
     # 内核不支持 Landlock 时 enabled 用例自动 SKIP，不误报失败。
     add_executable(test_sandbox tests/unit/test_sandbox.c)
     target_compile_definitions(test_sandbox PRIVATE AIRY_COMPLIANCE_IMPL)
@@ -386,7 +390,7 @@ if(BUILD_TESTS)
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME error_code_consistency_tests COMMAND test_error_code_consistency)
 
-    # M2-S5 (0.1.9 §3.2 PEP)：cupolas_init_pep 语义单测——不构造本地
+    # PEP：cupolas_init_pep 语义单测——不构造本地
     # permission 引擎（策略由 PDP cupolas_d 持有），sanitizer 层保留
     add_executable(test_cupolas_pep_init tests/unit/test_cupolas_pep_init.c)
     target_compile_definitions(test_cupolas_pep_init PRIVATE AIRY_COMPLIANCE_IMPL)
@@ -405,7 +409,7 @@ if(BUILD_TESTS)
         add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
     endif()
 
-    # M2-S2 (0.1.9 §3.2 PDP): DP 引擎单元测试
+    # DP 引擎单元测试
     # 需要 AIRY_ENABLE_V2_API 暴露 dpolicy_* API；cJSON 用于 JSON 往返断言
     add_executable(test_dynamic_policy_engine tests/unit/test_dynamic_policy_engine.c)
     target_compile_definitions(test_dynamic_policy_engine PRIVATE
@@ -419,7 +423,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_dynamic_policy_engine cupolas ${CJSON_LIBRARIES})
     add_test(NAME cupolas_dpolicy_engine_tests COMMAND test_dynamic_policy_engine)
 
-    # M2-S1 前置基准：权限检查延迟 p50/p99 + PEP 缓存命中率基线。
+    # 权限检查延迟 p50/p99 + PEP 缓存命中率基线。
     # 非断言型基准（性能观测用），默认跳过；--run-benchmark 参数显式运行。
     add_executable(benchmark_permission tests/benchmark/benchmark_permission.c)
     target_include_directories(benchmark_permission PRIVATE
