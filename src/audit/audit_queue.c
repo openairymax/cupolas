@@ -10,7 +10,6 @@
  * @file audit_queue.c
  * @brief Audit Log Queue Implementation - Thread-safe Producer-Consumer Queue
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "audit_queue.h"

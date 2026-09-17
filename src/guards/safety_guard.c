@@ -8,7 +8,7 @@
  * 本文件保留 SafetyGuard 的入口与核心状态机：上下文创建/销毁、
  * 守卫注册/注销/启用/禁用与数量查询。
  *
- * P1.4: C-L05 Cupolas SafetyGuard → tool_d 工具审批
+ * Cupolas SafetyGuard → tool_d 工具审批
  * 实现 6 种守卫类型与 tool_d 的映射：
  *   - SAFETY_GUARD_PERMISSION    → RBAC 权限检查
  *   - SAFETY_GUARD_RATE_LIMIT    → 工具调用频率限制

@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* SP06 decoupling: cupolas no longer depends on the gateway module.
+/* cupolas no longer depends on the gateway module.
  * The types below define a generic HTTP endpoint request/response
  * abstraction; the caller (e.g. gateway_d) adapts it to a concrete HTTP
  * server implementation. */
@@ -412,7 +412,6 @@ void cupolas_monitoring_shutdown_instance(void);
  * @ownership mgr and server_handle: caller retains ownership
  *
  * @since 0.1.0
- * @changed SP06 (0.1.1): gateway_t *gw → void *server_handle + register_fn callback
  */
 int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, void *server_handle,
                                           cupolas_endpoint_register_fn_t register_fn);

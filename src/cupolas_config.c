@@ -10,7 +10,6 @@
  * @file cupolas_config.c
  * @brief Configuration Manager - Runtime configuration updates
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  *
  * This module implements configuration management:
  * - Configuration validation and application

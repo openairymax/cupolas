@@ -226,7 +226,7 @@ static void cupolas_workbench_setup_process_attr(workbench_t *wb, cupolas_proces
     attr->redirect_stdin = wb->manager.redirect_stdin;
     attr->redirect_stdout = wb->manager.redirect_stdout;
     attr->redirect_stderr = wb->manager.redirect_stderr;
-    /* S-7 原生沙箱：enabled 时才传递给 spawn（否则保持 NULL） */
+    /* 原生沙箱：enabled 时才传递给 spawn（否则保持 NULL） */
     if (wb->manager.sandbox.enabled) {
         attr->sandbox = &wb->manager.sandbox;
     }

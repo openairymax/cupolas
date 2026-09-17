@@ -6,7 +6,7 @@
  * @brief Container mode implementation: Docker/runc-based isolated
  *        execution.
  *
- * @attention 实验性备用实现（SSoT 收敛 S-7，2026-08-14）：见
+ * @attention 实验性备用实现（未纳入构建）：见
  *   workbench_container.h 头部说明。本文件已从 cupolas 构建中移除，
  *   保留供未来"原生容器运行时（runc/libcontainer）后端"或"Landlock
  *   原生沙箱"落地时参考，不作为当前运行时的一部分。
@@ -196,7 +196,7 @@ void container_manager_destroy(void *mgr)
  *
  * Replaces popen/system shell calls. The split argv is passed directly to
  * execvp without going through /bin/sh, fundamentally eliminating command
- * injection risk (BAN-211/235).
+ * injection risk.
  *
  * Supported syntax:
  * - Tokens separated by whitespace
@@ -253,8 +253,7 @@ static int split_command_to_argv(char *cmd, char *argv[], int max_args)
 }
 
 /**
- * @brief Execute a command and capture output (argv form, no shell,
- *        BAN-211/235 compliant)
+ * @brief Execute a command and capture output (argv form, no shell)
  *
  * @param cmd         Command string (split into argv in place)
  * @param timeout_ms  Timeout in milliseconds

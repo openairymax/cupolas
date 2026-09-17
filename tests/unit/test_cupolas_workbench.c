@@ -10,7 +10,6 @@
  * @file test_cupolas_workbench.c
  * @brief cupolas Workbench Module Unit Tests
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "../../src/platform/platform.h"

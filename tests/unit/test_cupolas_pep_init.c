@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
 /*
- * test_cupolas_pep_init.c - M2-S5 PEP 最小 guard 初始化单测
+ * test_cupolas_pep_init.c - PEP 最小 guard 初始化单测
  *
  * cupolas_init_pep 不构造本地 permission 引擎（策略由 PDP cupolas_d
  * 唯一持有），sanitizer 层保留。断言：

@@ -3,7 +3,7 @@
 
 /*
  * Process / Pipe primitives (cross-platform).
- * Split from platform.h (0.1.6 大文件拆分).
+ * Split from platform.h.
  */
 
 #ifndef cupolas_PLATFORM_PROCESS_H
@@ -25,8 +25,8 @@ extern "C" {
 typedef HANDLE cupolas_process_t;
 typedef DWORD cupolas_pid_t;
 /* Windows 下与 POSIX int[2] 对齐：{read, write} 两端相邻存放。
- * （此前 typedef HANDLE 单值，cupolas_pipe_create 却写入两把 HANDLE，
- * 会越界覆盖相邻结构体字段，MSVC 下还报 C2036。） */
+ * cupolas_pipe_create 写入两把 HANDLE，若定义为单值 HANDLE 会越界覆盖
+ * 相邻结构体字段。 */
 typedef HANDLE cupolas_pipe_t[2];
 #else
 typedef pid_t cupolas_pid_t;
@@ -51,7 +51,7 @@ typedef struct cupolas_process_attr {
     cupolas_pipe_t stdin_pipe;
     cupolas_pipe_t stdout_pipe;
     cupolas_pipe_t stderr_pipe;
-    const cupolas_sandbox_t *sandbox; /* 原生沙箱（S-7）；NULL = 不启用 */
+    const cupolas_sandbox_t *sandbox; /* 原生沙箱；NULL = 不启用 */
 } cupolas_process_attr_t;
 
 /* Process Interface */

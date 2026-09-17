@@ -10,7 +10,6 @@
  * @file cupolas_monitoring.c
  * @brief Monitoring Interface - Prometheus / OpenTelemetry
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  *
  * 本文件为监控模块核心域：实例生命周期管理、单例、查询接口与配置构建。
  * 系统指标采集与后台线程见 cupolas_monitoring_sys.c；

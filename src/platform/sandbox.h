@@ -3,9 +3,9 @@
 
 /*
  *
- * sandbox.h - Native Execution Sandbox (S-7 convergence: Landlock + seccomp)
+ * sandbox.h - Native Execution Sandbox (Landlock + seccomp)
  *
- * S-7 (0.1.2): 沙箱去 docker 化。docker 容器运行时（workbench_container.c）
+ * 沙箱去 docker 化。docker 容器运行时（workbench_container.c）
  * 已移出构建；原生进程模式（workbench.c fork/execvp + workbench_limits）
  * 为本体。本模块在 Linux 上叠加 Landlock（文件系统规则）+ seccomp
  * （syscall BPF 过滤）两层原生沙箱，替代外部 docker 的隔离语义。

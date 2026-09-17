@@ -5,8 +5,8 @@
  * @file sandbox.c
  * @brief Native execution sandbox: Landlock (FS rules) + seccomp (BPF).
  *
- * S-7 convergence (0.1.2): replaces the external docker isolation path
- * with in-process Linux sandboxing primitives. Applied in the fork child
+ * Replaces the external docker isolation path with in-process Linux
+ * sandboxing primitives. Applied in the fork child
  * before exec (see platform_process.c). Pure C11, no external deps;
  * non-Linux platforms degrade to no-op.
  *

@@ -3,7 +3,7 @@
 
 /**
  * @file mempool.h
- * @brief P3.16: mempool minimum-guarantee allocator.
+ * @brief mempool minimum-guarantee allocator.
  *
  * Guarantees memory allocation for critical paths (e.g. IPC messages) under
  * OOM conditions. Key features:

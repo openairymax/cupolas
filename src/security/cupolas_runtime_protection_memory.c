@@ -6,8 +6,7 @@
  * @brief Enhanced Runtime Protection - memory protection domain: ASLR / DEP
  *        hardening, memory locking, page protection and protected allocation
  *        (functional domain after cupolas_runtime_protection.c split).
- * @author SPHARX Ltd. - Airymax Team
- * @date 2026
+ * @author SPHARX Ltd. - Airymax Team
  */
 
 #include "cupolas_runtime_protection.h"

@@ -3,7 +3,7 @@
 
 /**
  * @file mempool.c
- * @brief P3.16: mempool minimum-guarantee allocator.
+ * @brief mempool minimum-guarantee allocator.
  *
  * Implementation notes:
  *   - Emergency reserve pool: preallocated fixed-size memory, usable only

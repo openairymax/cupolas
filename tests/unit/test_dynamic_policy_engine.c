@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
 /*
- * test_dynamic_policy_engine.c - M2-S2 DP 引擎单元测试
+ * test_dynamic_policy_engine.c - DP 引擎单元测试
  *
  * 覆盖：规则增删改 / glob 匹配 / fail-closed / 冲突消解 4 策略 /
  * 版本 commit-rollback / 32 版上限 / JSON 往返 / 合规兜底 deny-all /

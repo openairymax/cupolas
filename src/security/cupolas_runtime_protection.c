@@ -14,7 +14,6 @@
  *        cupolas_runtime_protection_check.c and
  *        cupolas_runtime_protection_integrity.c.
  * @author SPHARX Ltd. - Airymax Team
- * @date 2026
  */
 
 #include "cupolas_runtime_protection.h"

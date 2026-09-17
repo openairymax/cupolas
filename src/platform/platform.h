@@ -5,7 +5,7 @@
  * @file platform.h
  * @brief Cross-platform abstraction layer for cupolas - unified entry.
  *
- * 0.1.6 大文件拆分：本文件保留为聚合入口（向后兼容，所有
+ * 本文件保留为平台层聚合入口（向后兼容，所有
  * `#include "platform.h"` 无需修改），实际声明按功能域分布到：
  *   - platform_base.h    平台检测 / export / 错误码 / 基础宏
  *   - platform_thread.h  线程 / 互斥锁 / 读写锁 / 条件变量

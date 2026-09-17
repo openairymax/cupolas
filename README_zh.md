@@ -5,13 +5,13 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/cupolas)
+[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/cupolas)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
 - **仓库地址：** `git@atomgit.com:openairymax/cupolas.git`
 - **分支：** `develop/hubs-01`（`main` 为发布快照）
-- **版本：** 0.1.9
+- **版本：** 0.1.16
 
 ---
 
@@ -26,7 +26,7 @@
 
 cupolas 遵循纵深防御和零信任原则：默认拒绝、每次调用基于身份与上下文授权、完全可审计、最小权限、动态可扩展的 guard 框架。它构建单一静态库 `airy_cupolas`，聚合所有安全子系统，OpenSSL 条件的 iOS 级模块（签名、密钥库、entitlements、运行时保护、网络/TLS 安全）由 `AIRY_HAS_OPENSSL` 门控。
 
-自 0.1.9 起，cupolas 在四层内生安全之上承担**策略决策点（PDP）**职责：`src/policy/` 的动态策略引擎（接口见 `dynamic_policy_engine.h`）统一负责安全策略的加载、暂存（staging）校验、冲突检测与解决、激活生效与版本回滚（JSON 规则集，支持按版本回退）；生效策略下发至各守护进程，由守护进程本地的**策略执行点（PEP）**以缓存方式就近执行——策略变更秒级生效，可随时回滚。
+cupolas 在四层内生安全之上承担**策略决策点（PDP）**职责：`src/policy/` 的动态策略引擎（接口见 `dynamic_policy_engine.h`）统一负责安全策略的加载、暂存（staging）校验、冲突检测与解决、激活生效与版本回滚（JSON 规则集，支持按版本回退）；生效策略下发至各守护进程，由守护进程本地的**策略执行点（PEP）**以缓存方式就近执行——策略变更秒级生效，可随时回滚。
 
 `cupolas` 是 [agentrt](../) 管理仓聚合的 7 个叶子仓之一，在循环分层架构中位于内核层（`atoms`）与服务/组合层（`gateway`、`daemons`）之间。
 
@@ -171,7 +171,7 @@ cupolas/
 
 ## 上游依赖
 
-> `commons` 是所有 agentrt 模块的基础库；cupolas 直接消费它。cupolas 不依赖 `atoms`（2026-09-12 复核：构建期零 include/零链接引用）。
+> `commons` 是所有 agentrt 模块的基础库；cupolas 直接消费它。cupolas 不依赖 `atoms`（构建期零 include/零链接引用）。
 
 | 依赖 | 是否必需 | 用途 |
 |------|----------|------|
@@ -180,7 +180,7 @@ cupolas/
 | libyaml | 否 | 完整 YAML 支持；内置 `yaml_minimal.c` 为回退 |
 | cJSON | 否 | JSON 配置解析 |
 
-> **BAN-12**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AIRY_HAS_OPENSSL`、`AIRY_HAS_YAML`、`AIRY_HAS_CJSON`）。
+> **依赖检测**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AIRY_HAS_OPENSSL`、`AIRY_HAS_YAML`、`AIRY_HAS_CJSON`）。
 
 ## 下游消费者
 
@@ -193,7 +193,7 @@ cupolas/
 ## 构建
 
 ```bash
-# 标准构建（源外构建，BAN-33 强制要求）
+# 标准构建（源外构建）
 cmake -S . -B /tmp/cupolas-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build /tmp/cupolas-build --parallel $(nproc)
 

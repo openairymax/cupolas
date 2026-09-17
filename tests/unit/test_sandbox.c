@@ -3,7 +3,7 @@
 
 /**
  * @file test_sandbox.c
- * @brief cupolas_sandbox 单元测试（S-7：Landlock + seccomp）
+ * @brief cupolas_sandbox 单元测试（Landlock + seccomp）
  *
  * 验证：
  * - cupolas_sandbox_init: 清零为禁用默认
@@ -235,7 +235,7 @@ static void test_sandbox_enabled_exec(void)
 int main(void)
 {
     printf("========================================================\n");
-    printf("  cupolas sandbox 单元测试（S-7: Landlock + seccomp）\n");
+    printf("  cupolas sandbox 单元测试（Landlock + seccomp）\n");
     printf("========================================================\n\n");
 
     RUN_TEST(test_sandbox_init);

@@ -3,7 +3,7 @@
 
 /*
  * File system primitives (cross-platform).
- * Split from platform.h (0.1.6 大文件拆分).
+ * Split from platform.h.
  */
 
 #ifndef cupolas_PLATFORM_FS_H

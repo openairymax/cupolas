@@ -10,7 +10,6 @@
  * @file test_cupolas_config.c
  * @brief cupolas Configuration Module Unit Tests
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "../../src/cupolas_config.h"

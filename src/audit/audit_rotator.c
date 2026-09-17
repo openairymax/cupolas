@@ -10,7 +10,6 @@
  * @file audit_rotator.c
  * @brief Audit Log Rotator Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "audit_rotator.h"

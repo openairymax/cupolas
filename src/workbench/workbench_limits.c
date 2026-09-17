@@ -10,7 +10,6 @@
  * @file workbench_limits.c
  * @brief Resource Limits Runtime Enforcement - Cross-platform Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  *
  * This module implements cross-platform resource limits:
  * - Linux: cgroups v2 API

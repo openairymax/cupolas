@@ -1,7 +1,6 @@
 # Permission — 权限管理
 
 **模块路径**: `agentrt/cupolas/src/permission/`
-**版本**: v0.1.0
 
 ## 概述
 

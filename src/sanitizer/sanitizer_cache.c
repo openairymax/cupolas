@@ -10,7 +10,6 @@
  * @file sanitizer_cache.c
  * @brief Sanitizer Cache Implementation
  * @author SPHARX Ltd. - Airymax Team
- * @date 2024
  */
 
 #include "sanitizer_cache.h"
