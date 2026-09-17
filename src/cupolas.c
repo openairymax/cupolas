@@ -35,6 +35,10 @@
 #define CUPOLAS_DEFAULT_AUDIT_MAX_FILES 5
 #define CUPOLAS_CONFIG_PATH_MAX 512
 
+#ifndef AIRYRT_VERSION
+#define AIRYRT_VERSION "0.0.0"
+#endif
+
 typedef struct {
     char permission_rules_path[CUPOLAS_CONFIG_PATH_MAX];
     char audit_log_dir[CUPOLAS_CONFIG_PATH_MAX];
@@ -45,13 +49,13 @@ static void cupolas_internal_config_init_defaults(cupolas_internal_config_t *cfg
     if (!cfg)
         return;
     __builtin_memset(cfg, 0, sizeof(*cfg));
-    /* R-6 根因修复：默认路径必须走运行期 AIRY_HOME 路径系统
+    /* 默认路径必须走运行期 AIRY_HOME 路径系统
      * （airy_config_dir()/airy_log_dir()，由 airy_paths_init() 依
      * $AIRY_HOME 解析并导出 $AIRY_CONFIG_DIR/$AIRY_LOG_DIR），而非
      * 编译期宏 AIRY_CONFIG_DIR/AIRY_LOG_DIR（= /etc/agentrt、
-     * /var/log/agentrt）。此前 PDP permission_engine 按编译期路径
-     * 加载 permission_rules.yaml，部署到 $AIRY_HOME 下时该文件不存在
-     * → 规则为空 → fail-closed 拒绝所有工具（社区「工具不可用」）。 */
+     * /var/log/agentrt）。若按编译期路径加载 permission_rules.yaml，
+     * 部署到 $AIRY_HOME 下时该文件不存在 → 规则为空 → fail-closed
+     * 拒绝所有工具。 */
 #ifdef _WIN32
     snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
              "%s\\cupolas\\permission_rules.yaml", airy_config_dir());
@@ -168,7 +172,7 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
         }
     }
 
-    /* M2-S5（0.1.9 §3.2）：pep 模式不构造本地 permission 引擎——策略
+    /* pep 模式不构造本地 permission 引擎——策略
      * 唯一持有者为 PDP（cupolas_d）；本地仅保留 sanitizer/workbench/audit。 */
     if (with_perm) {
         g_cupolas.perm = permission_engine_create(
@@ -323,7 +327,7 @@ void cupolas_cleanup(void)
 
 const char *cupolas_version(void)
 {
-    return "0.1.1";
+    return AIRYRT_VERSION;
 }
 
 int cupolas_check_permission(const char *agent_id, const char *action, const char *resource,
