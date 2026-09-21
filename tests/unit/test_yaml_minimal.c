@@ -263,6 +263,27 @@ static void test_string_parse(void)
     PASS();
 }
 
+static void test_plain_scalar_with_colon(void)
+{
+    TEST("Parse plain scalar containing ':'");
+    yaml_document_t *doc = yaml_create();
+    const char *yaml = "base_url: https://api.example.com\n"
+                       "endpoint: http://localhost:11434/v1\n"
+                       "tag: foo:bar\n";
+    int rc = yaml_parse_string(doc, yaml, strlen(yaml));
+    ASSERT(rc == 0, "plain scalar with ':' should parse");
+    ASSERT(strcmp(yaml_as_string(yaml_get(doc->root, "base_url"), ""),
+                  "https://api.example.com") == 0,
+           "scheme ':' must stay inside the scalar");
+    ASSERT(strcmp(yaml_as_string(yaml_get(doc->root, "endpoint"), ""),
+                  "http://localhost:11434/v1") == 0,
+           "port ':' must stay inside the scalar");
+    ASSERT(strcmp(yaml_as_string(yaml_get(doc->root, "tag"), ""), "foo:bar") == 0,
+           "':' without following space is not a key separator");
+    yaml_destroy(doc);
+    PASS();
+}
+
 static void test_quoted_double(void)
 {
     TEST("Parse double-quoted string");
@@ -322,6 +343,7 @@ int main(void)
     test_int_parse();
     test_bool_parse();
     test_string_parse();
+    test_plain_scalar_with_colon();
     test_quoted_double();
     test_has_key_null_node();
     test_sequence_get_index_negative();
