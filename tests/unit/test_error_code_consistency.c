@@ -12,10 +12,10 @@
  *   4. 各模块错误码段区间互不重叠（通用/系统/内核/服务/LLM/执行/记忆/安全/Cupolas/协调）
  *   5. cupolas_error_string / 转换函数基本可用性
  *
- * 已知差异（非 bug，保留 cupolas enum 数值不变以避免破坏 ABI）：
- *   - cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
- *     （cupolas_ERROR_WOULD_BLOCK 别名映射到 cupolas_ERR_TRY_AGAIN=-15）
- *     后续统一为 commons 权威值。
+ * 0.1.19 SSoT 收敛：cupolas_ERR_TRY_AGAIN 已由 -15 统一为 commons 权威值
+ *   AIRY_ERR_WOULD_BLOCK=-18，cupolas_ERROR_WOULD_BLOCK 别名随之对齐；
+ *   cupolas_ERROR_* 别名宏唯一定义点收敛至 cupolas_error.h
+ *   （此前 cupolas.h / platform_base.h 各持一套互相遮蔽的定义）。
  *
  * @author SPHARX Ltd. - Airymax Team
  */
@@ -51,8 +51,8 @@ static int g_failed = 0;
  * commons 权威宏一致。若数值偏离，则 cupolas 公共 API 返回的错误码会被
  * 调用方误判（如 cupolas_ERR_OUT_OF_MEMORY=-49 必须等于 AIRY_ERR_OUT_OF_MEMORY=-49）。
  *
- * 注意：cupolas_ERR_TRY_AGAIN=-15 与 AIRY_ERR_WOULD_BLOCK=-18 数值不同
- * （已知差异，留待 1.0.1+ 统一），本测试不检查此项。
+ * 注意：cupolas_ERR_TRY_AGAIN 已统一为 AIRY_ERR_WOULD_BLOCK=-18
+ * （0.1.19 SSoT 收敛），本测试检查此项。
  * ============================================================================ */
 
 static void test_cupolas_enum_matches_commons(void)
@@ -87,6 +87,8 @@ static void test_cupolas_enum_matches_commons(void)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_STATE_ERROR mismatch");
     if ((int)cupolas_ERR_OVERFLOW != (int)AIRY_ERR_OVERFLOW)
         TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_OVERFLOW mismatch");
+    if ((int)cupolas_ERR_TRY_AGAIN != (int)AIRY_ERR_WOULD_BLOCK)
+        TEST_FAIL("cupolas_enum_matches_commons", "cupolas_ERR_TRY_AGAIN mismatch");
 
     TEST_PASS("cupolas_enum_matches_commons");
 }

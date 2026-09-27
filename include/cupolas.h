@@ -51,42 +51,10 @@ extern "C" {
 #endif
 #endif
 
-#ifndef cupolas_OK
-#define cupolas_OK AIRY_OK
-#endif
-#ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN AIRY_ERR_UNKNOWN
-#endif
-#ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG AIRY_ERR_INVALID_PARAM
-#endif
-#ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY AIRY_ERR_OUT_OF_MEMORY
-#endif
-#ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND AIRY_ERR_NOT_FOUND
-#endif
-#ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION AIRY_ERR_PERMISSION_DENIED
-#endif
-#ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY AIRY_ERR_STATE_ERROR
-#endif
-#ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT AIRY_ERR_TIMEOUT
-#endif
-#ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK AIRY_ERR_STATE_ERROR
-#endif
-#ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW AIRY_ERR_OVERFLOW
-#endif
-#ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED AIRY_ERR_NOT_SUPPORTED
-#endif
-#ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO AIRY_ERR_IO
-#endif
+/* SSoT: cupolas_OK 与 cupolas_ERROR_* 别名宏唯一定义点为 cupolas_error.h，
+ * 本公共头仅重导出，严禁在此重复定义（历史上三处定义互相遮蔽，
+ * 曾导致跨翻译单元错误码不一致与审计条目泄漏）。 */
+#include "../src/security/cupolas_error.h"
 
 #ifndef CUPOLAS_OK
 #define CUPOLAS_OK cupolas_OK

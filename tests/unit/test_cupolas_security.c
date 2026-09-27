@@ -411,26 +411,26 @@ void test_network_security_module(void)
     /* Test cert mode strings */
     const char *mode_str;
 
-    mode_str = cupolas_cert_mode_string(CUPOLAS_CERT_NONE);
+    mode_str = cupolas_cert_str(CUPOLAS_CERT_NONE);
     TEST_ASSERT(mode_str != NULL, "cert_mode_NONE", "Should return none mode string");
 
-    mode_str = cupolas_cert_mode_string(CUPOLAS_CERT_OPTIONAL);
+    mode_str = cupolas_cert_str(CUPOLAS_CERT_OPTIONAL);
     TEST_ASSERT(mode_str != NULL, "cert_mode_OPTIONAL", "Should return optional mode string");
 
-    mode_str = cupolas_cert_mode_string(CUPOLAS_CERT_REQUIRED);
+    mode_str = cupolas_cert_str(CUPOLAS_CERT_REQUIRED);
     TEST_ASSERT(mode_str != NULL, "cert_mode_REQUIRED", "Should return required mode string");
 
     /* Test firewall action strings */
     const char *fw_str;
 
-    fw_str = cupolas_fw_action_string(CUPOLAS_FW_ALLOW);
+    fw_str = cupolas_fw_str(CUPOLAS_FW_ALLOW);
     TEST_ASSERT(fw_str != NULL && strcmp(fw_str, "Allow") == 0, "fw_action_ALLOW",
                 "Should return Allow");
 
-    fw_str = cupolas_fw_action_string(CUPOLAS_FW_DENY);
+    fw_str = cupolas_fw_str(CUPOLAS_FW_DENY);
     TEST_ASSERT(fw_str != NULL && strcmp(fw_str, "Deny") == 0, "fw_action_DENY", "Should return Deny");
 
-    fw_str = cupolas_fw_action_string(CUPOLAS_FW_RATE_LIMIT);
+    fw_str = cupolas_fw_str(CUPOLAS_FW_RATE_LIMIT);
     TEST_ASSERT(fw_str != NULL, "fw_action_RATE_LIMIT", "Should return rate limit action string");
 
     /* Test protocol strings */
@@ -449,14 +449,14 @@ void test_network_security_module(void)
     /* Test direction strings */
     const char *dir_str;
 
-    dir_str = cupolas_direction_string(CUPOLAS_DIR_ANY);
+    dir_str = cupolas_dir_str(CUPOLAS_DIR_ANY);
     TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Any") == 0, "dir_ANY", "Should return Any");
 
-    dir_str = cupolas_direction_string(CUPOLAS_DIR_INBOUND);
+    dir_str = cupolas_dir_str(CUPOLAS_DIR_INBOUND);
     TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Inbound") == 0, "dir_INBOUND",
                 "Should return Inbound");
 
-    dir_str = cupolas_direction_string(CUPOLAS_DIR_OUTBOUND);
+    dir_str = cupolas_dir_str(CUPOLAS_DIR_OUTBOUND);
     TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Outbound") == 0, "dir_OUTBOUND",
                 "Should return Outbound");
 }

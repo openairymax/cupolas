@@ -71,10 +71,14 @@ static int ensure_overflow_dir(const char *dir)
         AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
 #if cupolas_PLATFORM_WINDOWS
-    return mkdir(dir);
+    if (mkdir(dir) == 0)
+        return 0;
 #else
-    return mkdir(dir, 0755);
+    if (mkdir(dir, 0755) == 0)
+        return 0;
 #endif
+    /* EEXIST 属成功语义（同名非目录由后续 fopen 失败兜底） */
+    return (errno == EEXIST) ? 0 : -1;
 }
 
 static FILE *open_new_overflow_file(overflow_handler_t *handler)
@@ -362,6 +366,11 @@ void overflow_handler_reset_stats(overflow_handler_t *handler)
     cupolas_mutex_unlock(&handler->lock);
 }
 
+const char *overflow_handler_get_dir(const overflow_handler_t *handler)
+{
+    return handler ? handler->overflow_dir : NULL;
+}
+
 overflow_level_t overflow_handler_check_level(size_t current_size, size_t max_size)
 {
     if (max_size == 0)
@@ -484,6 +493,9 @@ int audit_queue_ex_push_with_callback(audit_queue_ex_t *queue, audit_entry_t *en
 
             return 0;
         } else {
+            /* 审计条目不得静默丢失：丢弃路径同样必须销毁条目，
+             * 否则内存泄漏且违反审计链完整性。 */
+            audit_entry_destroy(entry);
             cupolas_atomic_add64(&queue->total_dropped, 1);
 
             cupolas_mutex_lock(&queue->level_lock);

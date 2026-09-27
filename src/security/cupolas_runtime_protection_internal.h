@@ -68,6 +68,10 @@ typedef struct {
     uint8_t data_hash[32];
     int hashes_computed;
 
+    cupolas_thread_t integrity_thread;
+    atomic_int integrity_stop;
+    int integrity_thread_active;
+
     void (*violation_callback)(const cupolas_violation_event_t *event);
     void (*integrity_callback)(int result);
 
@@ -82,5 +86,8 @@ uint32_t cupolas_rtp_get_pid(void);
 uint32_t cupolas_rtp_get_tid(void);
 void cupolas_record_violation(cupolas_violation_type_t type, const char *details,
                               const char *syscall_name);
+
+/* Defined in cupolas_runtime_protection_integrity.c. */
+void cupolas_rtp_integrity_shutdown(void);
 
 #endif /* CUPOLAS_RUNTIME_PROTECTION_INTERNAL_H */

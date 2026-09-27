@@ -86,7 +86,6 @@ set(CUPOLAS_SOURCES
     src/guards/safety_guard_quota.c
     src/guards/safety_guard_audit.c
     src/guards/safety_guard_ctrl.c
-    src/circuit_breaker.c
     src/slab.c
     src/mempool.c
     # 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
@@ -110,6 +109,9 @@ if(AIRY_HAS_OPENSSL)
         src/security/cupolas_entitlements_parse.c
         src/security/cupolas_entitlements_crypto.c
         src/security/cupolas_runtime_protection.c
+        src/security/cupolas_runtime_protection_memory.c
+        src/security/cupolas_runtime_protection_check.c
+        src/security/cupolas_runtime_protection_integrity.c
         # cupolas_network_security 按功能域拆分：生命周期+TLS/防火墙规则/包过滤/连接监控/检测引擎/DNS/工具
         src/security/cupolas_network_security.c
         src/security/cupolas_network_security_firewall.c
@@ -151,6 +153,7 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_entitlements.h
     src/security/cupolas_entitlements_internal.h
     src/security/cupolas_runtime_protection.h
+    src/security/cupolas_runtime_protection_internal.h
     src/security/cupolas_network_security.h
     src/security/cupolas_network_security_internal.h
     src/security/cupolas_error.h
@@ -161,7 +164,6 @@ set(CUPOLAS_HEADERS
     src/security/network/network_utils.h
     src/guards/guard_core.h
     src/guards/guard_integration.h
-    src/circuit_breaker.h
     src/slab.h
     src/mempool.h
     include/dynamic_policy_engine.h
@@ -204,9 +206,14 @@ target_compile_definitions(cupolas PRIVATE
     AIRY_ENABLE_V2_API=1
 )
 
+# src 根仅自用，不对外传播；src/security 公共头有 daemon 接线层消费者，
+# 保留传播（头迁移至 include/ 待后续线，0.1.19 F4）
+target_include_directories(cupolas PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
 target_include_directories(cupolas PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     # 安全子模块公共头（vault/entitlements/network/error），供 daemon 接线层裸名 include
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/security>
     $<INSTALL_INTERFACE:include>
@@ -215,6 +222,9 @@ target_include_directories(cupolas PUBLIC
 
 target_include_directories(cupolas PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    # 版本 SSoT 头（commons/include/airyrt_version.h）：显式声明，避免
+    # 依赖 airy_common 的传递性 include 传播（Unify Design：依赖可见）
+    ${COMMON_MODULE_DIR}/include
 )
 
 target_include_directories(cupolas PUBLIC
@@ -457,17 +467,6 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_sanitizer_cache cupolas)
     add_test(NAME sanitizer_cache_tests COMMAND test_sanitizer_cache)
-
-    # L1-B 接线：熔断器单测
-    add_executable(test_circuit_breaker tests/unit/test_circuit_breaker.c)
-    target_compile_definitions(test_circuit_breaker PRIVATE AIRY_COMPLIANCE_IMPL)
-    target_include_directories(test_circuit_breaker PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${COMMON_INCLUDE_DIRS}
-    )
-    target_link_libraries(test_circuit_breaker cupolas)
-    add_test(NAME circuit_breaker_tests COMMAND test_circuit_breaker)
 
     # L1-B 接线：安全模块（entitlements/network/runtime/signature/vault）单测
     add_executable(test_cupolas_security tests/unit/test_cupolas_security.c)

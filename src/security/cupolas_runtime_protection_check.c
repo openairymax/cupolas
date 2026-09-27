@@ -12,6 +12,7 @@
 #include "cupolas_runtime_protection.h"
 #include "cupolas_runtime_protection_internal.h"
 
+#include "airy_memory.h"
 #include "../platform/platform.h"
 #include "string_compat.h"
 

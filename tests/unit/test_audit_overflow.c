@@ -14,12 +14,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
+
 static void test_overflow_handler_create_destroy(void)
 {
     printf("Test: overflow_handler_create_destroy... ");
 
     overflow_handler_t *handler = overflow_handler_create(AIRY_TMP_DIR "/cupolas_test", 1, 100);
     assert(handler != NULL);
+
+    overflow_handler_destroy(handler);
+    printf("PASS\n");
+}
+
+static void test_overflow_dir_already_exists(void)
+{
+    printf("Test: overflow_dir_already_exists... ");
+
+    /* EEXIST 回归：目录预创建后 create，溢出目录必须保持原值，
+     * 不得误判失败而回退 AIRY_TMP_DIR"/cupolas_audit"。 */
+    const char *dir = AIRY_TMP_DIR "/cupolas_eexist_test";
+#if defined(_WIN32)
+    (void)_mkdir(dir);
+#else
+    (void)mkdir(dir, 0755);
+#endif
+
+    overflow_handler_t *handler = overflow_handler_create(dir, 1, 100);
+    assert(handler != NULL);
+    assert(strcmp(overflow_handler_get_dir(handler), dir) == 0);
 
     overflow_handler_destroy(handler);
     printf("PASS\n");
@@ -238,6 +266,7 @@ int main(void)
     printf("=== Audit Overflow Tests ===\n");
 
     test_overflow_handler_create_destroy();
+    test_overflow_dir_already_exists();
     test_overflow_level_check();
     test_overflow_write_and_stats();
     test_overflow_null_handling();

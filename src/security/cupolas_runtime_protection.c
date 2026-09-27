@@ -146,6 +146,8 @@ void cupolas_runtime_protect_cleanup(void)
     if (atomic_load(&g_runtime_prot.initialized) != RTP_INIT_COMPLETE)
         return;
 
+    cupolas_rtp_integrity_shutdown();
+
     for (size_t i = 0; i < g_runtime_prot.seccomp_rule_count; i++) {
         AIRY_FREE(g_runtime_prot.seccomp_rules[i].syscall_name);
     }
