@@ -25,6 +25,7 @@
 #include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 #include "airy_memory.h"
+#include "airyrt_version.h"
 #include "workbench/workbench.h"
 
 #include <stdio.h>
@@ -34,10 +35,6 @@
 #define CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE (10 * 1024 * 1024)
 #define CUPOLAS_DEFAULT_AUDIT_MAX_FILES 5
 #define CUPOLAS_CONFIG_PATH_MAX 512
-
-#ifndef AIRYRT_VERSION
-#define AIRYRT_VERSION "0.0.0"
-#endif
 
 typedef struct {
     char permission_rules_path[CUPOLAS_CONFIG_PATH_MAX];

@@ -107,6 +107,13 @@ typedef struct {
 } cupolas_integrity_config_t;
 
 /**
+ * @brief Hash algorithm selectors for integrity checking
+ */
+typedef enum {
+    CUPOLAS_HASH_SHA256 = 1 /**< SHA-256 (32-byte digest) */
+} cupolas_hash_algo_t;
+
+/**
  * @brief Runtime protection configuration
  */
 typedef struct {

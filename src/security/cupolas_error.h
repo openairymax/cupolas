@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "error.h"
+#include "../../../commons/utils/error/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,7 +59,7 @@ typedef enum {
     cupolas_ERR_IO = AIRY_ERR_IO, /* -44 */
     cupolas_ERR_STATE_ERROR = AIRY_ERR_STATE_ERROR, /* -46 */
     cupolas_ERR_OVERFLOW = AIRY_ERR_OVERFLOW,
-    cupolas_ERR_TRY_AGAIN = -15,
+    cupolas_ERR_TRY_AGAIN = AIRY_ERR_WOULD_BLOCK, /* -18 */
     /* v5.0 fix: 5 security-specific error codes migrated from -16..-20 to
      * the cupolas-dedicated -718..-726 segment, eliminating numeric
      * collisions with the POSIX codes in airy_types.h:

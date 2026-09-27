@@ -523,7 +523,7 @@ const char *cupolas_proto_string(cupolas_proto_t protocol)
     }
 }
 
-const char *cupolas_cert_mode_string(cupolas_cert_mode_t result)
+const char *cupolas_cert_str(cupolas_cert_mode_t result)
 {
     switch (result) {
     case CUPOLAS_CERT_NONE:
@@ -537,7 +537,7 @@ const char *cupolas_cert_mode_string(cupolas_cert_mode_t result)
     }
 }
 
-const char *cupolas_fw_action_string(cupolas_fw_action_t action)
+const char *cupolas_fw_str(cupolas_fw_action_t action)
 {
     switch (action) {
     case CUPOLAS_FW_ALLOW:
@@ -553,7 +553,7 @@ const char *cupolas_fw_action_string(cupolas_fw_action_t action)
     }
 }
 
-const char *cupolas_direction_string(cupolas_direction_t direction)
+const char *cupolas_dir_str(cupolas_direction_t direction)
 {
     switch (direction) {
     case CUPOLAS_DIR_ANY:

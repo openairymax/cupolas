@@ -77,42 +77,10 @@ extern "C" {
  * Error Handling
  * ============================================================================ */
 
-#ifndef cupolas_OK
-#define cupolas_OK 0
-#endif
-#ifndef cupolas_ERROR_UNKNOWN
-#define cupolas_ERROR_UNKNOWN -1
-#endif
-#ifndef cupolas_ERROR_INVALID_ARG
-#define cupolas_ERROR_INVALID_ARG -2
-#endif
-#ifndef cupolas_ERROR_NO_MEMORY
-#define cupolas_ERROR_NO_MEMORY -3
-#endif
-#ifndef cupolas_ERROR_NOT_FOUND
-#define cupolas_ERROR_NOT_FOUND -4
-#endif
-#ifndef cupolas_ERROR_PERMISSION
-#define cupolas_ERROR_PERMISSION -5
-#endif
-#ifndef cupolas_ERROR_BUSY
-#define cupolas_ERROR_BUSY -6
-#endif
-#ifndef cupolas_ERROR_TIMEOUT
-#define cupolas_ERROR_TIMEOUT -7
-#endif
-#ifndef cupolas_ERROR_WOULD_BLOCK
-#define cupolas_ERROR_WOULD_BLOCK -8
-#endif
-#ifndef cupolas_ERROR_OVERFLOW
-#define cupolas_ERROR_OVERFLOW -9
-#endif
-#ifndef cupolas_ERROR_NOT_SUPPORTED
-#define cupolas_ERROR_NOT_SUPPORTED -10
-#endif
-#ifndef cupolas_ERROR_IO
-#define cupolas_ERROR_IO -11
-#endif
+/* SSoT: 错误码别名宏唯一定义点为 cupolas_error.h。
+ * 历史上本头文件曾硬编码 -1..-11 旧错误码（与 commons 权威值错位，
+ * WOULD_BLOCK=-8 与 TIMEOUT 撞号），已整体移除。 */
+#include "../security/cupolas_error.h"
 
 /**
  * @brief Get last error code
