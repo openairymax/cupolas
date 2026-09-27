@@ -6,7 +6,10 @@
  * test_circuit_breaker.c - Circuit Breaker Unit Tests
  */
 
-#include "circuit_breaker.h"
+/* 相对路径直取 cupolas 版：-I 序中 commons/utils/ipc 的同名头先于
+ * cupolas/src 被命中，裸文件名 include 会解析到 CB_STATE_* 契约。 */
+#include "../../src/circuit_breaker.h"
+#include "error.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -212,7 +215,7 @@ static void test_breaker_reject_when_open(void)
     assert(circuit_breaker_get_state(breaker) == CIRCUIT_STATE_OPEN);
 
     int result = circuit_breaker_call(breaker, success_func, NULL, 100);
-    assert(result == -2);
+    assert(result == AIRY_ERR_BUSY);
 
     circuit_breaker_stats_t stats;
     circuit_breaker_get_stats(breaker, &stats);

@@ -7,6 +7,7 @@
  */
 
 #include "audit_overflow.h"
+#include "error.h"
 #include "platform.h"
 
 #include <assert.h>
@@ -95,7 +96,7 @@ static void test_overflow_null_handling(void)
     audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_SYSTEM, NULL, NULL, NULL, NULL, 0);
     if (entry) {
         int result = overflow_handler_write(NULL, entry);
-        assert(result == -1);
+        assert(result == AIRY_ERR_NULL_POINTER);
         audit_entry_destroy(entry);
     }
 
@@ -155,27 +156,27 @@ static void test_queue_ex_push_pop(void)
     printf("PASS\n");
 }
 
-static void test_queue_ex_overflow_callback_called(int call_count)
+static int g_overflow_callback_invoked = 0;
+
+static void test_overflow_callback(overflow_level_t level, size_t queue_size, size_t max_size,
+                                   void *user_data)
 {
-    static int callback_invoked = 0;
+    (void)queue_size;
+    (void)max_size;
+    (void)user_data;
+    g_overflow_callback_invoked++;
+    assert(level >= OVERFLOW_LEVEL_WARNING);
+}
 
-    static void test_callback(overflow_level_t level, size_t queue_size, size_t max_size,
-                              void *user_data)
-    {
-        (void)queue_size;
-        (void)max_size;
-        (void)user_data;
-        callback_invoked++;
-        assert(level >= OVERFLOW_LEVEL_WARNING);
-    }
-
+static void test_queue_ex_overflow_callback_called(void)
+{
     printf("Test: queue_ex_overflow_callback... ");
 
     audit_queue_ex_t *queue = audit_queue_ex_create(3, AIRY_TMP_DIR "/cupolas_test", 5);
     assert(queue != NULL);
 
-    callback_invoked = 0;
-    int cb_result = audit_queue_ex_set_overflow_callback(queue, test_callback, NULL);
+    g_overflow_callback_invoked = 0;
+    int cb_result = audit_queue_ex_set_overflow_callback(queue, test_overflow_callback, NULL);
     assert(cb_result == 0);
 
     for (int i = 0; i < 4; i++) {
@@ -187,11 +188,11 @@ static void test_queue_ex_overflow_callback_called(int call_count)
             audit_entry_create(AUDIT_EVENT_PERMISSION, agent, action, "resource", "detail", 1);
 
         if (entry) {
-            audit_queue_ex_push_with_callback(queue, entry, test_callback, NULL);
+            audit_queue_ex_push_with_callback(queue, entry, test_overflow_callback, NULL);
         }
     }
 
-    assert(callback_invoked > 0 ||
+    assert(g_overflow_callback_invoked > 0 ||
            audit_queue_ex_get_overflow_level(queue) >= OVERFLOW_LEVEL_WARNING);
 
     audit_queue_ex_destroy(queue);
@@ -242,7 +243,7 @@ int main(void)
     test_overflow_null_handling();
     test_queue_ex_create_destroy();
     test_queue_ex_push_pop();
-    test_queue_ex_overflow_callback_called(0);
+    test_queue_ex_overflow_callback_called();
     test_queue_ex_stats();
 
     printf("=== All tests PASSED ===\n");

@@ -497,10 +497,34 @@ int cupolas_net_validate_ip(const char *ip);
 int cupolas_net_validate_port(uint16_t port);
 
 /**
- * @brief Certificate validation result string
+ * @brief TLS version string
  * @return Static string (do not free)
  */
-const char *cupolas_cert_result_string(cupolas_cert_mode_t result);
+const char *cupolas_tls_version_string(cupolas_tls_version_t version);
+
+/**
+ * @brief Protocol string
+ * @return Static string (do not free)
+ */
+const char *cupolas_proto_string(cupolas_proto_t protocol);
+
+/**
+ * @brief Certificate validation mode string
+ * @return Static string (do not free)
+ */
+const char *cupolas_cert_mode_string(cupolas_cert_mode_t mode);
+
+/**
+ * @brief Firewall action string
+ * @return Static string (do not free)
+ */
+const char *cupolas_fw_action_string(cupolas_fw_action_t action);
+
+/**
+ * @brief Connection direction string
+ * @return Static string (do not free)
+ */
+const char *cupolas_direction_string(cupolas_direction_t direction);
 
 #ifdef __cplusplus
 }

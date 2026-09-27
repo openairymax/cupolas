@@ -2,13 +2,18 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 
 /*
+ * sanitizer.h - Input sanitizer public interface: injection attack prevention
  *
- * sanitizer.h - Input Sanitizer Public Interface: Injection Attack Prevention
+ * Level-driven enforcement (sanitize_level_t; authoritative definition in
+ * 04-cupolas.md §4.3):
+ * - NONE   : pass input through unchanged
+ * - LOW    : escape special characters
+ * - MEDIUM : escaping plus configurable literal pattern-matching rules
+ * - HIGH   : whitelist mode, reject anything not whitelisted
+ * - MAX    : reject all input
  *
- * Design Principles:
- * - Whitelist First: Only allow known-safe patterns
- * - Defense in Depth: Rules + length + encoding checks
- * - Configurable: Custom rules support
+ * Defense in depth: allow_* flags select the acceptable character classes,
+ * max_length bounds the input size, and custom rules add literal patterns.
  */
 
 #ifndef CUPOLAS_SANITIZER_H
@@ -159,7 +164,7 @@ void sanitizer_default_context(sanitize_context_t *ctx);
 /**
  * @brief Add sanitization rule
  * @param[in] sanitizer Sanitizer handle (must not be NULL)
- * @param[in] pattern Match pattern (regex), must not be NULL
+ * @param[in] pattern Literal substring to match, must not be NULL
  * @param[in] replacement Replacement string (NULL to reject)
  * @return 0 on success, negative on failure
  * @note Thread-safe: Yes

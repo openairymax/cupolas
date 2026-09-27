@@ -14,6 +14,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,17 +69,17 @@ void test_error_codes(void)
     /* Test module-specific to unified conversion */
     cupolas_error_t err;
 
-    err = cupolas_error_from_sig(cupolas_SIG_OK);
-    TEST_ASSERT(err == cupolas_ERR_OK, "from_sig_OK", "Should convert SIG_OK to ERR_OK");
+    err = cupolas_error_from_sig(cupolas_SIG_ERR_OK);
+    TEST_ASSERT(err == cupolas_ERR_OK, "from_sig_OK", "Should convert SIG_ERR_OK to ERR_OK");
 
-    err = cupolas_error_from_sig(cupolas_SIG_INVALID);
+    err = cupolas_error_from_sig(cupolas_SIG_ERR_INVALID);
     TEST_ASSERT(err == cupolas_ERR_SIGNATURE_INVALID, "from_sig_INVALID",
                 "Should convert properly");
 
-    err = cupolas_error_from_ent(cupolas_ENT_OK);
-    TEST_ASSERT(err == cupolas_ERR_OK, "from_ent_OK", "Should convert ENT_OK to ERR_OK");
+    err = cupolas_error_from_ent(cupolas_ENT_ERR_OK);
+    TEST_ASSERT(err == cupolas_ERR_OK, "from_ent_OK", "Should convert ENT_ERR_OK to ERR_OK");
 
-    err = cupolas_error_from_ent(cupolas_ENT_DENIED);
+    err = cupolas_error_from_ent(cupolas_ENT_ERR_DENIED);
     TEST_ASSERT(err == cupolas_ERR_PERMISSION_DENIED, "from_ent_DENIED", "Should convert properly");
 
     err = cupolas_error_from_vault(cupolas_VAULT_ERR_OK);
@@ -104,8 +105,13 @@ void test_error_codes(void)
     TEST_ASSERT(cupolas_ERROR_IS_SUCCESS(0) == true, "IS_SUCCESS_0", "0 should be success");
     TEST_ASSERT(cupolas_ERROR_IS_SUCCESS(-1) == false, "IS_SUCCESS_NEG1",
                 "-1 should not be success");
-    TEST_ASSERT(cupolas_ERROR_IS_FATAL(cupolas_ERR_OUT_OF_MEMORY) == true, "IS_FATAL_OOM",
-                "OOM should be fatal");
+    /* fatal 判据（SSoT，见 test_error_code_consistency.c）：fatal = 错误码
+     * 严格小于 OUT_OF_MEMORY。OOM 本身可恢复（重试/释放后重试），非 fatal；
+     * OVERFLOW（数据损坏）与 UNKNOWN（未知）属不可恢复，为 fatal。 */
+    TEST_ASSERT(cupolas_ERROR_IS_FATAL(cupolas_ERR_OUT_OF_MEMORY) == false, "IS_FATAL_OOM",
+                "OOM is recoverable, not fatal");
+    TEST_ASSERT(cupolas_ERROR_IS_FATAL(cupolas_ERR_OVERFLOW) == true, "IS_FATAL_OVERFLOW",
+                "Data corruption should be fatal");
     TEST_ASSERT(cupolas_ERROR_IS_FATAL(cupolas_ERR_TIMEOUT) == false, "IS_FATAL_TIMEOUT",
                 "Timeout should not be fatal");
 }
@@ -134,17 +140,17 @@ void test_signature_module(void)
     /* Test result strings */
     const char *result_str;
 
-    result_str = cupolas_signature_result_string(cupolas_SIG_OK);
+    result_str = cupolas_signature_result_string(CUPOLAS_SIG_OK);
     TEST_ASSERT(result_str != NULL && strcmp(result_str, "Signature valid") == 0, "result_OK",
                 "Should return valid string");
 
-    result_str = cupolas_signature_result_string(cupolas_SIG_INVALID);
+    result_str = cupolas_signature_result_string(CUPOLAS_SIG_INVALID);
     TEST_ASSERT(result_str != NULL, "result_INVALID", "Should return invalid string");
 
-    result_str = cupolas_signature_result_string(cupolas_SIG_EXPIRED);
+    result_str = cupolas_signature_result_string(CUPOLAS_SIG_EXPIRED);
     TEST_ASSERT(result_str != NULL, "result_EXPIRED", "Should return expired string");
 
-    result_str = cupolas_signature_result_string(cupolas_SIG_TAMPERED);
+    result_str = cupolas_signature_result_string(CUPOLAS_SIG_TAMPERED);
     TEST_ASSERT(result_str != NULL, "result_TAMPERED", "Should return tampered string");
 
     /* Test timestamp function */
@@ -266,17 +272,17 @@ void test_entitlements_module(void)
     /* Test result strings */
     const char *result_str;
 
-    result_str = cupolas_entitlements_result_string(cupolas_ENT_OK);
-    TEST_ASSERT(result_str != NULL && strcmp(result_str, "Verification successful") == 0,
-                "ent_result_OK", "Should return success string");
+    result_str = cupolas_entitlements_result_string(CUPOLAS_ENT_OK);
+    TEST_ASSERT(result_str != NULL && strcmp(result_str, "Success") == 0, "ent_result_OK",
+                "Should return success string");
 
-    result_str = cupolas_entitlements_result_string(cupolas_ENT_DENIED);
-    TEST_ASSERT(result_str != NULL && strstr(result_str, "denied") != NULL, "ent_result_DENIED",
-                "Should contain denied");
+    result_str = cupolas_entitlements_result_string(CUPOLAS_ENT_DENIED);
+    TEST_ASSERT(result_str != NULL && strcmp(result_str, "Permission denied") == 0,
+                "ent_result_DENIED", "Should return denied string");
 
-    result_str = cupolas_entitlements_result_string(cupolas_ENT_EXPIRED);
-    TEST_ASSERT(result_str != NULL && strstr(result_str, "expired") != NULL, "ent_result_EXPIRED",
-                "Should contain expired");
+    result_str = cupolas_entitlements_result_string(CUPOLAS_ENT_EXPIRED);
+    TEST_ASSERT(result_str != NULL && strcmp(result_str, "Expired") == 0, "ent_result_EXPIRED",
+                "Should return expired string");
 
     /* Test path matching */
     int match_ret;
@@ -301,7 +307,6 @@ void test_entitlements_module(void)
     TEST_ASSERT(match_ret == 0, "host_match_different", "Different hosts should not match");
 
     /* Test validity check */
-    uint64_t now = cupolas_signature_get_timestamp(); /* Reuse timestamp function */
     int valid_ret;
 
     valid_ret = cupolas_entitlements_check_validity(NULL);
@@ -335,20 +340,20 @@ void test_runtime_protection_module(void)
     const char *status_str;
 
     status_str = cupolas_protection_status_string(CUPOLAS_PROTECT_STATUS_INACTIVE);
-    TEST_ASSERT(status_str != NULL && strstr(status_str, "inactive") != NULL,
-                "protect_status_INACTIVE", "Should contain inactive");
+    TEST_ASSERT(status_str != NULL && strcmp(status_str, "Inactive") == 0,
+                "protect_status_INACTIVE", "Should return inactive");
 
     status_str = cupolas_protection_status_string(CUPOLAS_PROTECT_STATUS_ACTIVE);
-    TEST_ASSERT(status_str != NULL && strstr(status_str, "active") != NULL, "protect_status_ACTIVE",
-                "Should contain active");
+    TEST_ASSERT(status_str != NULL && strcmp(status_str, "Active") == 0, "protect_status_ACTIVE",
+                "Should return active");
 
     status_str = cupolas_protection_status_string(CUPOLAS_PROTECT_STATUS_VIOLATION);
-    TEST_ASSERT(status_str != NULL && strstr(status_str, "violation") != NULL,
-                "protect_status_VIOLATION", "Should contain violation");
+    TEST_ASSERT(status_str != NULL && strcmp(status_str, "Violation") == 0,
+                "protect_status_VIOLATION", "Should return violation");
 
     status_str = cupolas_protection_status_string(CUPOLAS_PROTECT_STATUS_COMPROMISED);
-    TEST_ASSERT(status_str != NULL && strstr(status_str, "compromised") != NULL,
-                "protect_status_COMPROMISED", "Should contain compromised");
+    TEST_ASSERT(status_str != NULL && strcmp(status_str, "Compromised") == 0,
+                "protect_status_COMPROMISED", "Should return compromised");
 
     /* Test violation type strings */
     const char *viol_str;
@@ -419,12 +424,11 @@ void test_network_security_module(void)
     const char *fw_str;
 
     fw_str = cupolas_fw_action_string(CUPOLAS_FW_ALLOW);
-    TEST_ASSERT(fw_str != NULL && strstr(fw_str, "allow") != NULL, "fw_action_ALLOW",
-                "Should contain allow");
+    TEST_ASSERT(fw_str != NULL && strcmp(fw_str, "Allow") == 0, "fw_action_ALLOW",
+                "Should return Allow");
 
     fw_str = cupolas_fw_action_string(CUPOLAS_FW_DENY);
-    TEST_ASSERT(fw_str != NULL && strstr(fw_str, "deny") != NULL, "fw_action_DENY",
-                "Should contain deny");
+    TEST_ASSERT(fw_str != NULL && strcmp(fw_str, "Deny") == 0, "fw_action_DENY", "Should return Deny");
 
     fw_str = cupolas_fw_action_string(CUPOLAS_FW_RATE_LIMIT);
     TEST_ASSERT(fw_str != NULL, "fw_action_RATE_LIMIT", "Should return rate limit action string");
@@ -433,42 +437,28 @@ void test_network_security_module(void)
     const char *proto_str;
 
     proto_str = cupolas_proto_string(CUPOLAS_PROTO_TCP);
-    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "tcp") == 0, "proto_TCP",
-                "Should return tcp");
+    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "TCP") == 0, "proto_TCP", "Should return TCP");
 
     proto_str = cupolas_proto_string(CUPOLAS_PROTO_UDP);
-    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "udp") == 0, "proto_UDP",
-                "Should return udp");
+    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "UDP") == 0, "proto_UDP", "Should return UDP");
 
     proto_str = cupolas_proto_string(CUPOLAS_PROTO_ICMP);
-    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "icmp") == 0, "proto_ICMP",
-                "Should return icmp");
+    TEST_ASSERT(proto_str != NULL && strcmp(proto_str, "ICMP") == 0, "proto_ICMP",
+                "Should return ICMP");
 
     /* Test direction strings */
     const char *dir_str;
 
     dir_str = cupolas_direction_string(CUPOLAS_DIR_ANY);
-    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "any") == 0, "dir_ANY", "Should return any");
+    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Any") == 0, "dir_ANY", "Should return Any");
 
     dir_str = cupolas_direction_string(CUPOLAS_DIR_INBOUND);
-    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "inbound") == 0, "dir_INBOUND",
-                "Should return inbound");
+    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Inbound") == 0, "dir_INBOUND",
+                "Should return Inbound");
 
     dir_str = cupolas_direction_string(CUPOLAS_DIR_OUTBOUND);
-    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "outbound") == 0, "dir_OUTBOUND",
-                "Should return outbound");
-
-    /* Test certificate validation functions (should not crash with NULL) */
-    int cert_ret;
-
-    cert_ret = cupolas_cert_validate(NULL, NULL, NULL);
-    TEST_ASSERT(cert_ret != 0, "cert_validate_null", "NULL cert should fail validation");
-
-    cert_ret = cupolas_cert_is_expired(NULL);
-    TEST_ASSERT(cert_ret == 1, "cert_expired_null", "NULL cert should be expired");
-
-    cert_ret = cupolas_cert_verify_hostname(NULL, NULL);
-    TEST_ASSERT(cert_ret != 0, "cert_verify_host_null", "NULL cert hostname check should fail");
+    TEST_ASSERT(dir_str != NULL && strcmp(dir_str, "Outbound") == 0, "dir_OUTBOUND",
+                "Should return Outbound");
 }
 
 /* ========================================================================

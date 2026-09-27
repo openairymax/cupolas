@@ -79,20 +79,6 @@ CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource
                                      size_t input_size, guard_result_t *results, size_t max_results,
                                      size_t *actual_results);
 
-/**
- * @brief Register the Cupolas hooks
- *
- * Registers the guard hooks into the Cupolas components.
- * Note: must be called after Cupolas initialization.
- * @return Error code
- */
-CUPOLAS_API int cupolas_guards_register_hooks(void);
-
-/**
- * @brief Unregister the Cupolas hooks
- */
-CUPOLAS_API void cupolas_guards_unregister_hooks(void);
-
 #ifdef __cplusplus
 }
 #endif

@@ -507,7 +507,7 @@ const char *cupolas_tls_version_string(cupolas_tls_version_t version)
     }
 }
 
-const char *cupolas_protocol_string(cupolas_proto_t protocol)
+const char *cupolas_proto_string(cupolas_proto_t protocol)
 {
     switch (protocol) {
     case CUPOLAS_PROTO_ANY:
@@ -523,7 +523,7 @@ const char *cupolas_protocol_string(cupolas_proto_t protocol)
     }
 }
 
-const char *cupolas_cert_result_string(cupolas_cert_mode_t result)
+const char *cupolas_cert_mode_string(cupolas_cert_mode_t result)
 {
     switch (result) {
     case CUPOLAS_CERT_NONE:
@@ -532,6 +532,36 @@ const char *cupolas_cert_result_string(cupolas_cert_mode_t result)
         return "Optional";
     case CUPOLAS_CERT_REQUIRED:
         return "Required";
+    default:
+        return "Unknown";
+    }
+}
+
+const char *cupolas_fw_action_string(cupolas_fw_action_t action)
+{
+    switch (action) {
+    case CUPOLAS_FW_ALLOW:
+        return "Allow";
+    case CUPOLAS_FW_DENY:
+        return "Deny";
+    case CUPOLAS_FW_LOG:
+        return "Log";
+    case CUPOLAS_FW_RATE_LIMIT:
+        return "Rate limit";
+    default:
+        return "Unknown";
+    }
+}
+
+const char *cupolas_direction_string(cupolas_direction_t direction)
+{
+    switch (direction) {
+    case CUPOLAS_DIR_ANY:
+        return "Any";
+    case CUPOLAS_DIR_INBOUND:
+        return "Inbound";
+    case CUPOLAS_DIR_OUTBOUND:
+        return "Outbound";
     default:
         return "Unknown";
     }

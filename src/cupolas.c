@@ -470,7 +470,15 @@ int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
         }
     }
 
-    return (result == SANITIZE_OK) ? CUPOLAS_OK : cupolas_ERR_PERMISSION_DENIED;
+    switch (result) {
+    case SANITIZE_OK:
+    case SANITIZE_MODIFIED:
+        return CUPOLAS_OK;
+    case SANITIZE_REJECTED:
+        return cupolas_ERR_PERMISSION_DENIED;
+    default:
+        return cupolas_ERR_STATE_ERROR;
+    }
 }
 
 int cupolas_execute_command(const char *command, char *const argv[], int *exit_code,

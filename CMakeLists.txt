@@ -423,6 +423,63 @@ if(BUILD_TESTS)
     target_link_libraries(test_dynamic_policy_engine cupolas ${CJSON_LIBRARIES})
     add_test(NAME cupolas_dpolicy_engine_tests COMMAND test_dynamic_policy_engine)
 
+    # L1-B 接线：四重防护链独立集成测试（INT-11 全链，tests/ 根）
+    add_executable(test_protection_chain tests/test_protection_chain.c)
+    target_compile_definitions(test_protection_chain PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_protection_chain PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_protection_chain cupolas)
+    add_test(NAME protection_chain_tests COMMAND test_protection_chain)
+
+    # L1-B 接线：审计溢出防护单测
+    add_executable(test_audit_overflow tests/unit/test_audit_overflow.c)
+    target_compile_definitions(test_audit_overflow PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_audit_overflow PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/audit
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_audit_overflow cupolas)
+    add_test(NAME audit_overflow_tests COMMAND test_audit_overflow)
+
+    # L1-B 接线：sanitizer 缓存单测
+    add_executable(test_sanitizer_cache tests/unit/test_sanitizer_cache.c)
+    target_compile_definitions(test_sanitizer_cache PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_sanitizer_cache PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/sanitizer
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_sanitizer_cache cupolas)
+    add_test(NAME sanitizer_cache_tests COMMAND test_sanitizer_cache)
+
+    # L1-B 接线：熔断器单测
+    add_executable(test_circuit_breaker tests/unit/test_circuit_breaker.c)
+    target_compile_definitions(test_circuit_breaker PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_circuit_breaker PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_circuit_breaker cupolas)
+    add_test(NAME circuit_breaker_tests COMMAND test_circuit_breaker)
+
+    # L1-B 接线：安全模块（entitlements/network/runtime/signature/vault）单测
+    add_executable(test_cupolas_security tests/unit/test_cupolas_security.c)
+    target_compile_definitions(test_cupolas_security PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_cupolas_security PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_cupolas_security cupolas)
+    add_test(NAME cupolas_security_tests COMMAND test_cupolas_security)
+
     # 权限检查延迟 p50/p99 + PEP 缓存命中率基线。
     # 非断言型基准（性能观测用），默认跳过；--run-benchmark 参数显式运行。
     add_executable(benchmark_permission tests/benchmark/benchmark_permission.c)

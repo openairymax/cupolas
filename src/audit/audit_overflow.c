@@ -68,7 +68,7 @@ static void get_timestamp_filename(char *buffer, size_t buffer_size)
 static int ensure_overflow_dir(const char *dir)
 {
     if (!dir)
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
 #if cupolas_PLATFORM_WINDOWS
     return mkdir(dir);
@@ -159,7 +159,7 @@ done:
 static int write_entry_to_file(FILE *file, audit_entry_t *entry)
 {
     if (!file || !entry)
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
     char agent_escaped[256], action_escaped[256], resource_escaped[256], detail_escaped[512];
 
@@ -178,11 +178,11 @@ static int write_entry_to_file(FILE *file, audit_entry_t *entry)
                        action_escaped, resource_escaped, detail_escaped, entry->result);
 
     if (len < 0 || (size_t)len >= sizeof(json_buffer)) {
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_BUFFER_TOO_SMALL);
     }
 
     if (fwrite(json_buffer, 1, len, file) != (size_t)len) {
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_IO);
     }
 
     return len;
@@ -287,7 +287,7 @@ void overflow_handler_destroy(overflow_handler_t *handler)
 int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
 {
     if (!handler || !entry)
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
     cupolas_mutex_lock(&handler->lock);
 
@@ -296,7 +296,7 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     if (!handler->current_file || handler->current_file_size >= handler->max_file_size_bytes) {
         if (open_new_overflow_file(handler) == NULL) {
             cupolas_mutex_unlock(&handler->lock);
-            AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+            AIRY_RET_ERR(AIRY_ERR_IO);
         }
     }
 
@@ -304,7 +304,7 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     if (written < 0) {
         handler->disk_write_errors++;
         cupolas_mutex_unlock(&handler->lock);
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_IO);
     }
 
     handler->current_file_size += written;
@@ -383,7 +383,7 @@ int overflow_handler_set_callback(overflow_handler_t *handler, overflow_callback
                                   void *user_data)
 {
     if (!handler)
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
     handler->callback = callback;
     handler->callback_user_data = user_data;
@@ -594,7 +594,7 @@ int audit_queue_ex_set_overflow_callback(audit_queue_ex_t *queue, overflow_callb
                                          void *user_data)
 {
     if (!queue)
-        AIRY_RET_ERR(AIRY_ERR_UNKNOWN);
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
     queue->overflow_callback = callback;
     queue->callback_user_data = user_data;

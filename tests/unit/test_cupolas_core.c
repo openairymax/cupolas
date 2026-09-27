@@ -34,7 +34,7 @@
 
 static void test_platform_mutex(void)
 {
-    cupolas_mutex_t __attribute__((unused)) mutex;
+    cupolas_mutex_t mutex;
 
     assert(cupolas_mutex_init(&mutex) == CUPOLAS_OK);
     assert(cupolas_mutex_lock(&mutex) == CUPOLAS_OK);
@@ -46,7 +46,7 @@ static void test_platform_mutex(void)
 
 static void test_platform_rwlock(void)
 {
-    cupolas_rwlock_t __attribute__((unused)) rwlock;
+    cupolas_rwlock_t rwlock;
 
     assert(cupolas_rwlock_init(&rwlock) == CUPOLAS_OK);
     assert(cupolas_rwlock_rdlock(&rwlock) == CUPOLAS_OK);
@@ -60,12 +60,12 @@ static void test_platform_rwlock(void)
 
 static void test_platform_time(void)
 {
-    cupolas_timestamp_t __attribute__((unused)) ts;
+    cupolas_timestamp_t ts;
 
     assert(cupolas_time_now(&ts) == cupolas_OK);
     assert(ts.sec > 0);
 
-    uint64_t __attribute__((unused)) ms = cupolas_time_ms();
+    uint64_t ms = cupolas_time_ms();
     assert(ms > 0);
 
     TEST_PASS("platform_time");
@@ -156,7 +156,7 @@ static void test_audit_queue(void)
     audit_queue_t *queue = audit_queue_create(100);
     assert(queue != NULL);
 
-    audit_entry_t *entry1 __attribute__((unused)) =
+    audit_entry_t *entry1 =
         audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
     assert(entry1 != NULL);
 
@@ -173,7 +173,7 @@ static void test_audit_queue(void)
     assert(audit_queue_size(queue) == 1);
 
     audit_entry_t *entry2 = NULL;
-    int pop_ret __attribute__((unused)) = audit_queue_try_pop(queue, &entry2);
+    int pop_ret = audit_queue_try_pop(queue, &entry2);
     assert(pop_ret == cupolas_OK);
     assert(entry2 != NULL);
     if (entry2) {
@@ -195,18 +195,18 @@ static void test_sanitizer(void)
     sanitizer_t *san = sanitizer_create(NULL);
     assert(san != NULL);
 
-    char output[256] __attribute__((unused));
+    char output[256];
     sanitize_context_t ctx;
     sanitizer_default_context(&ctx);
 
     assert(sanitizer_sanitize(san, "hello world", output, sizeof(output), &ctx) == SANITIZE_OK);
     assert(strcmp(output, "hello world") == 0);
 
-    ctx.level = SANITIZE_LEVEL_STRICT;
+    ctx.level = SANITIZE_LEVEL_HIGH;
     assert(sanitizer_sanitize(san, "<script>alert(1)</script>", output, sizeof(output), &ctx) ==
            SANITIZE_REJECTED);
 
-    ctx.level = SANITIZE_LEVEL_NORMAL;
+    ctx.level = SANITIZE_LEVEL_MEDIUM;
     assert(sanitizer_sanitize(san, "<script>", output, sizeof(output), &ctx) == SANITIZE_MODIFIED);
 
     sanitizer_destroy(san);
@@ -289,7 +289,7 @@ static void test_cupolas_sanitize(void)
 {
     assert(cupolas_init(NULL, NULL) == cupolas_OK);
 
-    char output[256] __attribute__((unused));
+    char output[256];
     assert(cupolas_sanitize_input("hello", output, sizeof(output)) == cupolas_OK);
     assert(strcmp(output, "hello") == 0);
 
