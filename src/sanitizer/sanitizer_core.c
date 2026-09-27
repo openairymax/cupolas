@@ -38,7 +38,7 @@ void sanitizer_default_context(sanitize_context_t *ctx)
         return;
 
     __builtin_memset(ctx, 0, sizeof(sanitize_context_t));
-    ctx->level = SANITIZE_LEVEL_NORMAL;
+    ctx->level = SANITIZE_LEVEL_MEDIUM;
     ctx->max_length = DEFAULT_MAX_LENGTH;
     ctx->allow_html = false;
     ctx->allow_sql = false;
@@ -96,80 +96,48 @@ void sanitizer_destroy(sanitizer_t *sanitizer)
     cupolas_mem_free(sanitizer);
 }
 
-/**
- * @brief Check whether a character is dangerous in HTML context
- * @param c Character
- * @param ctx Sanitization context
- * @return true if dangerous
- */
-static bool is_html_dangerous(char c, const sanitize_context_t *ctx)
+static bool is_html_danger(char c, const sanitize_context_t *ctx)
 {
     if (ctx->allow_html)
         return false;
     return (c == '<' || c == '>');
 }
 
-/**
- * @brief Check whether a character is dangerous in SQL context
- * @param c Character
- * @param ctx Sanitization context
- * @return true if dangerous
- */
-static bool cupolas_sanitizer_is_sql_dangerous(char c, const sanitize_context_t *ctx)
+static bool is_sql_danger(char c, const sanitize_context_t *ctx)
 {
     if (ctx->allow_sql)
-        return false;
-    if (ctx->level != SANITIZE_LEVEL_STRICT)
         return false;
     return (c == '\'' || c == '"' || c == ';');
 }
 
-/**
- * @brief Check whether a character is dangerous in shell context
- * @param c Character
- * @param ctx Sanitization context
- * @return true if dangerous
- */
-static bool cupolas_sanitizer_is_shell_dangerous(char c, const sanitize_context_t *ctx)
+static bool is_shell_danger(char c, const sanitize_context_t *ctx)
 {
     if (ctx->allow_shell)
-        return false;
-    if (ctx->level == SANITIZE_LEVEL_RELAXED)
         return false;
     return (c == '|' || c == '&' || c == '$' || c == '`' || c == '(' || c == ')' || c == '{' ||
             c == '}');
 }
 
-/**
- * @brief Check whether a character is dangerous in path context
- * @param c Current character
- * @param prev_char Previous character
- * @param ctx Sanitization context
- * @return true if dangerous
- */
-static bool cupolas_sanitizer_is_path_dangerous(char c, char prev_char,
-                                                const sanitize_context_t *ctx)
+static bool is_path_danger(char c, char prev_char, const sanitize_context_t *ctx)
 {
     if (ctx->allow_path)
-        return false;
-    if (ctx->level != SANITIZE_LEVEL_STRICT)
         return false;
     return (c == '\\' || (c == '.' && prev_char == '.'));
 }
 
-/**
- * @brief Check whether a character is a dangerous control character
- * @param c Character
- * @return true if a dangerous control character
- */
-static bool cupolas_sanitizer_is_control_dangerous(char c)
+static bool is_ctrl_danger(char c)
 {
     unsigned char uc = (unsigned char)c;
     return (uc < 0x20 && c != '\t' && c != '\n' && c != '\r');
 }
 
-static bool cupolas_sanitizer_contains_dangerous_chars(const char *input,
-                                                       const sanitize_context_t *ctx)
+/*
+ * Character-class danger detection is deliberately independent of the
+ * sanitize level: the level selects the enforcement strategy (escape,
+ * whitelist, reject) while the allow_* flags select which character
+ * classes are acceptable.
+ */
+static bool has_danger_chars(const char *input, const sanitize_context_t *ctx)
 {
     if (!input)
         return false;
@@ -180,15 +148,15 @@ static bool cupolas_sanitizer_contains_dangerous_chars(const char *input,
     while (*p) {
         char c = *p;
 
-        if (is_html_dangerous(c, ctx))
+        if (is_html_danger(c, ctx))
             return true;
-        if (cupolas_sanitizer_is_sql_dangerous(c, ctx))
+        if (is_sql_danger(c, ctx))
             return true;
-        if (cupolas_sanitizer_is_shell_dangerous(c, ctx))
+        if (is_shell_danger(c, ctx))
             return true;
-        if (cupolas_sanitizer_is_path_dangerous(c, prev_char, ctx))
+        if (is_path_danger(c, prev_char, ctx))
             return true;
-        if (cupolas_sanitizer_is_control_dangerous(c))
+        if (is_ctrl_danger(c))
             return true;
 
         prev_char = c;
@@ -198,17 +166,55 @@ static bool cupolas_sanitizer_contains_dangerous_chars(const char *input,
     return false;
 }
 
-/**
- * @brief Try to escape an HTML character
- * @param c Character
- * @param output Output buffer
- * @param out_pos Output position pointer
- * @param output_size Output buffer size
- * @param ctx Sanitization context
- * @return true if the character was handled, false otherwise
+/*
+ * HIGH level whitelist: printable ASCII text plus common punctuation.
+ * Quotes, HTML/shell metacharacters, control characters, non-ASCII bytes
+ * and any other byte outside the set are rejected outright.
  */
-static bool cupolas_sanitizer_try_escape_html(char c, char *output, size_t *out_pos,
-                                              size_t output_size, const sanitize_context_t *ctx)
+static bool is_whitelisted(const char *input)
+{
+    if (!input)
+        return false;
+
+    for (const unsigned char *p = (const unsigned char *)input; *p; p++) {
+        unsigned char c = *p;
+
+        if (c >= 0x80)
+            return false;
+        if (isalnum(c))
+            continue;
+
+        switch (c) {
+        case ' ':
+        case '\t':
+        case '\n':
+        case '\r':
+        case '.':
+        case ',':
+        case ':':
+        case ';':
+        case '_':
+        case '@':
+        case '#':
+        case '-':
+        case '+':
+        case '/':
+        case '=':
+        case '?':
+        case '!':
+        case '(':
+        case ')':
+            continue;
+        default:
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool try_escape_html(char c, char *output, size_t *out_pos, size_t output_size,
+                            const sanitize_context_t *ctx)
 {
     if (ctx->allow_html)
         return false;
@@ -237,17 +243,8 @@ static bool cupolas_sanitizer_try_escape_html(char c, char *output, size_t *out_
     return false;
 }
 
-/**
- * @brief Try to escape an SQL character
- * @param c Character
- * @param output Output buffer
- * @param out_pos Output position pointer
- * @param output_size Output buffer size
- * @param ctx Sanitization context
- * @return true if the character was handled, false otherwise
- */
-static bool cupolas_sanitizer_try_escape_sql(char c, char *output, size_t *out_pos,
-                                             size_t output_size, const sanitize_context_t *ctx)
+static bool try_escape_sql(char c, char *output, size_t *out_pos, size_t output_size,
+                           const sanitize_context_t *ctx)
 {
     if (ctx->allow_sql)
         return false;
@@ -262,33 +259,19 @@ static bool cupolas_sanitizer_try_escape_sql(char c, char *output, size_t *out_p
     return false;
 }
 
-/**
- * @brief Check whether a character is shell-special
- * @param c Character
- * @return true if shell-special
- */
-static bool cupolas_sanitizer_is_shell_special_char(char c)
+static bool is_shell_special(char c)
 {
     return (c == '\\' || c == '\'' || c == '\"' || c == '`' || c == '$' || c == '|' || c == '&' ||
             c == ';' || c == '(' || c == ')' || c == '{' || c == '}');
 }
 
-/**
- * @brief Try to escape a shell character
- * @param c Character
- * @param output Output buffer
- * @param out_pos Output position pointer
- * @param output_size Output buffer size
- * @param ctx Sanitization context
- * @return true if the character was handled, false otherwise
- */
-static bool cupolas_sanitizer_try_escape_shell(char c, char *output, size_t *out_pos,
-                                               size_t output_size, const sanitize_context_t *ctx)
+static bool try_escape_shell(char c, char *output, size_t *out_pos, size_t output_size,
+                             const sanitize_context_t *ctx)
 {
     if (ctx->allow_shell)
         return false;
 
-    if (cupolas_sanitizer_is_shell_special_char(c)) {
+    if (is_shell_special(c)) {
         if (*out_pos + 2 >= output_size)
             return false;
         output[(*out_pos)++] = '\\';
@@ -298,8 +281,8 @@ static bool cupolas_sanitizer_try_escape_shell(char c, char *output, size_t *out
     return false;
 }
 
-static int cupolas_sanitizer_apply_escape_rules(const char *input, char *output, size_t output_size,
-                                                const sanitize_context_t *ctx)
+static int escape_rules(const char *input, char *output, size_t output_size,
+                        const sanitize_context_t *ctx)
 {
     if (!input || !output || output_size == 0)
         return cupolas_ERROR_INVALID_ARG;
@@ -310,11 +293,11 @@ static int cupolas_sanitizer_apply_escape_rules(const char *input, char *output,
     for (size_t i = 0; i < in_len; i++) {
         char c = input[i];
 
-        if (cupolas_sanitizer_try_escape_html(c, output, &out_pos, output_size, ctx))
+        if (try_escape_html(c, output, &out_pos, output_size, ctx))
             continue;
-        if (cupolas_sanitizer_try_escape_sql(c, output, &out_pos, output_size, ctx))
+        if (try_escape_sql(c, output, &out_pos, output_size, ctx))
             continue;
-        if (cupolas_sanitizer_try_escape_shell(c, output, &out_pos, output_size, ctx))
+        if (try_escape_shell(c, output, &out_pos, output_size, ctx))
             continue;
 
         if (c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' || c == '|' || c == '$' ||
@@ -350,7 +333,16 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         ctx = &default_ctx;
     }
 
+    output[0] = '\0';
+
     size_t input_len = strlen(input);
+
+    if (ctx->level >= SANITIZE_LEVEL_MAX) {
+        AIRY_LOG_WARN("sanitizer_sanitize: rejected by MAX level - input_len=%zu", input_len);
+        cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+        return SANITIZE_REJECTED;
+    }
+
     if (ctx->max_length > 0 && input_len > ctx->max_length) {
         AIRY_LOG_WARN("sanitizer_sanitize: input truncated/rejected - input_len=%zu, max_length=%zu",
                  input_len, ctx->max_length);
@@ -361,7 +353,6 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
     cupolas_rwlock_rdlock(&sanitizer->lock);
 
     bool cached = false;
-    sanitize_result_t cached_result = SANITIZE_OK;
     char *cached_output = sanitizer_cache_get(sanitizer->cache, input, ctx->level);
     if (cached_output) {
         AIRY_STRNCPY_TERM(output, cached_output, output_size);
@@ -372,48 +363,52 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
 
     if (cached) {
         cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
-        return cached_result;
+        return (strcmp(output, input) != 0) ? SANITIZE_MODIFIED : SANITIZE_OK;
     }
 
-    bool modified = false;
-    if (cupolas_sanitizer_contains_dangerous_chars(input, ctx)) {
-        AIRY_LOG_WARN("sanitizer_sanitize: malicious input detected - input_len=%zu, level=%d",
-                 input_len, (int)ctx->level);
-        if (ctx->level == SANITIZE_LEVEL_STRICT) {
+    if (ctx->level == SANITIZE_LEVEL_NONE) {
+        AIRY_STRNCPY_TERM(output, input, output_size);
+    } else if (ctx->level >= SANITIZE_LEVEL_HIGH) {
+        if (!is_whitelisted(input)) {
+            AIRY_LOG_WARN("sanitizer_sanitize: rejected by whitelist - input_len=%zu, level=%d",
+                     input_len, (int)ctx->level);
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_REJECTED;
         }
-
-        if (cupolas_sanitizer_apply_escape_rules(input, output, output_size, ctx) != cupolas_OK) {
+        AIRY_STRNCPY_TERM(output, input, output_size);
+    } else if (has_danger_chars(input, ctx)) {
+        AIRY_LOG_WARN("sanitizer_sanitize: malicious input detected - input_len=%zu, level=%d",
+                 input_len, (int)ctx->level);
+        if (escape_rules(input, output, output_size, ctx) != cupolas_OK) {
             AIRY_LOG_ERROR("sanitizer_sanitize: escape rules failed for input_len=%zu, output_size=%zu",
                       input_len, output_size);
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_ERROR;
         }
-        modified = true;
     } else {
         AIRY_STRNCPY_TERM(output, input, output_size);
     }
 
-    /* Rule-engine wiring (the original implementation never called
-     * san->rules, so add_rule had no effect on sanitization -- a stub).
-     * Custom rules run after character-level sanitization: a rejecting rule
-     * with an empty replacement rejects the whole input (fail-closed), and
-     * a replacing rule marks the output MODIFIED. */
-    if (sanitizer->rules) {
+    /* MEDIUM adds pattern-matching rules on top of character escaping.
+     * A rule without replacement rejects the whole input (fail-closed). */
+    if (ctx->level >= SANITIZE_LEVEL_MEDIUM && ctx->level < SANITIZE_LEVEL_HIGH &&
+        sanitizer->rules) {
         char *tmp = (char *)AIRY_MALLOC(output_size);
-        if (tmp) {
-            int rrc = sanitizer_rules_apply(sanitizer->rules, output, tmp, output_size);
-            if (rrc != cupolas_OK) {
-                AIRY_FREE(tmp);
-                cupolas_atomic_add64(&sanitizer->total_rejected, 1);
-                return SANITIZE_REJECTED;
-            }
-            if (strcmp(tmp, output) != 0)
-                modified = true;
-            AIRY_STRNCPY_TERM(output, tmp, output_size);
-            AIRY_FREE(tmp);
+        if (!tmp) {
+            AIRY_LOG_ERROR("sanitizer_sanitize: rule buffer allocation failed - output_size=%zu",
+                      output_size);
+            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            return SANITIZE_ERROR;
         }
+
+        int rrc = sanitizer_rules_apply(sanitizer->rules, output, tmp, output_size);
+        if (rrc != cupolas_OK) {
+            AIRY_FREE(tmp);
+            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            return SANITIZE_REJECTED;
+        }
+        AIRY_STRNCPY_TERM(output, tmp, output_size);
+        AIRY_FREE(tmp);
     }
 
     cupolas_rwlock_wrlock(&sanitizer->lock);
@@ -421,7 +416,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
     cupolas_rwlock_unlock(&sanitizer->lock);
 
     cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
-    return modified ? SANITIZE_MODIFIED : SANITIZE_OK;
+    return (strcmp(output, input) != 0) ? SANITIZE_MODIFIED : SANITIZE_OK;
 }
 
 bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize_context_t *ctx)
@@ -443,7 +438,14 @@ bool sanitizer_is_safe(sanitizer_t *sanitizer, const char *input, const sanitize
         return false;
     }
 
-    return !cupolas_sanitizer_contains_dangerous_chars(input, ctx);
+    if (ctx->level >= SANITIZE_LEVEL_MAX)
+        return false;
+    if (ctx->level == SANITIZE_LEVEL_NONE)
+        return true;
+    if (ctx->level >= SANITIZE_LEVEL_HIGH)
+        return is_whitelisted(input);
+
+    return !has_danger_chars(input, ctx);
 }
 
 int sanitizer_escape_html(const char *input, char *output, size_t output_size)

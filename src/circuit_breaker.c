@@ -390,7 +390,7 @@ int circuit_breaker_call(circuit_breaker_t *breaker, int (*func)(void *arg), voi
         } else {
             circuit_breaker_record_failure(breaker);
         }
-        return result == -1 ? -3 : result;
+        return result;
     }
 
     circuit_breaker_record_success(breaker);
@@ -498,10 +498,15 @@ void circuit_breaker_registry_destroy(circuit_breaker_registry_t *registry)
     cupolas_mutex_lock(&registry->lock);
 
     struct circuit_breaker_registry_entry *entry = registry->entries;
+    registry->entries = NULL;
     while (entry) {
         struct circuit_breaker_registry_entry *next = entry->next;
-        circuit_breaker_destroy(entry->breaker);
+        circuit_breaker_t *breaker = entry->breaker;
         cupolas_mem_free(entry);
+        if (breaker) {
+            breaker->registry = NULL;
+            circuit_breaker_destroy(breaker);
+        }
         entry = next;
     }
 
@@ -583,8 +588,12 @@ void circuit_breaker_registry_remove(circuit_breaker_registry_t *registry, const
     while (entry) {
         if (strcmp(entry->name, name) == 0) {
             *prev = entry->next;
-            circuit_breaker_destroy(entry->breaker);
+            circuit_breaker_t *breaker = entry->breaker;
             cupolas_mem_free(entry);
+            if (breaker) {
+                breaker->registry = NULL;
+                circuit_breaker_destroy(breaker);
+            }
             break;
         }
         prev = &entry->next;

@@ -51,7 +51,7 @@ void sanitizer_rules_destroy(sanitizer_rules_t *rules);
 /**
  * @brief Add a sanitization rule
  * @param[in] rules Rules manager handle
- * @param[in] pattern Match pattern (regex or literal)
+ * @param[in] pattern Literal substring to match
  * @param[in] replacement Replacement string
  * @return 0 on success, negative on failure
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other

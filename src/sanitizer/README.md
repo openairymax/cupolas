@@ -8,11 +8,11 @@ Sanitizer 模块提供全面的输入清洗和注入防护能力，是 Cupolas �
 
 ## 设计目标
 
-- **全面防护**：覆盖 XSS、SQL 注入、命令注入、路径遍历四大攻击向量
-- **规则引擎**：可配置的清洗规则，支持自定义规则扩展
-- **高性能缓存**：清洗结果缓存，避免重复计算
-- **零误判**：严格区分恶意输入和合法输入，最小化误报
-- **可扩展**：支持自定义清洗规则和回调函数
+- **全面防护**：覆盖 XSS、SQL 注入、命令注入、路径遍历四类危险字符
+- **分级执行**：NONE/LOW/MEDIUM/HIGH/MAX 五级策略，按场景选择转义或拒绝
+- **规则引擎**：可配置的字面量规则，支持自定义规则扩展
+- **高性能缓存**：清洗结果按输入与级别缓存，避免重复计算
+- **fail-closed**：异常路径（无 replacement 规则、缓冲区不足、内存失败）一律收紧而非放行
 
 ## 目录结构
 
@@ -27,48 +27,64 @@ sanitizer/
 └── README.md                    # 本文档
 ```
 
-## 攻击向量与防护策略
+## 净化级别
 
-### XSS 防护
+净化级别由 `sanitize_level.h`（commons SSoT）唯一定义，强度递增，`level` 可直接数值比较。
+权威来源：`docs/AirymaxRT/07-subsystem-specs/04-cupolas.md §4.3`。
 
-| 检测项 | 说明 |
-|--------|------|
-| `<script>` 标签 | 检测并移除 `<script>...</script>` |
-| 事件处理器 | 检测 `on*=` 属性（onclick, onerror 等） |
-| `javascript:` 协议 | 检测 `href="javascript:..."` |
-| `<iframe>` 标签 | 检测并移除 iframe 嵌入 |
-| `<object>/<embed>` | 检测并移除插件嵌入 |
-| CSS 表达式 | 检测 `expression()` 和 `url()` |
+| 级别 | 值 | 执行策略 |
+|------|------|------|
+| `SANITIZE_LEVEL_NONE` | 0 | 不净化，输入原样透传（仍受 `max_length` 约束） |
+| `SANITIZE_LEVEL_LOW` | 1 | 危险字符转义（字符类由 `allow_*` 决定） |
+| `SANITIZE_LEVEL_MEDIUM` | 2 | 转义 + 自定义规则阶段（默认级别） |
+| `SANITIZE_LEVEL_HIGH` | 3 | 白名单模式，非白名单输入直接拒绝 |
+| `SANITIZE_LEVEL_MAX` | 4 | 拒绝全部输入 |
 
-### SQL 注入防护
+`sanitize_context_t.level` 缺省为 `SANITIZE_LEVEL_MEDIUM`（`sanitizer_default_context`）。
+`sanitizer_is_safe` 与 `sanitizer_sanitize` 采用同一级别语义：MAX 恒不安全；NONE 恒安全；
+HIGH/MAX 走白名单判定；LOW/MEDIUM 检查危险字符。
 
-| 检测项 | 说明 |
-|--------|------|
-| 关键字检测 | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `DROP`, `UNION`, `EXEC` |
-| 注释绕过 | `--`, `/* */`, `#` |
-| 布尔注入 | `OR 1=1`, `AND 1=1`, `' OR '` |
-| 堆叠查询 | 分号分隔的多语句 |
-| 编码绕过 | URL 编码、Unicode 编码、Hex 编码 |
+## 净化语义
 
-### 命令注入防护
+净化结果只会是**转义**或**拒绝**，从不静默删除文本。因此转义后的输出仍可能包含
+`onerror`、`DROP TABLE` 等字样——防护目标是消除**未转义的危险元字符**，
+而非移除关键词。判定其中的字符类：
 
-| 检测项 | 说明 |
-|--------|------|
-| 命令链接 | `;`, `&&`, `\|\|` |
-| 命令替换 | `` `command` ``, `$(command)` |
-| 管道操作 | `\|`, `|&` |
-| 重定向 | `>`, `>>`, `<` |
-| 危险命令 | `rm`, `chmod`, `chown`, `sudo`, `su`, `curl`, `wget` |
+| 字符类 | 触发字符 | 受控开关 |
+|--------|----------|----------|
+| HTML | `<` `>` `&` | `allow_html` |
+| SQL | `'` `"` `;` | `allow_sql` |
+| Shell | `\|` `&` `$` `` ` `` `(` `)` `{` `}` | `allow_shell` |
+| 路径 | `\`、连续 `..` | `allow_path` |
+| 控制字符 | `< 0x20`（除 `\t` `\n` `\r`） | 无（恒拒绝） |
 
-### 路径遍历防护
+字符类危险判定与级别解耦：`level` 选择执行策略（转义 / 白名单 / 拒绝），
+`allow_*` 选择可接受字符类。
 
-| 检测项 | 说明 |
-|--------|------|
-| 目录穿越 | `../`, `..\\` |
-| 绝对路径 | `/etc/passwd`, `C:\\Windows\\` |
-| 编码绕过 | `%2e%2e%2f`, `..%252f`, `..%c0%af` |
-| 符号链接 | 检测 symlink 跟随 |
-| NULL 字节 | `%00`, `\\0` 截断 |
+### 转义策略
+
+| 字符类 | 转义形式 |
+|--------|----------|
+| HTML | `<`→`&lt;`、`>`→`&gt;`、`&`→`&amp;` |
+| SQL | `'`→`''` |
+| Shell | 前导反斜杠（`\` + 字符） |
+| 兜底 | 缓冲区不足以容纳转义序列时降级为 `?` |
+| 专用 API | `sanitizer_escape_html` 额外处理 `"`→`&quot;`、`'`→`&#39;`；`sanitizer_escape_shell` / `sanitizer_escape_path` 使用 `\xNN` / `%NN` 编码 |
+
+### HIGH 白名单
+
+`SANITIZE_LEVEL_HIGH` 仅放行可打印 ASCII：字母数字、空白（空格 / `\t` / `\n` / `\r`），
+以及 `. , : ; _ @ # - + / = ? ! ( )`。引号、HTML/Shell 元字符、控制字符、
+非 ASCII 字节（`>= 0x80`）以及集合外任意字节一律拒绝。
+
+### 自定义规则（MEDIUM 阶段）
+
+`sanitizer_add_rule(san, pattern, replacement)` 添加**字面量子串**匹配规则
+（非正则）。MEDIUM 级别在字符转义之后执行规则阶段：
+
+- 命中且 `replacement` 非空：整段替换为 `replacement`
+- 命中且 `replacement` 为 NULL：**fail-closed 整体拒绝**（`SANITIZE_REJECTED`）
+- 规则阶段内存分配失败：`SANITIZE_ERROR`
 
 ## 接口说明
 
@@ -113,7 +129,7 @@ sanitizer/
 |------|------|------|
 | `agent_id` | `const char *` | Agent 标识 |
 | `input_type` | `const char *` | 输入类型 |
-| `level` | `sanitize_level_t` | 清洗级别 |
+| `level` | `sanitize_level_t` | 清洗级别（见「净化级别」，缺省 `MEDIUM`） |
 | `max_length` | `size_t` | 最大输入长度 |
 | `allow_html` | `bool` | 是否允许 HTML |
 | `allow_sql` | `bool` | 是否允许 SQL |

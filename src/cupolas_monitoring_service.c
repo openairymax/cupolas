@@ -88,7 +88,7 @@ static int handle_health_endpoint(const cupolas_endpoint_request_t *req,
     return 0;
 }
 
-static int handle_index_endpoint(const cupolas_endpoint_request_t *req __attribute__((unused)),
+static int handle_index_endpoint(const cupolas_endpoint_request_t *req,
                                  cupolas_endpoint_response_t *resp)
 {
     const char *body = "<html><head><title>Cupolas Monitoring</title></head><body>"
