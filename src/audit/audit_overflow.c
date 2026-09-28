@@ -12,17 +12,10 @@
 #include "platform.h"
 #include "utils/cupolas_utils.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <time.h>
-
-#ifdef _WIN32
-#include <direct.h>
-#endif
 
 #include "error.h"
 
@@ -70,15 +63,16 @@ static int ensure_overflow_dir(const char *dir)
     if (!dir)
         AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
-#if cupolas_PLATFORM_WINDOWS
-    if (mkdir(dir) == 0)
+    /* 目录创建收敛至 cupolas_file_mkdir 递归通道（audit_rotator 同范式）。
+     * 历史单级 mkdir：父级缺失即 ENOENT，回退路径同样单级且忽略返回值，
+     * fopen 失败致 overflow_handler_create 返回 NULL——windows run
+     * 36393198095 audit_overflow_tests 首轮 0xc0000409 即此形态，
+     * 恰因同批测试套件先补建了 tmp 根目录才在重跑时通过。
+     * 已存在属成功语义（同名非目录由后续 fopen 失败兜底）。 */
+    if (cupolas_file_mkdir(dir, true) == 0)
         return 0;
-#else
-    if (mkdir(dir, 0755) == 0)
-        return 0;
-#endif
-    /* EEXIST 属成功语义（同名非目录由后续 fopen 失败兜底） */
-    return (errno == EEXIST) ? 0 : -1;
+
+    return cupolas_file_exists(dir) ? 0 : -1;
 }
 
 static FILE *open_new_overflow_file(overflow_handler_t *handler)
