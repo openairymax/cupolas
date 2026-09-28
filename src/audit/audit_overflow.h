@@ -52,7 +52,7 @@ void overflow_handler_flush(overflow_handler_t *handler);
 
 void overflow_handler_get_stats(overflow_handler_t *handler, overflow_stats_t *stats);
 
-const char *overflow_handler_get_dir(const overflow_handler_t *handler);
+const char *overflow_get_dir(const overflow_handler_t *handler);
 
 void overflow_handler_reset_stats(overflow_handler_t *handler);
 

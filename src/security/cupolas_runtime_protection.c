@@ -146,7 +146,7 @@ void cupolas_runtime_protect_cleanup(void)
     if (atomic_load(&g_runtime_prot.initialized) != RTP_INIT_COMPLETE)
         return;
 
-    cupolas_rtp_integrity_shutdown();
+    cupolas_integ_stop();
 
     for (size_t i = 0; i < g_runtime_prot.seccomp_rule_count; i++) {
         AIRY_FREE(g_runtime_prot.seccomp_rules[i].syscall_name);
@@ -194,7 +194,7 @@ int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *manag
 
     if (g_runtime_prot.manager.integrity.enable_code_integrity ||
         g_runtime_prot.manager.integrity.enable_data_integrity) {
-        int result = cupolas_integrity_enable(&g_runtime_prot.manager.integrity);
+        int result = cupolas_integ_enable(&g_runtime_prot.manager.integrity);
         if (result != 0)
             return result;
     }

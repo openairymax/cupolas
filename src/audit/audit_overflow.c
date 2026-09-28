@@ -366,7 +366,7 @@ void overflow_handler_reset_stats(overflow_handler_t *handler)
     cupolas_mutex_unlock(&handler->lock);
 }
 
-const char *overflow_handler_get_dir(const overflow_handler_t *handler)
+const char *overflow_get_dir(const overflow_handler_t *handler)
 {
     return handler ? handler->overflow_dir : NULL;
 }

@@ -195,8 +195,8 @@ security/
 | `cupolas_seccomp_allow(syscall_name)` | 允许系统调用 |
 | `cupolas_seccomp_deny(syscall_name)` | 拒绝系统调用 |
 | `cupolas_seccomp_check(syscall_name)` | 检查系统调用是否允许 |
-| `cupolas_integrity_enable(config)` | 启用完整性校验 |
-| `cupolas_integrity_check()` | 执行完整性检查 |
+| `cupolas_integ_enable(config)` | 启用完整性校验 |
+| `cupolas_integ_check()` | 执行完整性检查 |
 
 **保护级别**：`PROTECT_NONE` → `PROTECT_BASIC` → `PROTECT_ENHANCED` → `PROTECT_MAXIMUM`
 

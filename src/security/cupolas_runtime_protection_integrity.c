@@ -19,7 +19,7 @@
  *  - ro_sections：Linux /proc/self/maps 的 W^X 审计，RWX 私有映射即违例，
  *    非 Linux 端该能力缺位（与 memory 域同款按平台分级模式）；
  *  - self_check：check_interval_ms 周期自检线程，统一由
- *    cupolas_rtp_integrity_shutdown() 在模块 cleanup 时 join。
+ *    cupolas_integ_stop() 在模块 cleanup 时 join。
  * @author SPHARX Ltd. - Airymax Team
  */
 
@@ -235,13 +235,13 @@ static void *rtp_integrity_thread(void *arg)
         elapsed += RTP_TICK_MS;
         if (elapsed >= interval) {
             elapsed = 0;
-            (void)cupolas_integrity_check();
+            (void)cupolas_integ_check();
         }
     }
     return NULL;
 }
 
-int cupolas_integrity_compute_code_hash(uint8_t *hash_out)
+int cupolas_integ_hash(uint8_t *hash_out)
 {
     if (!hash_out)
         return AIRY_EINVAL;
@@ -253,13 +253,13 @@ int cupolas_integrity_compute_code_hash(uint8_t *hash_out)
     return rtp_sha256_file(path, hash_out);
 }
 
-int cupolas_integrity_verify_code(const uint8_t *expected_hash)
+int cupolas_verify_code(const uint8_t *expected_hash)
 {
     if (!expected_hash)
         return AIRY_EINVAL;
 
     uint8_t cur[RTP_HASH_LEN];
-    int rc = cupolas_integrity_compute_code_hash(cur);
+    int rc = cupolas_integ_hash(cur);
     if (rc != 0)
         return rc;
 
@@ -270,7 +270,7 @@ int cupolas_integrity_verify_code(const uint8_t *expected_hash)
     return (CRYPTO_memcmp(cur, expected_hash, RTP_HASH_LEN) == 0) ? 0 : AIRY_EACCES;
 }
 
-int cupolas_integrity_verify_data(const uint8_t *expected_hash)
+int cupolas_verify_data(const uint8_t *expected_hash)
 {
     if (!expected_hash)
         return AIRY_EINVAL;
@@ -287,7 +287,7 @@ int cupolas_integrity_verify_data(const uint8_t *expected_hash)
     return (CRYPTO_memcmp(cur, expected_hash, RTP_HASH_LEN) == 0) ? 0 : AIRY_EACCES;
 }
 
-int cupolas_integrity_check(void)
+int cupolas_integ_check(void)
 {
     cupolas_mutex_lock(&g_runtime_prot.lock);
     if (!g_runtime_prot.hashes_computed) {
@@ -305,9 +305,9 @@ int cupolas_integrity_check(void)
 
     int rc = 0;
     if (code_on)
-        rc = cupolas_integrity_verify_code(base);
+        rc = cupolas_verify_code(base);
     if (rc == 0 && data_on)
-        rc = cupolas_integrity_verify_data(base_data);
+        rc = cupolas_verify_data(base_data);
     if (rc == 0 && wx_on) {
         rc = rtp_wx_scan();
         if (rc != 0)
@@ -318,7 +318,7 @@ int cupolas_integrity_check(void)
     return rtp_fail(rc, "Integrity baseline mismatch");
 }
 
-int cupolas_integrity_enable(const cupolas_integrity_config_t *config)
+int cupolas_integ_enable(const cupolas_integrity_config_t *config)
 {
     if (!config)
         return AIRY_EINVAL;
@@ -327,7 +327,7 @@ int cupolas_integrity_enable(const cupolas_integrity_config_t *config)
     if (config->enable_self_check && config->check_interval_ms == 0)
         return AIRY_EINVAL;
 
-    cupolas_rtp_integrity_shutdown();
+    cupolas_integ_stop();
 
     cupolas_mutex_lock(&g_runtime_prot.lock);
     AIRY_MEMSET(g_runtime_prot.code_hash, 0, RTP_HASH_LEN);
@@ -337,7 +337,7 @@ int cupolas_integrity_enable(const cupolas_integrity_config_t *config)
 
     if (config->enable_code_integrity) {
         uint8_t hash[RTP_HASH_LEN];
-        int rc = cupolas_integrity_compute_code_hash(hash);
+        int rc = cupolas_integ_hash(hash);
         if (rc != 0)
             return rc;
         cupolas_mutex_lock(&g_runtime_prot.lock);
@@ -374,7 +374,7 @@ int cupolas_integrity_enable(const cupolas_integrity_config_t *config)
     return 0;
 }
 
-int cupolas_integrity_set_callback(void (*callback)(int result))
+int cupolas_integ_set_cb(void (*callback)(int result))
 {
     cupolas_mutex_lock(&g_runtime_prot.lock);
     g_runtime_prot.integrity_callback = callback;
@@ -382,7 +382,7 @@ int cupolas_integrity_set_callback(void (*callback)(int result))
     return 0;
 }
 
-void cupolas_rtp_integrity_shutdown(void)
+void cupolas_integ_stop(void)
 {
     if (!g_runtime_prot.integrity_thread_active)
         return;
