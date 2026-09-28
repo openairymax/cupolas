@@ -356,9 +356,7 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_cupolas_integration cupolas)
 
-    # test_stress_concurrent disabled: 压力测试非单元测试，单独手动运行
-
-    # 签名/压力/YAML/凭证库测试：与其余单元测试一致使用 AIRY_COMPLIANCE_IMPL
+    # 签名/YAML/凭证库测试：与其余单元测试一致使用 AIRY_COMPLIANCE_IMPL
     add_executable(test_cupolas_signature tests/unit/test_cupolas_signature.c)
     target_compile_definitions(test_cupolas_signature PRIVATE AIRY_COMPLIANCE_IMPL)
     target_include_directories(test_cupolas_signature PRIVATE
@@ -478,6 +476,20 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_cupolas_security cupolas)
     add_test(NAME cupolas_security_tests COMMAND test_cupolas_security)
+
+    # 并发压力金丝雀：64 线程×10K 权限检查，非断言型（仅崩溃/挂死判失败）。
+    # RUN_SERIAL 隔离资源争抢，TIMEOUT 兜底无限挂起。
+    add_executable(test_stress_concurrent tests/stress/test_stress_concurrent.c)
+    target_compile_definitions(test_stress_concurrent PRIVATE AIRY_COMPLIANCE_IMPL)
+    target_include_directories(test_stress_concurrent PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_stress_concurrent cupolas Threads::Threads)
+    add_test(NAME cupolas_stress_concurrent COMMAND test_stress_concurrent)
+    set_tests_properties(cupolas_stress_concurrent PROPERTIES
+        RUN_SERIAL TRUE TIMEOUT 300)
 
     # 权限检查延迟 p50/p99 + PEP 缓存命中率基线。
     # 非断言型基准（性能观测用），默认跳过；--run-benchmark 参数显式运行。
