@@ -47,7 +47,7 @@ static void test_overflow_dir_already_exists(void)
 
     overflow_handler_t *handler = overflow_handler_create(dir, 1, 100);
     assert(handler != NULL);
-    assert(strcmp(overflow_handler_get_dir(handler), dir) == 0);
+    assert(strcmp(overflow_get_dir(handler), dir) == 0);
 
     overflow_handler_destroy(handler);
     printf("PASS\n");

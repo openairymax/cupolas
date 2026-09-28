@@ -394,7 +394,7 @@ int cupolas_seccomp_get_stats(uint64_t *allowed, uint64_t *denied);
  * @reentrant No
  * @ownership config: caller retains ownership
  */
-int cupolas_integrity_enable(const cupolas_integrity_config_t *config);
+int cupolas_integ_enable(const cupolas_integrity_config_t *config);
 
 /**
  * @brief Perform integrity check
@@ -402,7 +402,7 @@ int cupolas_integrity_enable(const cupolas_integrity_config_t *config);
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  */
-int cupolas_integrity_check(void);
+int cupolas_integ_check(void);
 
 /**
  * @brief Compute code section hash
@@ -412,7 +412,7 @@ int cupolas_integrity_check(void);
  * @reentrant Yes
  * @ownership hash_out: caller provides buffer, function writes to it
  */
-int cupolas_integrity_compute_code_hash(uint8_t *hash_out);
+int cupolas_integ_hash(uint8_t *hash_out);
 
 /**
  * @brief Verify code section integrity
@@ -422,7 +422,7 @@ int cupolas_integrity_compute_code_hash(uint8_t *hash_out);
  * @reentrant Yes
  * @ownership expected_hash: caller retains ownership
  */
-int cupolas_integrity_verify_code(const uint8_t *expected_hash);
+int cupolas_verify_code(const uint8_t *expected_hash);
 
 /**
  * @brief Verify data section integrity
@@ -432,7 +432,7 @@ int cupolas_integrity_verify_code(const uint8_t *expected_hash);
  * @reentrant Yes
  * @ownership expected_hash: caller retains ownership
  */
-int cupolas_integrity_verify_data(const uint8_t *expected_hash);
+int cupolas_verify_data(const uint8_t *expected_hash);
 
 /**
  * @brief Set integrity check callback
@@ -441,7 +441,7 @@ int cupolas_integrity_verify_data(const uint8_t *expected_hash);
  * @note Thread-safe: Safe to call from multiple threads
  * @reentrant No
  */
-int cupolas_integrity_set_callback(void (*callback)(int result));
+int cupolas_integ_set_cb(void (*callback)(int result));
 
 /**
  * @brief Set violation handler callback

@@ -88,6 +88,6 @@ void cupolas_record_violation(cupolas_violation_type_t type, const char *details
                               const char *syscall_name);
 
 /* Defined in cupolas_runtime_protection_integrity.c. */
-void cupolas_rtp_integrity_shutdown(void);
+void cupolas_integ_stop(void);
 
 #endif /* CUPOLAS_RUNTIME_PROTECTION_INTERNAL_H */
