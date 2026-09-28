@@ -28,14 +28,6 @@
 #define STRESS_OPS_PER_THREAD 10000
 #define STRESS_DURATION_MS 5000
 
-typedef struct {
-    int thread_id;
-    int ops_count;
-    int success_count;
-    int fail_count;
-    double avg_latency_us;
-} thread_result_t;
-
 static permission_engine_t *g_perm_engine = NULL;
 
 typedef struct {
