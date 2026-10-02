@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-#include "error.h"
-#include "cupolas.h"
 /*
  *
  * cupolas_vault.c - Secure Credential Storage: iOS Keychain-like Implementation
@@ -13,30 +11,7 @@
  * @brief Secure credential storage (iOS Keychain-like) implementation.
  */
 
-#include "cupolas_vault.h"
 #include "cupolas_vault_internal.h"
-
-#include "../platform/platform.h"
-#include "atomic_compat.h"
-#include "cupolas_error.h"
-#include "logging.h"
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-#ifdef CUPOLAS_USE_OPENSSL
-#include <openssl/aes.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/sha.h>
-#endif
 
 static vault_global_ctx_t g_vault_ctx = {0};
 

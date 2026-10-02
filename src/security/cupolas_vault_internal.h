@@ -10,10 +10,31 @@
 #ifndef CUPOLAS_VAULT_INTERNAL_H
 #define CUPOLAS_VAULT_INTERNAL_H
 
+#include "error.h"
+#include "cupolas.h"
 #include "cupolas_vault.h"
 
 #include "../platform/platform.h"
 #include "atomic_compat.h"
+#include "cupolas_error.h"
+#include "logging.h"
+#include "airy_memory.h"
+#include "utils/cupolas_utils.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifdef CUPOLAS_USE_OPENSSL
+#include <openssl/aes.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/sha.h>
+#endif
 
 #define VAULT_MAGIC 0x564C5453 /* "VLTS" */
 #define VAULT_VERSION 1

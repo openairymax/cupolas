@@ -7,32 +7,7 @@
  *        and validation.
  */
 
-#include "error.h"
-#include "cupolas.h"
-#include "cupolas_vault.h"
 #include "cupolas_vault_internal.h"
-
-#include "../platform/platform.h"
-#include "atomic_compat.h"
-#include "cupolas_error.h"
-#include "logging.h"
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-#ifdef CUPOLAS_USE_OPENSSL
-#include <openssl/aes.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/sha.h>
-#endif
 
 bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
                                 cupolas_vault_operation_t operation)
