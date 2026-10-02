@@ -128,7 +128,7 @@ int cupolas_entitlements_sign(cupolas_entitlements_t *entitlements, const char *
                     AIRY_FREE(entitlements->signature);
                     entitlements->signature = (char *)AIRY_MALLOC(*sig_len);
                     if (entitlements->signature) {
-                        __builtin_memcpy(entitlements->signature, signature_out, *sig_len);
+                        AIRY_MEMCPY(entitlements->signature, signature_out, *sig_len);
                         entitlements->sig_len = *sig_len;
                     }
                 }

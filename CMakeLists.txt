@@ -73,10 +73,6 @@ set(CUPOLAS_SOURCES
     src/workbench/workbench.c
     src/workbench/workbench_limits.c
     src/security/cupolas_error.c
-    src/security/network/http_security.c
-    src/security/network/dns_security.c
-    src/security/network/network_filter.c
-    src/security/network/network_utils.c
     src/guards/guard_core.c
     src/guards/guard_integration.c
     # safety_guard 按功能域拆分：生命周期/规则匹配与策略执行/策略管理/配额/审核/回调与紧急停止
@@ -120,7 +116,6 @@ if(AIRY_HAS_OPENSSL)
         src/security/cupolas_network_security_ids.c
         src/security/cupolas_network_security_dns.c
         src/security/cupolas_network_security_util.c
-        src/security/network/tls_security.c
     )
 endif()
 
@@ -157,11 +152,6 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_network_security.h
     src/security/cupolas_network_security_internal.h
     src/security/cupolas_error.h
-    src/security/network/tls_security.h
-    src/security/network/http_security.h
-    src/security/network/dns_security.h
-    src/security/network/network_filter.h
-    src/security/network/network_utils.h
     src/guards/guard_core.h
     src/guards/guard_integration.h
     src/slab.h

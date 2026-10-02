@@ -57,10 +57,10 @@ int cupolas_signature_init(const cupolas_sig_config_t *config)
         return CUPOLAS_SIG_OK;
     }
 
-    __builtin_memset(&g_sig_ctx, 0, sizeof(g_sig_ctx));
+    AIRY_MEMSET(&g_sig_ctx, 0, sizeof(g_sig_ctx));
 
     if (config) {
-        __builtin_memcpy(&g_sig_ctx.config, config, sizeof(cupolas_sig_config_t));
+        AIRY_MEMCPY(&g_sig_ctx.config, config, sizeof(cupolas_sig_config_t));
     } else {
         g_sig_ctx.config.check_cert_chain = true;
         g_sig_ctx.config.check_revocation = true;
@@ -106,7 +106,7 @@ void cupolas_signature_cleanup(void)
     ERR_free_strings();
 #endif
 
-    __builtin_memset(&g_sig_ctx, 0, sizeof(g_sig_ctx));
+    AIRY_MEMSET(&g_sig_ctx, 0, sizeof(g_sig_ctx));
 }
 
 int cupolas_signature_compute_hash(const char *file_path, uint8_t *hash_out)
@@ -272,7 +272,7 @@ int cupolas_signature_get_signer_info(const char *file_path, cupolas_signer_info
         return CUPOLAS_SIG_INVALID;
     }
 
-    __builtin_memset(info, 0, sizeof(cupolas_signer_info_t));
+    AIRY_MEMSET(info, 0, sizeof(cupolas_signer_info_t));
 
     info->subject_cn = AIRY_STRDUP("unavailable");
     info->subject_org = AIRY_STRDUP("unavailable");
@@ -297,7 +297,7 @@ void cupolas_signature_free_signer_info(cupolas_signer_info_t *info)
     AIRY_FREE(info->serial_number);
     AIRY_FREE(info->key_id);
     AIRY_FREE(info->algorithm);
-    __builtin_memset(info, 0, sizeof(cupolas_signer_info_t));
+    AIRY_MEMSET(info, 0, sizeof(cupolas_signer_info_t));
 }
 
 bool cupolas_signature_is_trusted_signer(const char *signer_cn)

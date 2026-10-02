@@ -122,7 +122,7 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
     *key = (char *)AIRY_MALLOC(key_len + 1);
     if (!*key)
         return AIRY_EINVAL;
-    __builtin_memcpy(*key, p, key_len);
+    AIRY_MEMCPY(*key, p, key_len);
     (*key)[key_len] = '\0';
     *key = cupolas_str_trim(*key);
 
@@ -142,7 +142,7 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
             *key = NULL;
             return AIRY_EINVAL;
         }
-        __builtin_memcpy(*value, v, value_len);
+        AIRY_MEMCPY(*value, v, value_len);
         (*value)[value_len] = '\0';
     }
 
@@ -240,7 +240,7 @@ static const size_t g_key_handlers_count = sizeof(g_key_handlers) / sizeof(g_key
 int cupolas_parse_entitlements_content(const char *content,
                                        cupolas_entitlements_info_t *info)
 {
-    __builtin_memset(info, 0, sizeof(*info));
+    AIRY_MEMSET(info, 0, sizeof(*info));
 
     char *dup = cupolas_strdup(content);
     if (!dup)

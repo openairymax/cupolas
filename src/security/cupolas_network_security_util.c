@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-#include "cupolas.h"
 /*
  *
  * cupolas_network_security_util.c - Network Security: Address and URL Utilities
@@ -14,36 +13,7 @@
  * Implements URL parsing, CIDR membership, and IP/port validity checks.
  */
 
-#include "cupolas_network_security.h"
 #include "cupolas_network_security_internal.h"
-
-#include "../platform/platform.h"
-#include <platform.h>
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
 
 int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *port, char *path)
 {
@@ -72,7 +42,7 @@ int cupolas_net_parse_url(const char *url, char *scheme, char *host, uint16_t *p
             host_len = strlen(p);
         }
         size_t copy_len = host_len < (size_t)255 ? host_len : 255;
-        __builtin_memcpy(host, p, copy_len);
+        AIRY_MEMCPY(host, p, copy_len);
         host[copy_len] = '\0';
     }
 

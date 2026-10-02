@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-#include "cupolas.h"
 /*
  *
  * cupolas_network_security_firewall.c - Network Security: Firewall Rules Implementation
@@ -14,36 +13,7 @@
  * Implements add/delete/update/query/list management of filter rules.
  */
 
-#include "cupolas_network_security.h"
 #include "cupolas_network_security_internal.h"
-
-#include "../platform/platform.h"
-#include <platform.h>
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
 
 int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
 {
@@ -57,7 +27,7 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
     }
 
     filter_rule_entry_t *entry = &g_net_security.filter_rules[g_net_security.filter_rule_count];
-    __builtin_memset(entry, 0, sizeof(*entry));
+    AIRY_MEMSET(entry, 0, sizeof(*entry));
 
     entry->rule.rule_id = cupolas_strdup(rule->rule_id);
     entry->rule.description = cupolas_strdup(rule->description);
