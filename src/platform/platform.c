@@ -17,44 +17,7 @@
  * 本文件保留平台抽象层的核心状态机：互斥锁、读写锁、条件变量与线程。
  */
 
-#include "platform.h"
 #include "platform_internal.h"
-
-#include "atomic_compat.h"
-#include "airy_memory.h"
-#include "string_compat.h"
-
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include "airy_mman.h"
-#endif
-
-#if cupolas_PLATFORM_WINDOWS
-#include <direct.h>
-#include <io.h>
-#include <process.h>
-#include <windows.h>
-#define getcwd _getcwd
-#define rmdir _rmdir
-#define unlink _unlink
-#define access _access /* flawfinder: ignore */
-#define F_OK 0
-#define W_OK 2
-#define R_OK 4
-#else
-#include <fcntl.h>
-#include <pthread.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <time.h>
-#include <unistd.h>
-#endif
-
-#include "error.h"
 
 /* ============================================================================
  * Mutex Implementation
