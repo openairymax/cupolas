@@ -151,7 +151,7 @@ int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, con
     for (size_t i = 0; i < entry->acl.count; i++) {
         if (strcmp(entry->acl.entries[i].agent_id, agent_id) == 0) {
             AIRY_FREE(entry->acl.entries[i].agent_id);
-            __builtin_memmove(&entry->acl.entries[i], &entry->acl.entries[i + 1],
+            AIRY_MEMMOVE(&entry->acl.entries[i], &entry->acl.entries[i + 1],
                               (entry->acl.count - i - 1) * sizeof(cupolas_vault_acl_entry_t));
             entry->acl.count--;
             cupolas_rwlock_unlock(&vault->lock);

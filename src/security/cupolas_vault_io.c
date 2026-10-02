@@ -366,12 +366,12 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         }
 
         credential_entry_t *entry = &vault->entries[vault->entry_count];
-        __builtin_memset(entry, 0, sizeof(credential_entry_t));
+        AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = cred_id;
         entry->type = type;
         entry->encrypted_data = (uint8_t *)AIRY_MALLOC(total_decrypted);
         if (entry->encrypted_data) {
-            __builtin_memcpy(entry->encrypted_data, decrypted, total_decrypted);
+            AIRY_MEMCPY(entry->encrypted_data, decrypted, total_decrypted);
             entry->encrypted_len = total_decrypted;
         } else {
             entry->encrypted_data = NULL;
@@ -459,7 +459,7 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         }
 
         {
-            __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
+            AIRY_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
             char *meta_ptrs[4] = {NULL, NULL, NULL, NULL};
             for (int m = 0; m < 4; m++) {
                 size_t field_len = 0;
@@ -559,8 +559,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
                     entry->type = 0;
                     entry->encrypted_data = NULL;
                     entry->encrypted_len = 0;
-                    __builtin_memset(&entry->acl, 0, sizeof(entry->acl));
-                    __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
+                    AIRY_MEMSET(&entry->acl, 0, sizeof(entry->acl));
+                    AIRY_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
                     vault->entry_count++;
                     imported++;
                 }
@@ -576,8 +576,8 @@ int cupolas_vault_import(cupolas_vault_t *vault, const char *import_path, const 
         entry->type = 0;
         entry->encrypted_data = NULL;
         entry->encrypted_len = 0;
-        __builtin_memset(&entry->acl, 0, sizeof(entry->acl));
-        __builtin_memset(&entry->metadata, 0, sizeof(entry->metadata));
+        AIRY_MEMSET(&entry->acl, 0, sizeof(entry->acl));
+        AIRY_MEMSET(&entry->metadata, 0, sizeof(entry->metadata));
         vault->entry_count++;
         imported++;
     }

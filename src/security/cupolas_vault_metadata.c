@@ -70,7 +70,7 @@ void cupolas_vault_free_metadata(cupolas_vault_metadata_t *metadata)
     AIRY_FREE(metadata->description);
     AIRY_FREE(metadata->service);
     AIRY_FREE(metadata->account);
-    __builtin_memset(metadata, 0, sizeof(cupolas_vault_metadata_t));
+    AIRY_MEMSET(metadata, 0, sizeof(cupolas_vault_metadata_t));
 }
 
 int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,

@@ -72,9 +72,9 @@ static void vault_oom_pool_init(void)
 
     cupolas_mutex_init(&g_vault_oom_lock);
 
-    __builtin_memset(g_vault_oom_entries, 0, sizeof(g_vault_oom_entries));
-    __builtin_memset(g_vault_oom_data, 0, sizeof(g_vault_oom_data));
-    __builtin_memset(g_vault_oom_used, 0, sizeof(g_vault_oom_used));
+    AIRY_MEMSET(g_vault_oom_entries, 0, sizeof(g_vault_oom_entries));
+    AIRY_MEMSET(g_vault_oom_data, 0, sizeof(g_vault_oom_data));
+    AIRY_MEMSET(g_vault_oom_used, 0, sizeof(g_vault_oom_used));
 
     g_vault_oom_initialized = true;
 }
@@ -100,7 +100,7 @@ static credential_entry_t *vault_oom_pool_alloc(void)
     for (int i = 0; i < VAULT_OOM_PREALLOC_SLOTS; i++) {
         if (!g_vault_oom_used[i]) {
             g_vault_oom_used[i] = true;
-            __builtin_memset(&g_vault_oom_entries[i], 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(&g_vault_oom_entries[i], 0, sizeof(credential_entry_t));
             cupolas_mutex_unlock(&g_vault_oom_lock);
             return &g_vault_oom_entries[i];
         }
@@ -166,10 +166,10 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
 
     int expected = VLT_INIT_UNINIT;
     if (atomic_compare_exchange_strong(&g_vault_ctx.initialized, &expected, VLT_INIT_PROGRESS)) {
-        __builtin_memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+        AIRY_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 
         if (config) {
-            __builtin_memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
+            AIRY_MEMCPY(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
         } else {
             g_vault_ctx.default_config.enable_audit = true;
             g_vault_ctx.default_config.enable_auto_lock = true;
@@ -202,7 +202,7 @@ void cupolas_vault_cleanup(void)
     }
 
     cupolas_rwlock_destroy(&g_vault_ctx.global_lock);
-    __builtin_memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
+    AIRY_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 }
 
 int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault_t **vault)
@@ -241,14 +241,14 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     v->entry_count = 0;
 
     cupolas_rwlock_init(&v->lock);
-    __builtin_memcpy(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
+    AIRY_MEMCPY(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
 
     if (password) {
 #ifdef CUPOLAS_USE_OPENSSL
         uint8_t salt[SALT_SIZE] = {0};
         uint8_t id_hash[SHA256_DIGEST_LENGTH];
         SHA256((const unsigned char *)vault_id, strlen(vault_id), id_hash);
-        __builtin_memcpy(salt, id_hash, SALT_SIZE);
+        AIRY_MEMCPY(salt, id_hash, SALT_SIZE);
         if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                               AES_KEY_SIZE, v->master_key) != 1) {
             cupolas_rwlock_destroy(&v->lock);
@@ -296,7 +296,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
         AIRY_FREE(vault->entries);
     }
 
-    __builtin_memset(vault->master_key, 0, AES_KEY_SIZE);
+    AIRY_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
 
     cupolas_rwlock_unlock(&vault->lock);
     cupolas_rwlock_destroy(&vault->lock);
@@ -312,7 +312,7 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
     }
 
     cupolas_rwlock_wrlock(&vault->lock);
-    __builtin_memset(vault->master_key, 0, AES_KEY_SIZE);
+    AIRY_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
     vault->is_locked = true;
     cupolas_rwlock_unlock(&vault->lock);
 
@@ -333,7 +333,7 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
     uint8_t salt[SALT_SIZE] = {0};
     uint8_t id_hash[SHA256_DIGEST_LENGTH];
     SHA256((const unsigned char *)vault->vault_id, strlen(vault->vault_id), id_hash);
-    __builtin_memcpy(salt, id_hash, SALT_SIZE);
+    AIRY_MEMCPY(salt, id_hash, SALT_SIZE);
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                           AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);

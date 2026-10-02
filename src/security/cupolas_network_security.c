@@ -1,13 +1,10 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-#include "cupolas.h"
 /*
  *
  * cupolas_network_security.c - Network Security: TLS Hardening and Traffic Implementation
  */
-
-#include <ctype.h>
 
 /**
  * @file cupolas_network_security.c
@@ -18,36 +15,9 @@
  * cipher-suite policy, and version-string conversion.
  */
 
-#include "cupolas_network_security.h"
 #include "cupolas_network_security_internal.h"
 
-#include "../platform/platform.h"
-#include <platform.h>
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
+#include <ctype.h>
 
 cupolas_net_security_state_t g_net_security;
 
@@ -61,7 +31,7 @@ void cupolas_free_filter_rule(cupolas_net_filter_rule_t *rule)
     AIRY_FREE(rule->dst_ip_pattern);
     AIRY_FREE(rule->host_pattern);
     AIRY_FREE(rule->url_pattern);
-    __builtin_memset(rule, 0, sizeof(*rule));
+    AIRY_MEMSET(rule, 0, sizeof(*rule));
 }
 
 void cupolas_free_connection_info(cupolas_connection_info_t *info)
@@ -75,7 +45,7 @@ void cupolas_free_connection_info(cupolas_connection_info_t *info)
     AIRY_FREE(info->hostname);
     AIRY_FREE(info->cipher_suite);
 #pragma GCC diagnostic pop
-    __builtin_memset(info, 0, sizeof(*info));
+    AIRY_MEMSET(info, 0, sizeof(*info));
 }
 
 int cupolas_net_security_init(const cupolas_tls_config_t *manager)
@@ -83,7 +53,7 @@ int cupolas_net_security_init(const cupolas_tls_config_t *manager)
     if (g_net_security.initialized)
         return 0;
 
-    __builtin_memset(&g_net_security, 0, sizeof(g_net_security));
+    AIRY_MEMSET(&g_net_security, 0, sizeof(g_net_security));
 
     CUPOLAS_MUTEX_INIT(&g_net_security.lock);
 #ifdef _WIN32
@@ -146,7 +116,7 @@ void cupolas_net_security_cleanup(void)
     WSACleanup();
 #endif
 
-    __builtin_memset(&g_net_security, 0, sizeof(g_net_security));
+    AIRY_MEMSET(&g_net_security, 0, sizeof(g_net_security));
 }
 
 int cupolas_net_security_get_config(cupolas_tls_config_t *manager)
@@ -350,7 +320,7 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
     }
 
     struct sockaddr_in addr;
-    __builtin_memset(&addr, 0, sizeof(addr));
+    AIRY_MEMSET(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     /* gethostbyname may return IPv6 records (h_length=16) while sin_addr is
@@ -365,7 +335,7 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
         *result = CUPOLAS_CERT_REQUIRED;
         return AIRY_ERR_UNKNOWN;
     }
-    __builtin_memcpy(&addr.sin_addr, host->h_addr, host->h_length);
+    AIRY_MEMCPY(&addr.sin_addr, host->h_addr, host->h_length);
 
     int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (connect_result != 0) {

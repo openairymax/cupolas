@@ -81,7 +81,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         entry->metadata.cred_id = NULL;
     } else {
         entry = &vault->entries[vault->entry_count];
-        __builtin_memset(entry, 0, sizeof(credential_entry_t));
+        AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         entry->cred_id = AIRY_STRDUP(cred_id);
     }
 
@@ -97,7 +97,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
-            __builtin_memset(entry, 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         }
         cupolas_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
@@ -109,7 +109,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
-            __builtin_memset(entry, 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -125,7 +125,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
-            __builtin_memset(entry, 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -144,7 +144,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
-            __builtin_memset(entry, 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -160,7 +160,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         if (!existed) {
             AIRY_FREE(entry->cred_id);
             AIRY_FREE(entry->metadata.cred_id);
-            __builtin_memset(entry, 0, sizeof(credential_entry_t));
+            AIRY_MEMSET(entry, 0, sizeof(credential_entry_t));
         } else {
             entry->encrypted_data = NULL;
         }
@@ -355,7 +355,7 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
             }
             AIRY_FREE(entry->acl.entries);
 
-            __builtin_memmove(&vault->entries[i], &vault->entries[i + 1],
+            AIRY_MEMMOVE(&vault->entries[i], &vault->entries[i + 1],
                               (vault->entry_count - i - 1) * sizeof(credential_entry_t));
             vault->entry_count--;
 

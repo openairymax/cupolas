@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
-#include "cupolas.h"
 /*
  *
  * cupolas_network_security_ids.c - Network Security: Intrusion Detection Implementation
@@ -15,36 +14,7 @@
  * callback registration.
  */
 
-#include "cupolas_network_security.h"
 #include "cupolas_network_security_internal.h"
-
-#include "../platform/platform.h"
-#include <platform.h>
-#include "airy_memory.h"
-#include "utils/cupolas_utils.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
 
 int cupolas_net_ids_enable(bool enabled)
 {
