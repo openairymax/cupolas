@@ -16,28 +16,6 @@
 
 #include "cupolas_network_security_internal.h"
 
-static int cupolas_match_host_pattern(const char *pattern, const char *host)
-{
-    if (!pattern || !host)
-        return 0;
-
-    if (strcmp(pattern, "*") == 0)
-        return 1;
-
-    if (pattern[0] == '*' && pattern[1] == '.') {
-        const char *suffix = pattern + 1;
-        size_t host_len = strlen(host);
-        size_t suffix_len = strlen(suffix);
-
-        if (host_len >= suffix_len) {
-            return strcmp(host + host_len - suffix_len, suffix) == 0;
-        }
-        return 0;
-    }
-
-    return strcmp(pattern, host) == 0;
-}
-
 static int cupolas_match_url_pattern(const char *pattern, const char *url)
 {
     if (!pattern || !url)
@@ -71,7 +49,7 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
         if (!g_net_security.filter_rules[i].active || !rule->enabled)
             continue;
 
-        int host_match = cupolas_match_host_pattern(rule->host_pattern, host);
+        int host_match = cupolas_host_match(rule->host_pattern, host);
         int port_match = (rule->dst_port_start == 0 && rule->dst_port_end == 0) ||
                          (port >= rule->dst_port_start && port <= rule->dst_port_end);
         int proto_match = rule->protocol == 0 || rule->protocol == protocol;

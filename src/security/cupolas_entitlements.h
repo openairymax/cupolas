@@ -155,6 +155,7 @@ int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **en
  * @param[in] json_path Path to JSON file
  * @param[out] entitlements Output context
  * @return 0 on success, negative on failure
+ * @note Shares the same loader and content parser as cupolas_entitlements_load
  * @note Thread-safe: Safe to call from multiple threads (initialization only)
  * @reentrant No
  * @ownership json_path: caller retains ownership
@@ -408,6 +409,8 @@ int cupolas_entitlements_match_path(const char *pattern, const char *path);
  * @param[in] pattern Pattern (supports * prefix wildcard)
  * @param[in] host Actual host
  * @return 1 if matches, 0 otherwise
+ * @note Delegates to cupolas_host_match (utils/cupolas_utils.h), the shared
+ *       single source of truth for host/domain wildcard matching
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  * @ownership pattern and host: caller retains ownership

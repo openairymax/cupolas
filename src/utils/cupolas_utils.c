@@ -36,6 +36,28 @@ size_t cupolas_strlcpy(char *dst, const char *src, size_t size)
     return src_len;
 }
 
+int cupolas_host_match(const char *pattern, const char *host)
+{
+    if (!pattern || !host)
+        return 0;
+
+    if (strcmp(pattern, "*") == 0)
+        return 1;
+
+    if (pattern[0] == '*' && pattern[1] == '.') {
+        const char *suffix = pattern + 1;
+        size_t host_len = strlen(host);
+        size_t suffix_len = strlen(suffix);
+
+        if (host_len >= suffix_len) {
+            return strcmp(host + host_len - suffix_len, suffix) == 0;
+        }
+        return 0;
+    }
+
+    return strcmp(pattern, host) == 0;
+}
+
 void cupolas_memset_s(void *ptr, size_t len)
 {
     if (!ptr || len == 0)
