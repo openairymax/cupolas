@@ -242,8 +242,16 @@ static void cupolas_workbench_setup_process_attr(workbench_t *wb, cupolas_proces
     }
 }
 
-int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
-                      workbench_result_t *result)
+/*
+ * Shared spawn primitive for the sync/async entry points. Holds the lock
+ * across the whole start sequence and always releases it before returning.
+ * On success the caller owns a RUNNING workbench whose stdout/stderr write
+ * ends are already closed in the parent (P2-5): if they were kept, the
+ * blocking read in cupolas_workbench_read_output would never see EOF.
+ * reset_buf clears the capture buffer heads; only the sync path needs it.
+ */
+static int cupolas_wb_start(workbench_t *wb, const char *command, char *const argv[],
+                            bool reset_buf)
 {
     if (!wb || !command)
         return cupolas_ERROR_INVALID_ARG;
@@ -257,10 +265,12 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
 
     wb->stdout_size = 0;
     wb->stderr_size = 0;
-    if (wb->stdout_buf)
-        wb->stdout_buf[0] = '\0';
-    if (wb->stderr_buf)
-        wb->stderr_buf[0] = '\0';
+    if (reset_buf) {
+        if (wb->stdout_buf)
+            wb->stdout_buf[0] = '\0';
+        if (wb->stderr_buf)
+            wb->stderr_buf[0] = '\0';
+    }
 
     if (cupolas_workbench_create_pipes(wb) != cupolas_OK) {
         wb->state = WORKBENCH_STATE_ERROR;
@@ -284,21 +294,22 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
     wb->state = WORKBENCH_STATE_RUNNING;
     cupolas_mutex_unlock(&wb->lock);
 
-    /* P2-5 (cupolas_d): close the parent's stdout/stderr write ends and the
-     * stdin read end. If the write ends are kept, the subsequent blocking
-     * read in cupolas_workbench_read_output would hang forever because the
-     * pipe never sees EOF (execute_command deadlock). The child already
-     * closed its inherited copies at exec via FD_CLOEXEC, so the parent now
-     * holds the only write ends. */
-    if (wb->manager.redirect_stdout) {
+    if (wb->manager.redirect_stdout)
         cupolas_pipe_close_write_end(&wb->stdout_pipe);
-    }
-    if (wb->manager.redirect_stderr) {
+    if (wb->manager.redirect_stderr)
         cupolas_pipe_close_write_end(&wb->stderr_pipe);
-    }
-    if (wb->manager.redirect_stdin) {
+    if (wb->manager.redirect_stdin)
         cupolas_pipe_close_read_end(&wb->stdin_pipe);
-    }
+
+    return cupolas_OK;
+}
+
+int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
+                      workbench_result_t *result)
+{
+    int ret = cupolas_wb_start(wb, command, argv, true);
+    if (ret != cupolas_OK)
+        return ret;
 
     uint32_t timeout_ms = wb->manager.timeout_ms > 0 ? wb->manager.timeout_ms : 0;
 
@@ -333,56 +344,7 @@ int workbench_execute(workbench_t *wb, const char *command, char *const argv[],
 
 int workbench_execute_async(workbench_t *wb, const char *command, char *const argv[])
 {
-    if (!wb || !command)
-        return cupolas_ERROR_INVALID_ARG;
-
-    cupolas_mutex_lock(&wb->lock);
-
-    if (wb->state == WORKBENCH_STATE_RUNNING) {
-        cupolas_mutex_unlock(&wb->lock);
-        return cupolas_ERROR_BUSY;
-    }
-
-    wb->stdout_size = 0;
-    wb->stderr_size = 0;
-
-    if (cupolas_workbench_create_pipes(wb) != cupolas_OK) {
-        wb->state = WORKBENCH_STATE_ERROR;
-        cupolas_mutex_unlock(&wb->lock);
-        return cupolas_ERROR_IO;
-    }
-
-    cupolas_process_attr_t attr;
-    cupolas_workbench_setup_process_attr(wb, &attr);
-
-    wb->start_time_ms = cupolas_time_ms();
-
-    int ret = cupolas_process_spawn(&wb->process, command, argv, &attr);
-    if (ret != cupolas_OK) {
-        cupolas_workbench_close_pipes(wb);
-        wb->state = WORKBENCH_STATE_ERROR;
-        cupolas_mutex_unlock(&wb->lock);
-        return ret;
-    }
-
-    wb->state = WORKBENCH_STATE_RUNNING;
-    cupolas_mutex_unlock(&wb->lock);
-
-    /* P2-5 (cupolas_d): the async path closes the parent's stdout/stderr
-     * write ends and the stdin read end as well, so workbench_wait's
-     * read_output sees EOF (stdin_pipe[1] is kept for
-     * workbench_write_stdin). */
-    if (wb->manager.redirect_stdout) {
-        cupolas_pipe_close_write_end(&wb->stdout_pipe);
-    }
-    if (wb->manager.redirect_stderr) {
-        cupolas_pipe_close_write_end(&wb->stderr_pipe);
-    }
-    if (wb->manager.redirect_stdin) {
-        cupolas_pipe_close_read_end(&wb->stdin_pipe);
-    }
-
-    return cupolas_OK;
+    return cupolas_wb_start(wb, command, argv, false);
 }
 
 int workbench_wait(workbench_t *wb, workbench_result_t *result, uint32_t timeout_ms)
