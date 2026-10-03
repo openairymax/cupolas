@@ -127,6 +127,31 @@ void audit_queue_destroy(audit_queue_t *queue)
     cupolas_mem_free(queue);
 }
 
+/* Single-sourced ring mechanics: every producer/consumer mutates the
+ * head/tail/size triple through these two primitives so the invariants live
+ * in one place. Caller must hold queue->lock. */
+
+static void audit_q_enqueue(audit_queue_t *queue, audit_entry_t *entry)
+{
+    entry->next = NULL;
+    if (queue->tail)
+        queue->tail->next = entry;
+    else
+        queue->head = entry;
+    queue->tail = entry;
+    queue->size++;
+}
+
+static audit_entry_t *audit_q_unlink(audit_queue_t *queue)
+{
+    audit_entry_t *entry = queue->head;
+    queue->head = entry->next;
+    if (!queue->head)
+        queue->tail = NULL;
+    queue->size--;
+    return entry;
+}
+
 int audit_queue_push(audit_queue_t *queue, audit_entry_t *entry)
 {
     if (!queue || !entry)
@@ -143,14 +168,7 @@ int audit_queue_push(audit_queue_t *queue, audit_entry_t *entry)
         return cupolas_ERROR_UNKNOWN;
     }
 
-    entry->next = NULL;
-    if (queue->tail) {
-        queue->tail->next = entry;
-    } else {
-        queue->head = entry;
-    }
-    queue->tail = entry;
-    queue->size++;
+    audit_q_enqueue(queue, entry);
 
     cupolas_atomic_add64(&queue->total_pushed, 1);
 
@@ -177,14 +195,7 @@ int audit_queue_try_push(audit_queue_t *queue, audit_entry_t *entry)
         return cupolas_ERROR_WOULD_BLOCK;
     }
 
-    entry->next = NULL;
-    if (queue->tail) {
-        queue->tail->next = entry;
-    } else {
-        queue->head = entry;
-    }
-    queue->tail = entry;
-    queue->size++;
+    audit_q_enqueue(queue, entry);
 
     cupolas_atomic_add64(&queue->total_pushed, 1);
 
@@ -210,12 +221,7 @@ int audit_queue_pop(audit_queue_t *queue, audit_entry_t **entry)
         return cupolas_ERROR_UNKNOWN;
     }
 
-    *entry = queue->head;
-    queue->head = (*entry)->next;
-    if (!queue->head) {
-        queue->tail = NULL;
-    }
-    queue->size--;
+    *entry = audit_q_unlink(queue);
 
     cupolas_atomic_add64(&queue->total_popped, 1);
 
@@ -245,12 +251,7 @@ int audit_queue_timed_pop(audit_queue_t *queue, audit_entry_t **entry, uint32_t 
         return cupolas_ERROR_UNKNOWN;
     }
 
-    *entry = queue->head;
-    queue->head = (*entry)->next;
-    if (!queue->head) {
-        queue->tail = NULL;
-    }
-    queue->size--;
+    *entry = audit_q_unlink(queue);
 
     cupolas_atomic_add64(&queue->total_popped, 1);
 
@@ -272,12 +273,7 @@ int audit_queue_try_pop(audit_queue_t *queue, audit_entry_t **entry)
         return cupolas_ERROR_WOULD_BLOCK;
     }
 
-    *entry = queue->head;
-    queue->head = (*entry)->next;
-    if (!queue->head) {
-        queue->tail = NULL;
-    }
-    queue->size--;
+    *entry = audit_q_unlink(queue);
 
     cupolas_atomic_add64(&queue->total_popped, 1);
 
@@ -307,15 +303,9 @@ int audit_queue_pop_batch(audit_queue_t *queue, audit_entry_t **entries, size_t 
 
     size_t count = 0;
     while (count < max_count && queue->head) {
-        entries[count] = queue->head;
-        queue->head = entries[count]->next;
+        entries[count] = audit_q_unlink(queue);
         count++;
-        queue->size--;
         cupolas_atomic_add64(&queue->total_popped, 1);
-    }
-
-    if (!queue->head) {
-        queue->tail = NULL;
     }
 
     *actual_count = count;
