@@ -28,12 +28,12 @@
 
 #include "error.h"
 
-int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **entitlements)
+static int ent_load_file(const char *path, cupolas_entitlements_t **entitlements)
 {
-    if (!yaml_path || !entitlements)
+    if (!path || !entitlements)
         return CUPOLAS_ENT_INVALID;
 
-    FILE *f = fopen(yaml_path, "r");
+    FILE *f = fopen(path, "r");
     if (!f)
         return CUPOLAS_ENT_NOT_FOUND;
 
@@ -61,37 +61,14 @@ int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **en
     return result;
 }
 
+int cupolas_entitlements_load(const char *yaml_path, cupolas_entitlements_t **entitlements)
+{
+    return ent_load_file(yaml_path, entitlements);
+}
+
 int cupolas_entitlements_load_json(const char *json_path, cupolas_entitlements_t **entitlements)
 {
-    if (!json_path || !entitlements)
-        return CUPOLAS_ENT_INVALID;
-
-    FILE *f = fopen(json_path, "r");
-    if (!f)
-        return CUPOLAS_ENT_NOT_FOUND;
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = (char *)AIRY_MALLOC(size + 1);
-    if (!content) {
-        fclose(f);
-        return CUPOLAS_ENT_PARSE_ERROR;
-    }
-
-    size_t read_size = fread(content, 1, size, f);
-    fclose(f);
-    if (read_size != (size_t)size) {
-        AIRY_FREE(content);
-        return CUPOLAS_ENT_PARSE_ERROR;
-    }
-    content[read_size] = '\0';
-
-    int result = cupolas_entitlements_load_string(content, entitlements);
-    AIRY_FREE(content);
-
-    return result;
+    return ent_load_file(json_path, entitlements);
 }
 
 int cupolas_entitlements_load_string(const char *yaml_content,
@@ -357,36 +334,67 @@ int cupolas_entitlements_check_validity(cupolas_entitlements_t *entitlements)
     return CUPOLAS_ENT_OK;
 }
 
-int cupolas_entitlements_export_yaml(cupolas_entitlements_t *entitlements, char *yaml_out,
-                                     size_t *len)
+typedef struct {
+    const char *agent_id;
+    const char *version;
+    unsigned long long not_before;
+    unsigned long long not_after;
+    unsigned int max_cpu;
+    unsigned long long max_mem;
+    unsigned long long max_disk;
+    unsigned int max_proc;
+    unsigned int max_threads;
+    unsigned int max_files;
+    unsigned int max_conns;
+} ent_fields_t;
+
+static void ent_fill(const cupolas_entitlements_t *e, ent_fields_t *f)
 {
-    if (!entitlements || !yaml_out || !len)
+    f->agent_id = e->info.agent_id ? e->info.agent_id : "";
+    f->version = e->info.version ? e->info.version : "";
+    f->not_before = (unsigned long long)e->info.not_before;
+    f->not_after = (unsigned long long)e->info.not_after;
+    f->max_cpu = e->info.resources.max_cpu_percent;
+    f->max_mem = (unsigned long long)e->info.resources.max_memory_bytes;
+    f->max_disk = (unsigned long long)e->info.resources.max_disk_bytes;
+    f->max_proc = e->info.resources.max_processes;
+    f->max_threads = e->info.resources.max_threads;
+    f->max_files = e->info.resources.max_open_files;
+    f->max_conns = e->info.resources.max_network_connections;
+}
+
+static int ent_write(const ent_fields_t *f, char *out, size_t cap, int json)
+{
+    if (json)
+        return snprintf(out, cap, "{\n  \"agent_id\": \"%s\",\n  \"version\": \"%s\",\n"
+                        "  \"not_before\": %llu,\n  \"not_after\": %llu,\n"
+                        "  \"resources\": {\n    \"max_cpu_percent\": %u,\n"
+                        "    \"max_memory_bytes\": %llu,\n    \"max_disk_bytes\": %llu,\n"
+                        "    \"max_processes\": %u,\n    \"max_threads\": %u,\n"
+                        "    \"max_open_files\": %u,\n"
+                        "    \"max_network_connections\": %u\n  }\n}\n",
+                        f->agent_id, f->version, f->not_before, f->not_after, f->max_cpu,
+                        f->max_mem, f->max_disk, f->max_proc, f->max_threads, f->max_files,
+                        f->max_conns);
+
+    return snprintf(out, cap, "agent_id: %s\nversion: %s\nnot_before: %llu\nnot_after: %llu\n"
+                    "resources:\n  max_cpu_percent: %u\n  max_memory_bytes: %llu\n"
+                    "  max_disk_bytes: %llu\n  max_processes: %u\n  max_threads: %u\n"
+                    "  max_open_files: %u\n  max_network_connections: %u\n",
+                    f->agent_id, f->version, f->not_before, f->not_after, f->max_cpu,
+                    f->max_mem, f->max_disk, f->max_proc, f->max_threads, f->max_files,
+                    f->max_conns);
+}
+
+static int ent_export(cupolas_entitlements_t *e, char *out, size_t *len, int json)
+{
+    if (!e || !out || !len)
         return CUPOLAS_ENT_INVALID;
 
-    int written = snprintf(yaml_out, *len,
-                           "agent_id: %s\n"
-                           "version: %s\n"
-                           "not_before: %llu\n"
-                           "not_after: %llu\n"
-                           "resources:\n"
-                           "  max_cpu_percent: %u\n"
-                           "  max_memory_bytes: %llu\n"
-                           "  max_disk_bytes: %llu\n"
-                           "  max_processes: %u\n"
-                           "  max_threads: %u\n"
-                           "  max_open_files: %u\n"
-                           "  max_network_connections: %u\n",
-                           entitlements->info.agent_id ? entitlements->info.agent_id : "",
-                           entitlements->info.version ? entitlements->info.version : "",
-                           (unsigned long long)entitlements->info.not_before,
-                           (unsigned long long)entitlements->info.not_after,
-                           entitlements->info.resources.max_cpu_percent,
-                           (unsigned long long)entitlements->info.resources.max_memory_bytes,
-                           (unsigned long long)entitlements->info.resources.max_disk_bytes,
-                           entitlements->info.resources.max_processes,
-                           entitlements->info.resources.max_threads,
-                           entitlements->info.resources.max_open_files,
-                           entitlements->info.resources.max_network_connections);
+    ent_fields_t f;
+    ent_fill(e, &f);
+
+    int written = ent_write(&f, out, *len, json);
 
     if (written < 0 || (size_t)written >= *len) {
         *len = (size_t)written + 1;
@@ -397,47 +405,16 @@ int cupolas_entitlements_export_yaml(cupolas_entitlements_t *entitlements, char 
     return CUPOLAS_ENT_OK;
 }
 
+int cupolas_entitlements_export_yaml(cupolas_entitlements_t *entitlements, char *yaml_out,
+                                     size_t *len)
+{
+    return ent_export(entitlements, yaml_out, len, 0);
+}
+
 int cupolas_entitlements_export_json(cupolas_entitlements_t *entitlements, char *json_out,
                                      size_t *len)
 {
-    if (!entitlements || !json_out || !len)
-        return CUPOLAS_ENT_INVALID;
-
-    int written = snprintf(json_out, *len,
-                           "{\n"
-                           "  \"agent_id\": \"%s\",\n"
-                           "  \"version\": \"%s\",\n"
-                           "  \"not_before\": %llu,\n"
-                           "  \"not_after\": %llu,\n"
-                           "  \"resources\": {\n"
-                           "    \"max_cpu_percent\": %u,\n"
-                           "    \"max_memory_bytes\": %llu,\n"
-                           "    \"max_disk_bytes\": %llu,\n"
-                           "    \"max_processes\": %u,\n"
-                           "    \"max_threads\": %u,\n"
-                           "    \"max_open_files\": %u,\n"
-                           "    \"max_network_connections\": %u\n"
-                           "  }\n"
-                           "}\n",
-                           entitlements->info.agent_id ? entitlements->info.agent_id : "",
-                           entitlements->info.version ? entitlements->info.version : "",
-                           (unsigned long long)entitlements->info.not_before,
-                           (unsigned long long)entitlements->info.not_after,
-                           entitlements->info.resources.max_cpu_percent,
-                           (unsigned long long)entitlements->info.resources.max_memory_bytes,
-                           (unsigned long long)entitlements->info.resources.max_disk_bytes,
-                           entitlements->info.resources.max_processes,
-                           entitlements->info.resources.max_threads,
-                           entitlements->info.resources.max_open_files,
-                           entitlements->info.resources.max_network_connections);
-
-    if (written < 0 || (size_t)written >= *len) {
-        *len = (size_t)written + 1;
-        return CUPOLAS_ENT_PARSE_ERROR;
-    }
-
-    *len = (size_t)written;
-    return CUPOLAS_ENT_OK;
+    return ent_export(entitlements, json_out, len, 1);
 }
 
 const char *cupolas_entitlements_result_string(cupolas_ent_result_t result)
@@ -498,22 +475,5 @@ int cupolas_entitlements_match_path(const char *pattern, const char *path)
 
 int cupolas_entitlements_match_host(const char *pattern, const char *host)
 {
-    if (!pattern || !host)
-        return 0;
-
-    if (strcmp(pattern, "*") == 0)
-        return 1;
-
-    if (pattern[0] == '*' && pattern[1] == '.') {
-        const char *suffix = pattern + 1;
-        size_t host_len = strlen(host);
-        size_t suffix_len = strlen(suffix);
-
-        if (host_len >= suffix_len) {
-            return strcmp(host + host_len - suffix_len, suffix) == 0;
-        }
-        return 0;
-    }
-
-    return strcmp(pattern, host) == 0;
+    return cupolas_host_match(pattern, host);
 }

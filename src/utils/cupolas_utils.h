@@ -619,6 +619,21 @@ char *cupolas_strdup(const char *str);
 size_t cupolas_strlcpy(char *dest, const char *src, size_t len);
 
 /**
+ * @brief Match a host name against a pattern
+ * @param pattern Pattern: "*" (any), "*.suffix" (suffix match), or exact
+ * @param host Host name to test
+ * @return 1 on match, 0 on mismatch or NULL argument
+ * @note Single source of truth for host/domain wildcard matching shared by
+ *       the entitlements and network security domains
+ *
+ * @code
+ * cupolas_host_match("*.example.com", "api.example.com"); // 1
+ * cupolas_host_match("*.example.com", "evil.com");        // 0
+ * @endcode
+ */
+int cupolas_host_match(const char *pattern, const char *host);
+
+/**
  * @brief Secure memset that won't be optimized away
  * @param ptr Memory to fill
  * @param len Number of bytes to write
