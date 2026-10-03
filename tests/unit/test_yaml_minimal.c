@@ -322,6 +322,55 @@ static void test_sequence_get_index_negative(void)
     PASS();
 }
 
+static void fill_alpha(char *dst, size_t n, int seed)
+{
+    for (size_t i = 0; i < n; i++)
+        dst[i] = (char)('a' + (i + (size_t)seed) % 26);
+    dst[n] = '\0';
+}
+
+static void test_long_scan(void)
+{
+    TEST("Scanner buffers grow past initial capacity");
+    /* Every field below exceeds the initial capacity of the scanner that
+     * reads it (tag/anchor 64, quoted 128, plain 256), so the shared
+     * reserve helper must grow the buffer without corrupting content. */
+    char tag[81];
+    char anchor[81];
+    char plain[301];
+    char quoted[201];
+    fill_alpha(tag, 80, 0);
+    fill_alpha(anchor, 80, 3);
+    fill_alpha(plain, 300, 1);
+    fill_alpha(quoted, 200, 2);
+
+    char yaml[1024];
+    int n = snprintf(yaml, sizeof(yaml), "tagged: !!%s &%s %s\nquoted: \"%s\"\n", tag, anchor,
+                     plain, quoted);
+    ASSERT(n > 0 && (size_t)n < sizeof(yaml), "test input must fit");
+
+    yaml_document_t *doc = yaml_create();
+    int rc = yaml_parse_string(doc, yaml, (size_t)n);
+    ASSERT(rc == 0, "long-input parse should succeed");
+
+    struct yaml_node *tagged = yaml_get(doc->root, "tagged");
+    ASSERT(tagged != NULL, "tagged key should exist");
+    ASSERT(tagged->tag != NULL && strcmp(tagged->tag, tag) == 0,
+           "80-byte tag must survive buffer growth");
+    ASSERT(tagged->anchor_name != NULL && strcmp(tagged->anchor_name, anchor) == 0,
+           "80-byte anchor must survive buffer growth");
+    ASSERT(strcmp(yaml_as_string(tagged, ""), plain) == 0,
+           "300-byte plain scalar must survive buffer growth");
+
+    struct yaml_node *qn = yaml_get(doc->root, "quoted");
+    ASSERT(qn != NULL, "quoted key should exist");
+    ASSERT(strcmp(yaml_as_string(qn, ""), quoted) == 0,
+           "200-byte quoted scalar must survive buffer growth");
+
+    yaml_destroy(doc);
+    PASS();
+}
+
 int main(void)
 {
     printf("\n=== YAML Minimal Parser Unit Tests ===\n\n");
@@ -347,6 +396,7 @@ int main(void)
     test_quoted_double();
     test_has_key_null_node();
     test_sequence_get_index_negative();
+    test_long_scan();
 
     printf("\n=== Results: %d/%d tests passed ===\n\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
