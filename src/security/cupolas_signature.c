@@ -184,41 +184,60 @@ int cupolas_signature_verify_file(const char *file_path, const char *expected_si
     return CUPOLAS_SIG_OK;
 }
 
-int cupolas_signature_verify_data(const uint8_t *data, size_t data_len, const uint8_t *signature,
-                                  size_t sig_len, cupolas_sig_algo_t algo, const char *public_key)
-{
-    if (!data || !signature || !public_key) {
-        return CUPOLAS_SIG_INVALID;
-    }
-
 #ifdef CUPOLAS_USE_OPENSSL
-    EVP_PKEY *pkey = NULL;
-    BIO *bio = BIO_new_mem_buf(public_key, -1);
+/* Digest ceremony shared by the verify and sign paths: decode the PEM key,
+ * map the algorithm to a digest, then bind both into a fresh context. Keeping
+ * this in one place stops the two directions from drifting apart.
+ *
+ * `sign` selects the direction and, with it, the key role: signing consumes a
+ * private key, verifying a public key. On success the caller owns *key and
+ * *ctx; on failure both are left untouched. */
+
+static EVP_PKEY *sig_load_key(const char *pem, bool priv, int *err)
+{
+    BIO *bio = BIO_new_mem_buf(pem, -1);
     if (!bio) {
-        return CUPOLAS_SIG_INVALID;
+        *err = CUPOLAS_SIG_INVALID;
+        return NULL;
     }
 
-    pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+    EVP_PKEY *pkey = priv ? PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL)
+                          : PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
     BIO_free(bio);
-
     if (!pkey) {
-        return CUPOLAS_SIG_CERT_INVALID;
+        *err = CUPOLAS_SIG_CERT_INVALID;
     }
+    return pkey;
+}
 
-    const EVP_MD *md = NULL;
+static const EVP_MD *sig_digest_for(cupolas_sig_algo_t algo)
+{
     switch (algo) {
     case CUPOLAS_SIG_ALGO_RSA_SHA256:
     case CUPOLAS_SIG_ALGO_ECDSA_P256:
-        md = EVP_sha256();
-        break;
+        return EVP_sha256();
     case CUPOLAS_SIG_ALGO_RSA_SHA384:
     case CUPOLAS_SIG_ALGO_ECDSA_P384:
-        md = EVP_sha384();
-        break;
+        return EVP_sha384();
     case CUPOLAS_SIG_ALGO_RSA_SHA512:
-        md = EVP_sha512();
-        break;
+        return EVP_sha512();
     default:
+        return NULL;
+    }
+}
+
+static cupolas_sig_result_t sig_begin(const char *pem, cupolas_sig_algo_t algo,
+                                      bool sign, EVP_PKEY **key,
+                                      EVP_MD_CTX **ctx)
+{
+    int err = CUPOLAS_SIG_INVALID;
+    EVP_PKEY *pkey = sig_load_key(pem, sign, &err);
+    if (!pkey) {
+        return (cupolas_sig_result_t)err;
+    }
+
+    const EVP_MD *md = sig_digest_for(algo);
+    if (!md) {
         EVP_PKEY_free(pkey);
         return CUPOLAS_SIG_ALGO_UNSUPPORTED;
     }
@@ -229,11 +248,38 @@ int cupolas_signature_verify_data(const uint8_t *data, size_t data_len, const ui
         return CUPOLAS_SIG_INVALID;
     }
 
+    int inited = sign ? EVP_DigestSignInit(md_ctx, NULL, md, NULL, pkey)
+                      : EVP_DigestVerifyInit(md_ctx, NULL, md, NULL, pkey);
+    if (inited != 1) {
+        EVP_MD_CTX_free(md_ctx);
+        EVP_PKEY_free(pkey);
+        return CUPOLAS_SIG_INVALID;
+    }
+
+    *key = pkey;
+    *ctx = md_ctx;
+    return CUPOLAS_SIG_OK;
+}
+#endif
+
+int cupolas_signature_verify_data(const uint8_t *data, size_t data_len, const uint8_t *signature,
+                                  size_t sig_len, cupolas_sig_algo_t algo, const char *public_key)
+{
+    if (!data || !signature || !public_key) {
+        return CUPOLAS_SIG_INVALID;
+    }
+
+#ifdef CUPOLAS_USE_OPENSSL
+    EVP_PKEY *pkey = NULL;
+    EVP_MD_CTX *md_ctx = NULL;
+    cupolas_sig_result_t rc = sig_begin(public_key, algo, false, &pkey, &md_ctx);
+    if (rc != CUPOLAS_SIG_OK) {
+        return rc;
+    }
+
     int ret = CUPOLAS_SIG_INVALID;
-    if (EVP_DigestVerifyInit(md_ctx, NULL, md, NULL, pkey) == 1) {
-        if (EVP_DigestVerify(md_ctx, signature, sig_len, data, data_len) == 1) {
-            ret = CUPOLAS_SIG_OK;
-        }
+    if (EVP_DigestVerify(md_ctx, signature, sig_len, data, data_len) == 1) {
+        ret = CUPOLAS_SIG_OK;
     }
 
     EVP_MD_CTX_free(md_ctx);
@@ -375,49 +421,17 @@ int cupolas_signature_sign_data(const uint8_t *data, size_t data_len, const char
 
 #ifdef CUPOLAS_USE_OPENSSL
     EVP_PKEY *pkey = NULL;
-    BIO *bio = BIO_new_mem_buf(private_key, -1);
-    if (!bio) {
-        return CUPOLAS_SIG_INVALID;
-    }
-
-    pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
-    BIO_free(bio);
-
-    if (!pkey) {
-        return CUPOLAS_SIG_CERT_INVALID;
-    }
-
-    const EVP_MD *md = NULL;
-    switch (algo) {
-    case CUPOLAS_SIG_ALGO_RSA_SHA256:
-    case CUPOLAS_SIG_ALGO_ECDSA_P256:
-        md = EVP_sha256();
-        break;
-    case CUPOLAS_SIG_ALGO_RSA_SHA384:
-    case CUPOLAS_SIG_ALGO_ECDSA_P384:
-        md = EVP_sha384();
-        break;
-    case CUPOLAS_SIG_ALGO_RSA_SHA512:
-        md = EVP_sha512();
-        break;
-    default:
-        EVP_PKEY_free(pkey);
-        return CUPOLAS_SIG_ALGO_UNSUPPORTED;
-    }
-
-    EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
-    if (!md_ctx) {
-        EVP_PKEY_free(pkey);
-        return CUPOLAS_SIG_INVALID;
+    EVP_MD_CTX *md_ctx = NULL;
+    cupolas_sig_result_t rc = sig_begin(private_key, algo, true, &pkey, &md_ctx);
+    if (rc != CUPOLAS_SIG_OK) {
+        return rc;
     }
 
     int ret = CUPOLAS_SIG_INVALID;
-    if (EVP_DigestSignInit(md_ctx, NULL, md, NULL, pkey) == 1) {
-        size_t required_len = *sig_len;
-        if (EVP_DigestSign(md_ctx, signature_out, &required_len, data, data_len) == 1) {
-            *sig_len = required_len;
-            ret = CUPOLAS_SIG_OK;
-        }
+    size_t required_len = *sig_len;
+    if (EVP_DigestSign(md_ctx, signature_out, &required_len, data, data_len) == 1) {
+        *sig_len = required_len;
+        ret = CUPOLAS_SIG_OK;
     }
 
     EVP_MD_CTX_free(md_ctx);
