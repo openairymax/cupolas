@@ -273,24 +273,8 @@ int cupolas_tls_verify_cert_chain(const char *cert_chain, size_t chain_len,
 
     X509_STORE_CTX_init(ctx, store, sk_X509_value(certs, 0), certs);
 
-    int verify_result = X509_verify_cert(ctx);
-    if (verify_result != 1) {
-        int err = X509_STORE_CTX_get_error(ctx);
-        switch (err) {
-        case X509_V_ERR_CERT_HAS_EXPIRED:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        case X509_V_ERR_CERT_REVOKED:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        default:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        }
+    if (X509_verify_cert(ctx) != 1) {
+        *result = CUPOLAS_CERT_REQUIRED;
     }
 
     X509_STORE_CTX_free(ctx);
@@ -385,23 +369,8 @@ int cupolas_tls_check_connection(const char *hostname, uint16_t port, cupolas_ce
         return 0;
     }
 
-    long verify_result_long = SSL_get_verify_result(ssl);
-    if (verify_result_long != X509_V_OK) {
-        switch (verify_result_long) {
-        case X509_V_ERR_CERT_HAS_EXPIRED:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        case X509_V_ERR_CERT_REVOKED:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        default:
-            *result = CUPOLAS_CERT_REQUIRED;
-            break;
-        }
+    if (SSL_get_verify_result(ssl) != X509_V_OK) {
+        *result = CUPOLAS_CERT_REQUIRED;
     }
 
     SSL_free(ssl);

@@ -79,6 +79,21 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
     return 0;
 }
 
+/* Method whitelist gate shared by the URL gate and request validation.
+ * With no whitelist configured the URL gate fails closed (fail_open=0)
+ * while request validation lets the request pass (fail_open=1). */
+static int http_method_allowed(const char *method, int fail_open)
+{
+    if (!g_net_security.manager.http.allowed_methods)
+        return fail_open;
+
+    for (size_t i = 0; i < g_net_security.manager.http.method_count; i++) {
+        if (strcmp(g_net_security.manager.http.allowed_methods[i], method) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 int cupolas_net_check_url(const char *url, const char *method)
 {
     if (!url)
@@ -119,22 +134,7 @@ int cupolas_net_check_url(const char *url, const char *method)
         }
     }
 
-    if (g_net_security.manager.http.allowed_methods) {
-        int method_allowed = 0;
-        for (size_t i = 0; i < g_net_security.manager.http.method_count; i++) {
-            if (strcmp(g_net_security.manager.http.allowed_methods[i], method) == 0) {
-                method_allowed = 1;
-                break;
-            }
-        }
-        if (!method_allowed) {
-            cupolas_mutex_unlock(&g_net_security.lock);
-            return 0;
-        }
-    } else {
-        /* No method whitelist configured and no URL rule matched: deny by
-         * default (fail-closed). An explicit allow rule (e.g.
-         * url_pattern="*" action=allow) is required to pass. */
+    if (!http_method_allowed(method, 0)) {
         cupolas_mutex_unlock(&g_net_security.lock);
         return 0;
     }
@@ -175,17 +175,8 @@ int cupolas_http_validate_request(const char *method, const char *url, const cha
         }
     }
 
-    if (g_net_security.manager.http.allowed_methods) {
-        int method_allowed = 0;
-        for (size_t i = 0; i < g_net_security.manager.http.method_count; i++) {
-            if (strcmp(g_net_security.manager.http.allowed_methods[i], method) == 0) {
-                method_allowed = 1;
-                break;
-            }
-        }
-        if (!method_allowed)
-            return AIRY_ERR_UNKNOWN;
-    }
+    if (!http_method_allowed(method, 1))
+        return AIRY_ERR_UNKNOWN;
 
     if (g_net_security.manager.http.forbidden_headers && headers) {
         for (size_t i = 0; i < header_count; i++) {
