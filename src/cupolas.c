@@ -35,6 +35,7 @@
 #define CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE (10 * 1024 * 1024)
 #define CUPOLAS_DEFAULT_AUDIT_MAX_FILES 5
 #define CUPOLAS_CONFIG_PATH_MAX 512
+#define CUPOLAS_GUARD_MAX_RESULTS 8
 
 typedef struct {
     char permission_rules_path[CUPOLAS_CONFIG_PATH_MAX];
@@ -89,6 +90,42 @@ static struct {
 static cupolas_atomic32_t g_cupolas_init_state = 0;
 
 #define CUPOLAS_INIT_SPIN_MAX_RETRIES 10000000UL
+
+/* init 失败回收机制件：按依赖逆序幂等回收已建组件，NULL 字段跳过。 */
+static void cupolas_init_reclaim(void)
+{
+    if (g_cupolas.audit) {
+        audit_logger_destroy(g_cupolas.audit);
+        g_cupolas.audit = NULL;
+    }
+    if (g_cupolas.san) {
+        sanitizer_destroy(g_cupolas.san);
+        g_cupolas.san = NULL;
+    }
+    if (g_cupolas.perm) {
+        permission_engine_destroy(g_cupolas.perm);
+        g_cupolas.perm = NULL;
+    }
+    if (g_cupolas.config_mgr) {
+        cupolas_config_destroy(g_cupolas.config_mgr);
+        g_cupolas.config_mgr = NULL;
+    }
+}
+
+/* calloc 失败统一收尾机制件：OOM 出参、幂等回收、解锁销锁、复位初始化状态。 */
+static int cupolas_init_fail(const char *what, airy_err_t *error)
+{
+    if (error)
+        *error = AIRY_ERR_OUT_OF_MEMORY;
+    cupolas_init_reclaim();
+
+    cupolas_mutex_unlock(&g_cupolas.lock);
+    cupolas_mutex_destroy(&g_cupolas.lock);
+
+    cupolas_atomic_store32(&g_cupolas_init_state, 0);
+    CUPOLAS_LOG_ERROR("cupolas_init: %s failed", what);
+    return cupolas_ERR_OUT_OF_MEMORY;
+}
 
 static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_perm)
 {
@@ -176,41 +213,13 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
             g_cupolas.config.permission_rules_path[0] ? g_cupolas.config.permission_rules_path :
                                                         NULL);
         if (!g_cupolas.perm) {
-            if (error)
-                *error = AIRY_ERR_OUT_OF_MEMORY;
-            if (g_cupolas.config_mgr) {
-                cupolas_config_destroy(g_cupolas.config_mgr);
-                g_cupolas.config_mgr = NULL;
-            }
-
-            cupolas_mutex_unlock(&g_cupolas.lock);
-            cupolas_mutex_destroy(&g_cupolas.lock);
-
-            cupolas_atomic_store32(&g_cupolas_init_state, 0);
-            CUPOLAS_LOG_ERROR("cupolas_init: calloc permission engine failed");
-            return cupolas_ERR_OUT_OF_MEMORY;
+            return cupolas_init_fail("calloc permission engine", error);
         }
     }
 
     g_cupolas.san = sanitizer_create(NULL);
     if (!g_cupolas.san) {
-        if (error)
-            *error = AIRY_ERR_OUT_OF_MEMORY;
-        if (g_cupolas.perm) {
-            permission_engine_destroy(g_cupolas.perm);
-            g_cupolas.perm = NULL;
-        }
-        if (g_cupolas.config_mgr) {
-            cupolas_config_destroy(g_cupolas.config_mgr);
-            g_cupolas.config_mgr = NULL;
-        }
-
-        cupolas_mutex_unlock(&g_cupolas.lock);
-        cupolas_mutex_destroy(&g_cupolas.lock);
-
-        cupolas_atomic_store32(&g_cupolas_init_state, 0);
-        CUPOLAS_LOG_ERROR("cupolas_init: calloc sanitizer failed");
-        return cupolas_ERR_OUT_OF_MEMORY;
+        return cupolas_init_fail("calloc sanitizer", error);
     }
 
     g_cupolas.wb = NULL;
@@ -221,25 +230,7 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
                             "cupolas_audit", CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE,
                             CUPOLAS_DEFAULT_AUDIT_MAX_FILES);
     if (!g_cupolas.audit) {
-        if (error)
-            *error = AIRY_ERR_OUT_OF_MEMORY;
-        sanitizer_destroy(g_cupolas.san);
-        g_cupolas.san = NULL;
-        if (g_cupolas.perm) {
-            permission_engine_destroy(g_cupolas.perm);
-            g_cupolas.perm = NULL;
-        }
-        if (g_cupolas.config_mgr) {
-            cupolas_config_destroy(g_cupolas.config_mgr);
-            g_cupolas.config_mgr = NULL;
-        }
-
-        cupolas_mutex_unlock(&g_cupolas.lock);
-        cupolas_mutex_destroy(&g_cupolas.lock);
-
-        cupolas_atomic_store32(&g_cupolas_init_state, 0);
-        CUPOLAS_LOG_ERROR("cupolas_init: calloc audit_logger failed");
-        return cupolas_ERR_OUT_OF_MEMORY;
+        return cupolas_init_fail("calloc audit_logger", error);
     }
 
     g_cupolas.initialized = 1;
@@ -327,6 +318,33 @@ const char *cupolas_version(void)
     return AIRYRT_VERSION;
 }
 
+/* guard 同步审查机制件：管理器就绪检查、同步检查与中风险阻断判定为机制；
+ * 审计落账与拦截返回路径为策略，由调用方持有。命中阻断返回 true。 */
+static bool guards_blocking(const guard_context_t *ctx)
+{
+    guard_manager_t *gm = cupolas_guards_is_enabled() ? cupolas_guards_get_manager() : NULL;
+    if (!gm) {
+        return false;
+    }
+
+    guard_result_t results[CUPOLAS_GUARD_MAX_RESULTS];
+    size_t actual = 0;
+    if (guard_manager_check_sync(gm, ctx, results, CUPOLAS_GUARD_MAX_RESULTS, &actual) != 0) {
+        return false;
+    }
+
+    for (size_t i = 0; i < actual; i++) {
+        const guard_result_t *gr = &results[i];
+        if (gr->risk_level >= RISK_LEVEL_MEDIUM &&
+            (gr->recommended_action == GUARD_ACTION_BLOCK ||
+             gr->recommended_action == GUARD_ACTION_ISOLATE ||
+             gr->recommended_action == GUARD_ACTION_TERMINATE)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int cupolas_check_permission(const char *agent_id, const char *action, const char *resource,
                              const char *context)
 {
@@ -347,39 +365,22 @@ int cupolas_check_permission(const char *agent_id, const char *action, const cha
                          result >= 0 ? result : -1);
     }
 
-    if (result > 0 && cupolas_guards_is_enabled()) {
-        guard_manager_t *guard_manager = cupolas_guards_get_manager();
-        if (guard_manager) {
-#define MAX_RESULTS 8
-            guard_result_t results[MAX_RESULTS];
-            size_t actual_results = 0;
+    if (result > 0) {
+        guard_context_t guard_ctx = {.operation = "permission_check",
+                                     .resource = resource,
+                                     .agent_id = agent_id,
+                                     .session_id = context,
+                                     .input_data = (void *)action,
+                                     .input_size = action ? strlen(action) + 1 : 0,
+                                     .context_data = NULL,
+                                     .timestamp = cupolas_get_timestamp_ns()};
 
-            guard_context_t guard_ctx = {.operation = "permission_check",
-                                         .resource = resource,
-                                         .agent_id = agent_id,
-                                         .session_id = context,
-                                         .input_data = (void *)action,
-                                         .input_size = action ? strlen(action) + 1 : 0,
-                                         .context_data = NULL,
-                                         .timestamp = cupolas_get_timestamp_ns()};
-
-            int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx, results,
-                                                     MAX_RESULTS, &actual_results);
-            if (guard_ret == 0) {
-                for (size_t i = 0; i < actual_results; i++) {
-                    guard_result_t *gr = &results[i];
-                    if (gr->risk_level >= RISK_LEVEL_MEDIUM &&
-                        (gr->recommended_action == GUARD_ACTION_BLOCK ||
-                         gr->recommended_action == GUARD_ACTION_ISOLATE ||
-                         gr->recommended_action == GUARD_ACTION_TERMINATE)) {
-                        if (g_cupolas.audit) {
-                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_PERMISSION, agent_id,
-                                             "guard_block", resource, NULL, 0);
-                        }
-                        return 0;
-                    }
-                }
+        if (guards_blocking(&guard_ctx)) {
+            if (g_cupolas.audit) {
+                audit_logger_log(g_cupolas.audit, AUDIT_EVENT_PERMISSION, agent_id, "guard_block",
+                                 resource, NULL, 0);
             }
+            return 0;
         }
     }
 
@@ -431,8 +432,7 @@ int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
     if (result == SANITIZE_OK && cupolas_guards_is_enabled()) {
         guard_manager_t *guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
-#define MAX_RESULTS 8
-            guard_result_t results[MAX_RESULTS];
+            guard_result_t results[CUPOLAS_GUARD_MAX_RESULTS];
             size_t actual_results = 0;
 
             guard_context_t guard_ctx = {.operation = "input_sanitization",
@@ -445,7 +445,7 @@ int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
                                          .timestamp = cupolas_get_timestamp_ns()};
 
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx, results,
-                                                     MAX_RESULTS, &actual_results);
+                                                     CUPOLAS_GUARD_MAX_RESULTS, &actual_results);
             if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
                     guard_result_t *gr = &results[i];
@@ -494,55 +494,28 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
         return cupolas_ERR_STATE_ERROR;
     }
 
-    if (cupolas_guards_is_enabled()) {
-        guard_manager_t *guard_manager = cupolas_guards_get_manager();
-        if (guard_manager) {
-            char cmd_buffer[1024] = {0};
-            size_t pos = 0;
+    char cmd_buffer[1024] = {0};
+    size_t pos = snprintf(cmd_buffer, sizeof(cmd_buffer), "%s", command);
+    for (int i = 0; argv[i] && pos < sizeof(cmd_buffer) - 1; i++) {
+        pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, " %s", argv[i]);
+    }
 
-            if (command) {
-                pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, "%s", command);
-            }
+    guard_context_t guard_ctx = {.operation = "command_execution",
+                                 .resource = "workbench",
+                                 .agent_id = "system",
+                                 .session_id = NULL,
+                                 .input_data = cmd_buffer,
+                                 .input_size = strlen(cmd_buffer) + 1,
+                                 .context_data = NULL,
+                                 .timestamp = cupolas_get_timestamp_ns()};
 
-            if (argv) {
-                for (int i = 0; argv[i] && pos < sizeof(cmd_buffer) - 1; i++) {
-                    pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, " %s", argv[i]);
-                }
-            }
-
-#define MAX_RESULTS 8
-            guard_result_t results[MAX_RESULTS];
-            size_t actual_results = 0;
-
-            guard_context_t guard_ctx = {.operation = "command_execution",
-                                         .resource = "workbench",
-                                         .agent_id = "system",
-                                         .session_id = NULL,
-                                         .input_data = cmd_buffer,
-                                         .input_size = strlen(cmd_buffer) + 1,
-                                         .context_data = NULL,
-                                         .timestamp = cupolas_get_timestamp_ns()};
-
-            int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx, results,
-                                                     MAX_RESULTS, &actual_results);
-            if (guard_ret == 0) {
-                for (size_t i = 0; i < actual_results; i++) {
-                    guard_result_t *gr = &results[i];
-                    if (gr->risk_level >= RISK_LEVEL_MEDIUM &&
-                        (gr->recommended_action == GUARD_ACTION_BLOCK ||
-                         gr->recommended_action == GUARD_ACTION_ISOLATE ||
-                         gr->recommended_action == GUARD_ACTION_TERMINATE)) {
-                        if (g_cupolas.audit) {
-                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_WORKBENCH, "system",
-                                             "execute_command", command, "guard_block",
-                                             cupolas_ERR_PERMISSION_DENIED);
-                        }
-                        cupolas_mutex_unlock(&g_cupolas.lock);
-                        return cupolas_ERR_PERMISSION_DENIED;
-                    }
-                }
-            }
+    if (guards_blocking(&guard_ctx)) {
+        if (g_cupolas.audit) {
+            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_WORKBENCH, "system", "execute_command",
+                             command, "guard_block", cupolas_ERR_PERMISSION_DENIED);
         }
+        cupolas_mutex_unlock(&g_cupolas.lock);
+        return cupolas_ERR_PERMISSION_DENIED;
     }
 
     workbench_config_t wbcfg;
