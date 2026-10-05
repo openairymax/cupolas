@@ -19,6 +19,17 @@
 
 /* ── JSON 解析 ────────────────────────────────────────────────────── */
 
+/* 可选字符串字段 → 定长缓冲；非字符串或缺省时写入 fallback（NULL 保持原值）。 */
+static void copy_opt_str(const cJSON *j, const char *key, char *dst, size_t size,
+                         const char *fallback)
+{
+    const cJSON *v = cJSON_GetObjectItem(j, key);
+    if (cJSON_IsString(v))
+        AIRY_STRNCPY_TERM(dst, v->valuestring, size);
+    else if (fallback)
+        AIRY_STRNCPY_TERM(dst, fallback, size);
+}
+
 /* 纯解析：单条规则 JSON → dpolicy_rule_t（condition_json 深拷贝） */
 static int rule_from_json(const cJSON *j, dpolicy_rule_t *out)
 {
@@ -30,9 +41,7 @@ static int rule_from_json(const cJSON *j, dpolicy_rule_t *out)
         AIRY_STRNCPY_TERM(r.id, v->valuestring, sizeof(r.id));
     else
         return -1;
-    v = cJSON_GetObjectItem(j, "name");
-    if (cJSON_IsString(v))
-        AIRY_STRNCPY_TERM(r.name, v->valuestring, sizeof(r.name));
+    copy_opt_str(j, "name", r.name, sizeof(r.name), NULL);
     v = cJSON_GetObjectItem(j, "effect");
     if (cJSON_IsString(v)) {
         if (strcmp(v->valuestring, "allow") == 0)
@@ -48,21 +57,9 @@ static int rule_from_json(const cJSON *j, dpolicy_rule_t *out)
     } else {
         return -1;
     }
-    v = cJSON_GetObjectItem(j, "subject");
-    if (cJSON_IsString(v))
-        AIRY_STRNCPY_TERM(r.subject_pattern, v->valuestring, sizeof(r.subject_pattern));
-    else
-        AIRY_STRNCPY_TERM(r.subject_pattern, "*", sizeof(r.subject_pattern));
-    v = cJSON_GetObjectItem(j, "action");
-    if (cJSON_IsString(v))
-        AIRY_STRNCPY_TERM(r.action_pattern, v->valuestring, sizeof(r.action_pattern));
-    else
-        AIRY_STRNCPY_TERM(r.action_pattern, "*", sizeof(r.action_pattern));
-    v = cJSON_GetObjectItem(j, "resource");
-    if (cJSON_IsString(v))
-        AIRY_STRNCPY_TERM(r.resource_pattern, v->valuestring, sizeof(r.resource_pattern));
-    else
-        AIRY_STRNCPY_TERM(r.resource_pattern, "*", sizeof(r.resource_pattern));
+    copy_opt_str(j, "subject", r.subject_pattern, sizeof(r.subject_pattern), "*");
+    copy_opt_str(j, "action", r.action_pattern, sizeof(r.action_pattern), "*");
+    copy_opt_str(j, "resource", r.resource_pattern, sizeof(r.resource_pattern), "*");
     v = cJSON_GetObjectItem(j, "condition");
     if (cJSON_IsString(v) && v->valuestring && v->valuestring[0])
         r.condition_json = AIRY_STRDUP(v->valuestring);
@@ -112,6 +109,19 @@ static int rule_array_append(rule_array_t *a, const dpolicy_rule_t *r)
         return -3;
     a->count++;
     return 0;
+}
+
+/* 释放目标数组持有并接管 src 所有权（迁移；src 置空）。 */
+static void arr_adopt(dpolicy_rule_t **dst, size_t *cnt, size_t *cap, rule_array_t *src)
+{
+    for (size_t i = 0; i < *cnt; i++)
+        dpol_rule_free(&(*dst)[i]);
+    AIRY_FREE(*dst);
+    *dst = src->items;
+    *cnt = src->count;
+    *cap = src->cap;
+    src->items = NULL;
+    src->count = src->cap = 0;
 }
 
 /* 解析策略文档 → 规则数组。事务式：任一行非法或 id 重复即整体失败（-2），
@@ -172,24 +182,18 @@ static int doc_to_array(const char *json, rule_array_t *out)
  * cap>=8：activate(空暂存) 清空运行集后 add_rule 仍可直接写入。 */
 static void live_replace_locked(dpolicy_engine_t *e, rule_array_t *src)
 {
-    for (size_t i = 0; i < e->rule_count; i++)
-        dpol_rule_free(&e->rules[i]);
-    AIRY_FREE(e->rules);
-    e->rules = src->items;
-    e->rule_count = src->count;
-    e->rule_cap = src->cap > 0 ? src->cap : 8;
-    if (src->cap == 0)
+    arr_adopt(&e->rules, &e->rule_count, &e->rule_cap, src);
+    if (!e->rules) {
+        e->rule_cap = 8;
         e->rules = AIRY_CALLOC(e->rule_cap, sizeof(dpolicy_rule_t));
-    src->items = NULL;
-    src->count = src->cap = 0;
+    }
 }
 
 int dpolicy_engine_load_policies_json(dpolicy_engine_t *engine, const char *json)
 {
     if (!engine || !json)
         return -1;
-    rule_array_t doc;
-    __builtin_memset(&doc, 0, sizeof(doc));
+    rule_array_t doc = {0};
     int rc = doc_to_array(json, &doc);
     if (rc != 0)
         return rc;
@@ -206,20 +210,12 @@ int dpolicy_stage_json(dpolicy_engine_t *engine, const char *json)
 {
     if (!engine || !json)
         return -1;
-    rule_array_t doc;
-    __builtin_memset(&doc, 0, sizeof(doc));
+    rule_array_t doc = {0};
     int rc = doc_to_array(json, &doc);
     if (rc != 0)
         return rc;
     airy_mtx_lock(&engine->lock);
-    for (size_t i = 0; i < engine->staged_count; i++)
-        dpol_rule_free(&engine->staged[i]);
-    AIRY_FREE(engine->staged);
-    engine->staged = doc.items;
-    engine->staged_count = doc.count;
-    engine->staged_cap = doc.cap;
-    doc.items = NULL;
-    doc.count = doc.cap = 0;
+    arr_adopt(&engine->staged, &engine->staged_count, &engine->staged_cap, &doc);
     engine->staged_valid = 1;
     airy_mtx_unlock(&engine->lock);
     return 0;

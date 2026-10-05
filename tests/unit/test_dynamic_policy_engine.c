@@ -294,6 +294,24 @@ static void t_json(void)
     TEST_PASS("json");
 }
 
+/* 缺省 subject/action/resource 应回落通配 "*"（导出可观测） */
+static void t_json_defaults(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    CHECK(dpolicy_engine_load_policies_json(
+              e, "{\"rules\":[{\"id\":\"d1\",\"effect\":\"deny\"}]}") == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+    char *out = NULL;
+    CHECK(dpolicy_engine_export_policies_json(e, &out) == 0);
+    CHECK(out != NULL);
+    CHECK(out && strstr(out, "\"subject\":\"*\"") != NULL);
+    CHECK(out && strstr(out, "\"action\":\"*\"") != NULL);
+    CHECK(out && strstr(out, "\"resource\":\"*\"") != NULL);
+    cJSON_free(out);
+    dpolicy_engine_destroy(e);
+    TEST_PASS("json_defaults");
+}
+
 static void t_compliance(void)
 {
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
@@ -451,6 +469,17 @@ static void t_stage_activate(void)
           DPOLICY_EFFECT_DENY);
     CHECK(matched == 0);
 
+    /* 空运行集后仍可直接 add_rule：live 缓冲容量兜底非 0 */
+    dpolicy_rule_t extra;
+    memset(&extra, 0, sizeof(extra));
+    strcpy(extra.id, "post-clear");
+    extra.effect = DPOLICY_EFFECT_ALLOW;
+    extra.enabled = true;
+    CHECK(dpolicy_engine_add_rule(e, &extra) == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+    CHECK(dpolicy_engine_remove_rule(e, "post-clear") == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 0);
+
     /* 回滚 v1（allow 集）恢复规则，epoch 继续单调 */
     CHECK(dpolicy_engine_rollback(e, "v1") == 0);
     CHECK(dpolicy_engine_get_rule_count(e) == 1);
@@ -530,6 +559,7 @@ int main(void)
     t_versions();
     t_cap32();
     t_json();
+    t_json_defaults();
     t_compliance();
     t_callback();
     t_eval_match();
