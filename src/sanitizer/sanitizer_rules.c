@@ -13,6 +13,7 @@
  */
 
 #include "sanitizer_rules.h"
+#include "security/cupolas_error.h"
 
 #include "utils/cupolas_utils.h"
 #include "airy_memory.h"
@@ -29,19 +30,19 @@ struct sanitize_rule {
 struct sanitizer_rules {
     struct sanitize_rule *head;
     size_t count;
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 };
 
 sanitizer_rules_t *sanitizer_rules_create(const char *rules_path)
 {
-    sanitizer_rules_t *rules = (sanitizer_rules_t *)cupolas_mem_alloc(sizeof(sanitizer_rules_t));
+    sanitizer_rules_t *rules = (sanitizer_rules_t *)AIRY_CALLOC(1, sizeof(sanitizer_rules_t));
     if (!rules)
         return NULL;
 
     __builtin_memset(rules, 0, sizeof(sanitizer_rules_t));
 
-    if (cupolas_mutex_init(&rules->lock) != cupolas_OK) {
-        cupolas_mem_free(rules);
+    if (airy_mtx_init(&rules->lock) != cupolas_OK) {
+        AIRY_FREE(rules);
         return NULL;
     }
 
@@ -53,20 +54,20 @@ void sanitizer_rules_destroy(sanitizer_rules_t *rules)
     if (!rules)
         return;
 
-    cupolas_mutex_lock(&rules->lock);
+    airy_mtx_lock(&rules->lock);
 
     struct sanitize_rule *rule = rules->head;
     while (rule) {
         struct sanitize_rule *next = rule->next;
-        cupolas_mem_free(rule->pattern);
-        cupolas_mem_free(rule->replacement);
-        cupolas_mem_free(rule);
+        AIRY_FREE(rule->pattern);
+        AIRY_FREE(rule->replacement);
+        AIRY_FREE(rule);
         rule = next;
     }
 
-    cupolas_mutex_unlock(&rules->lock);
-    cupolas_mutex_destroy(&rules->lock);
-    cupolas_mem_free(rules);
+    airy_mtx_unlock(&rules->lock);
+    airy_mtx_destroy(&rules->lock);
+    AIRY_FREE(rules);
 }
 
 int sanitizer_rules_add(sanitizer_rules_t *rules, const char *pattern, const char *replacement)
@@ -75,34 +76,34 @@ int sanitizer_rules_add(sanitizer_rules_t *rules, const char *pattern, const cha
         return cupolas_ERROR_INVALID_ARG;
 
     struct sanitize_rule *rule =
-        (struct sanitize_rule *)cupolas_mem_alloc(sizeof(struct sanitize_rule));
+        (struct sanitize_rule *)AIRY_CALLOC(1, sizeof(struct sanitize_rule));
     if (!rule)
         return cupolas_ERROR_NO_MEMORY;
 
     __builtin_memset(rule, 0, sizeof(struct sanitize_rule));
 
-    rule->pattern = cupolas_strdup(pattern);
+    rule->pattern = AIRY_STRDUP(pattern);
     if (!rule->pattern) {
-        cupolas_mem_free(rule);
+        AIRY_FREE(rule);
         return cupolas_ERROR_NO_MEMORY;
     }
 
     if (replacement) {
-        rule->replacement = cupolas_strdup(replacement);
+        rule->replacement = AIRY_STRDUP(replacement);
         if (!rule->replacement) {
-            cupolas_mem_free(rule->pattern);
-            cupolas_mem_free(rule);
+            AIRY_FREE(rule->pattern);
+            AIRY_FREE(rule);
             return cupolas_ERROR_NO_MEMORY;
         }
     }
 
-    cupolas_mutex_lock(&rules->lock);
+    airy_mtx_lock(&rules->lock);
 
     rule->next = rules->head;
     rules->head = rule;
     rules->count++;
 
-    cupolas_mutex_unlock(&rules->lock);
+    airy_mtx_unlock(&rules->lock);
 
     return cupolas_OK;
 }
@@ -114,7 +115,7 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    cupolas_mutex_lock(&rules->lock);
+    airy_mtx_lock(&rules->lock);
 
     AIRY_STRNCPY_TERM(output, input, output_size);
 
@@ -135,14 +136,14 @@ int sanitizer_rules_apply(sanitizer_rules_t *rules, const char *input, char *out
                     }
                 }
             } else {
-                cupolas_mutex_unlock(&rules->lock);
+                airy_mtx_unlock(&rules->lock);
                 return cupolas_ERROR_UNKNOWN;
             }
         }
         rule = rule->next;
     }
 
-    cupolas_mutex_unlock(&rules->lock);
+    airy_mtx_unlock(&rules->lock);
 
     return cupolas_OK;
 }
@@ -152,19 +153,19 @@ void sanitizer_rules_clear(sanitizer_rules_t *rules)
     if (!rules)
         return;
 
-    cupolas_mutex_lock(&rules->lock);
+    airy_mtx_lock(&rules->lock);
 
     struct sanitize_rule *rule = rules->head;
     while (rule) {
         struct sanitize_rule *next = rule->next;
-        cupolas_mem_free(rule->pattern);
-        cupolas_mem_free(rule->replacement);
-        cupolas_mem_free(rule);
+        AIRY_FREE(rule->pattern);
+        AIRY_FREE(rule->replacement);
+        AIRY_FREE(rule);
         rule = next;
     }
 
     rules->head = NULL;
     rules->count = 0;
 
-    cupolas_mutex_unlock(&rules->lock);
+    airy_mtx_unlock(&rules->lock);
 }

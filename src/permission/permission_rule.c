@@ -12,7 +12,11 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
+#include "atomic_compat.h"
+#include "airy_memory.h"
 #include "permission_rule.h"
+#include "security/cupolas_error.h"
 
 #include "yaml_minimal.h" /* SP03: migrated to commons/utils/config_unified/ */
 #include <stdio.h>
@@ -26,11 +30,11 @@ static void cupolas_permission_free_rule(permission_rule_t *rule)
 {
     if (!rule)
         return;
-    cupolas_mem_free(rule->agent_id);
-    cupolas_mem_free(rule->action);
-    cupolas_mem_free(rule->resource);
-    cupolas_mem_free(rule->resource_pattern);
-    cupolas_mem_free(rule);
+    AIRY_FREE(rule->agent_id);
+    AIRY_FREE(rule->action);
+    AIRY_FREE(rule->resource);
+    AIRY_FREE(rule->resource_pattern);
+    AIRY_FREE(rule);
 }
 
 static void cupolas_permission_free_rules(permission_rule_t *rules)
@@ -46,24 +50,24 @@ static permission_rule_t *cupolas_permission_create_rule(const char *agent_id, c
                                                          const char *resource, int allow,
                                                          int priority)
 {
-    permission_rule_t *rule = (permission_rule_t *)cupolas_mem_alloc(sizeof(permission_rule_t));
+    permission_rule_t *rule = (permission_rule_t *)AIRY_CALLOC(1, sizeof(permission_rule_t));
     if (!rule)
         return NULL;
 
     __builtin_memset(rule, 0, sizeof(permission_rule_t));
 
     if (agent_id) {
-        rule->agent_id = cupolas_strdup(agent_id);
+        rule->agent_id = AIRY_STRDUP(agent_id);
         if (!rule->agent_id)
             goto error;
     }
     if (action) {
-        rule->action = cupolas_strdup(action);
+        rule->action = AIRY_STRDUP(action);
         if (!rule->action)
             goto error;
     }
     if (resource) {
-        rule->resource = cupolas_strdup(resource);
+        rule->resource = AIRY_STRDUP(resource);
         if (!rule->resource)
             goto error;
     }
@@ -145,27 +149,27 @@ static int cupolas_permission_match_pattern(const char *pattern, const char *str
 
 rule_manager_t *rule_manager_create(const char *path)
 {
-    rule_manager_t *mgr = (rule_manager_t *)cupolas_mem_alloc(sizeof(rule_manager_t));
+    rule_manager_t *mgr = (rule_manager_t *)AIRY_CALLOC(1, sizeof(rule_manager_t));
     if (!mgr)
         return NULL;
 
     __builtin_memset(mgr, 0, sizeof(rule_manager_t));
 
-    if (cupolas_rwlock_init(&mgr->rwlock) != cupolas_OK) {
-        cupolas_mem_free(mgr);
+    if (airy_rwlock_init(&mgr->rwlock) != cupolas_OK) {
+        AIRY_FREE(mgr);
         return NULL;
     }
 
     if (path) {
-        mgr->path = cupolas_strdup(path);
+        mgr->path = AIRY_STRDUP(path);
         if (!mgr->path) {
-            cupolas_rwlock_destroy(&mgr->rwlock);
-            cupolas_mem_free(mgr);
+            airy_rwlock_destroy(&mgr->rwlock);
+            AIRY_FREE(mgr);
             return NULL;
         }
 
         if (rule_manager_reload(mgr) != 0) {
-            cupolas_mem_free(mgr->path);
+            AIRY_FREE(mgr->path);
             mgr->path = NULL;
         }
     }
@@ -178,14 +182,14 @@ void rule_manager_destroy(rule_manager_t *mgr)
     if (!mgr)
         return;
 
-    cupolas_rwlock_wrlock(&mgr->rwlock);
+    airy_rwlock_wrlock(&mgr->rwlock);
     cupolas_permission_free_rules(mgr->rules);
     mgr->rules = NULL;
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    airy_rwlock_unlock(&mgr->rwlock);
 
-    cupolas_rwlock_destroy(&mgr->rwlock);
-    cupolas_mem_free(mgr->path);
-    cupolas_mem_free(mgr);
+    airy_rwlock_destroy(&mgr->rwlock);
+    AIRY_FREE(mgr->path);
+    AIRY_FREE(mgr);
 }
 
 int rule_manager_reload(rule_manager_t *mgr)
@@ -193,12 +197,12 @@ int rule_manager_reload(rule_manager_t *mgr)
     if (!mgr || !mgr->path)
         return cupolas_ERROR_INVALID_ARG;
 
-    cupolas_file_stat_t st;
-    if (cupolas_file_stat(mgr->path, &st) != cupolas_OK) {
+    airy_file_stat_t st;
+    if (airy_file_stat(mgr->path, &st) != 0) {
         return cupolas_ERROR_NOT_FOUND;
     }
 
-    uint64_t mtime = (uint64_t)st.mtime.sec * 1000 + st.mtime.nsec / 1000000;
+    uint64_t mtime = (uint64_t)st.mtime_sec * 1000 + st.mtime_nsec / 1000000;
     if (mtime == mgr->last_mtime) {
         return cupolas_OK;
     }
@@ -273,12 +277,12 @@ int rule_manager_reload(rule_manager_t *mgr)
 
     yaml_destroy(doc);
 
-    cupolas_rwlock_wrlock(&mgr->rwlock);
+    airy_rwlock_wrlock(&mgr->rwlock);
     permission_rule_t *old_rules = mgr->rules;
     mgr->rules = new_rules;
     mgr->last_mtime = mtime;
-    cupolas_atomic_inc32(&mgr->version);
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    atomic_fetch_add_32(&mgr->version, 1, memory_order_seq_cst);
+    airy_rwlock_unlock(&mgr->rwlock);
 
     cupolas_permission_free_rules(old_rules);
 
@@ -296,7 +300,7 @@ int rule_manager_match(rule_manager_t *mgr, const char *agent_id, const char *ac
     int best_priority = -1;
     int result = 0;
 
-    cupolas_rwlock_rdlock(&mgr->rwlock);
+    airy_rwlock_rdlock(&mgr->rwlock);
 
     permission_rule_t *rule = mgr->rules;
     while (rule) {
@@ -333,7 +337,7 @@ int rule_manager_match(rule_manager_t *mgr, const char *agent_id, const char *ac
         rule = rule->next;
     }
 
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    airy_rwlock_unlock(&mgr->rwlock);
 
     return result;
 }
@@ -349,7 +353,7 @@ int rule_manager_add(rule_manager_t *mgr, const char *agent_id, const char *acti
     if (!rule)
         return cupolas_ERROR_NO_MEMORY;
 
-    cupolas_rwlock_wrlock(&mgr->rwlock);
+    airy_rwlock_wrlock(&mgr->rwlock);
 
     permission_rule_t **pp = &mgr->rules;
     while (*pp && (*pp)->priority >= priority) {
@@ -359,9 +363,9 @@ int rule_manager_add(rule_manager_t *mgr, const char *agent_id, const char *acti
     rule->next = *pp;
     *pp = rule;
 
-    cupolas_atomic_inc32(&mgr->version);
+    atomic_fetch_add_32(&mgr->version, 1, memory_order_seq_cst);
 
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    airy_rwlock_unlock(&mgr->rwlock);
 
     return cupolas_OK;
 }
@@ -371,11 +375,11 @@ void rule_manager_clear(rule_manager_t *mgr)
     if (!mgr)
         return;
 
-    cupolas_rwlock_wrlock(&mgr->rwlock);
+    airy_rwlock_wrlock(&mgr->rwlock);
     cupolas_permission_free_rules(mgr->rules);
     mgr->rules = NULL;
-    cupolas_atomic_inc32(&mgr->version);
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    atomic_fetch_add_32(&mgr->version, 1, memory_order_seq_cst);
+    airy_rwlock_unlock(&mgr->rwlock);
 }
 
 size_t rule_manager_count(rule_manager_t *mgr)
@@ -383,7 +387,7 @@ size_t rule_manager_count(rule_manager_t *mgr)
     if (!mgr)
         return 0;
 
-    cupolas_rwlock_rdlock(&mgr->rwlock);
+    airy_rwlock_rdlock(&mgr->rwlock);
 
     size_t count = 0;
     permission_rule_t *rule = mgr->rules;
@@ -392,7 +396,7 @@ size_t rule_manager_count(rule_manager_t *mgr)
         rule = rule->next;
     }
 
-    cupolas_rwlock_unlock(&mgr->rwlock);
+    airy_rwlock_unlock(&mgr->rwlock);
 
     return count;
 }

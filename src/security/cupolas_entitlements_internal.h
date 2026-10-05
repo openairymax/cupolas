@@ -14,7 +14,7 @@
 
 #include "cupolas_entitlements.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "atomic_compat.h"
 
 #include <stddef.h>
@@ -32,7 +32,7 @@ struct cupolas_entitlements {
     size_t sig_len;
     uint64_t load_time;
     int is_verified;
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 };
 
 /* parse 模块（cupolas_entitlements_parse.c） */

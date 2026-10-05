@@ -7,6 +7,7 @@
  *        encrypted storage.
  */
 
+#include "airy_memory.h"
 #include "cupolas_vault_internal.h"
 
 credential_entry_t *find_entry(cupolas_vault_t *vault, const char *cred_id)
@@ -28,7 +29,7 @@ static int vault_rollback(cupolas_vault_t *vault, credential_entry_t *entry, int
     } else {
         entry->encrypted_data = NULL;
     }
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return err;
 }
 
@@ -46,14 +47,14 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     if (vault->entry_count >= vault->entry_capacity) {
         size_t new_capacity = vault->entry_capacity * 2;
         credential_entry_t *new_entries =
             AIRY_REALLOC(vault->entries, new_capacity * sizeof(credential_entry_t));
         if (!new_entries) {
-            cupolas_rwlock_unlock(&vault->lock);
+            airy_rwlock_unlock(&vault->lock);
             return cupolas_ERR_NULL_POINTER;
         }
         vault->entries = new_entries;
@@ -140,7 +141,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
             } else {
                 entry->encrypted_data = NULL;
             }
-            cupolas_rwlock_unlock(&vault->lock);
+            airy_rwlock_unlock(&vault->lock);
             return cupolas_ERR_OUT_OF_MEMORY;
         }
         for (size_t i = 0; i < acl->count; i++) {
@@ -162,7 +163,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
                     AIRY_FREE(entry->cred_id);
                     entry->cred_id = NULL;
                 }
-                cupolas_rwlock_unlock(&vault->lock);
+                airy_rwlock_unlock(&vault->lock);
                 return cupolas_ERR_OUT_OF_MEMORY;
             }
             entry->acl.entries[i].operations = acl->entries[i].operations;
@@ -174,7 +175,7 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
         vault->entry_count++;
     }
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }
 
@@ -192,11 +193,11 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NULL_POINTER;
     }
 
@@ -204,20 +205,20 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
         AIRY_LOG_WARN(
             "cupolas_vault_retrieve: access denied for agent_id=%s, cred_id=%s, operation=READ",
             agent_id ? agent_id : "(null)", cred_id);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     if (*data_len < entry->encrypted_len) {
         *data_len = entry->encrypted_len;
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_BUFFER_TOO_SMALL;
     }
 
 #ifdef CUPOLAS_USE_OPENSSL
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
 
@@ -225,20 +226,20 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, vault->master_key, entry->iv) != 1) {
         AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptInit failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptUpdate(ctx, data_out, &len, entry->encrypted_data, entry->encrypted_len) != 1) {
         AIRY_LOG_ERROR("cupolas_vault_retrieve: DecryptUpdate failed for cred_id=%s, encrypted_len=%zu",
                   cred_id, entry->encrypted_len);
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE, entry->tag) != 1) {
         AIRY_LOG_ERROR("cupolas_vault_retrieve: GCM tag set failed for cred_id=%s", cred_id);
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
     if (EVP_DecryptFinal_ex(ctx, data_out + len, &len) != 1) {
@@ -246,7 +247,7 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
                   "cred_id=%s",
                   cred_id);
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NOT_FOUND;
     }
 
@@ -254,11 +255,11 @@ int cupolas_vault_retrieve(cupolas_vault_t *vault, const char *cred_id, const ch
     EVP_CIPHER_CTX_free(ctx);
 #else
     (void)data_out;
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }
 
@@ -283,7 +284,7 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     for (size_t i = 0; i < vault->entry_count; i++) {
         if (strcmp(vault->entries[i].cred_id, cred_id) == 0) {
@@ -300,12 +301,12 @@ int cupolas_vault_delete(cupolas_vault_t *vault, const char *cred_id, const char
                               (vault->entry_count - i - 1) * sizeof(credential_entry_t));
             vault->entry_count--;
 
-            cupolas_rwlock_unlock(&vault->lock);
+            airy_rwlock_unlock(&vault->lock);
             return 0;
         }
     }
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return cupolas_ERR_NULL_POINTER;
 }
 
@@ -315,9 +316,9 @@ bool cupolas_vault_exists(cupolas_vault_t *vault, const char *cred_id)
         return false;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
     credential_entry_t *entry = find_entry(vault, cred_id);
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
 
     return entry != NULL;
 }
@@ -337,11 +338,11 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NULL_POINTER;
     }
 
@@ -352,14 +353,14 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
 #ifdef CUPOLAS_USE_OPENSSL
     if (RAND_bytes(entry->iv, AES_IV_SIZE) != 1) {
         AIRY_LOG_ERROR("cupolas_vault_update: RAND_bytes failed for cred_id=%s", cred_id);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         AIRY_LOG_ERROR("cupolas_vault_update: EVP_CIPHER_CTX_new failed for cred_id=%s", cred_id);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -367,7 +368,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
     entry->encrypted_data = (uint8_t *)AIRY_MALLOC(data_len + AES_BLOCK_SIZE);
     if (!entry->encrypted_data) {
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -379,7 +380,7 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
@@ -388,19 +389,19 @@ int cupolas_vault_update(cupolas_vault_t *vault, const char *cred_id, const uint
         AIRY_FREE(entry->encrypted_data);
         entry->encrypted_data = NULL;
         EVP_CIPHER_CTX_free(ctx);
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     entry->encrypted_len = data_len;
     EVP_CIPHER_CTX_free(ctx);
 #else
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     entry->metadata.updated_at = (uint64_t)time(NULL);
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }

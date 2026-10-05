@@ -28,15 +28,17 @@ utils/
 
 ### 线程同步原语
 
-| 宏 | 说明 |
-|------|------|
-| `CUPOLAS_MUTEX_TYPE` | 互斥锁类型（`cupolas_mutex_t`） |
-| `CUPOLAS_MUTEX_INIT(m)` | 初始化互斥锁 |
-| `CUPOLAS_MUTEX_LOCK(m)` | 加锁 |
-| `CUPOLAS_MUTEX_UNLOCK(m)` | 解锁 |
-| `CUPOLAS_MUTEX_DESTROY(m)` | 销毁互斥锁 |
+线程同步直接使用 Commons 平台域的 `airy_mtx_*` 函数（`<platform_sync.h>`）：
 
-> 底层使用 `platform.h` 提供的跨平台互斥锁实现。非递归锁，同线程重复加锁将死锁。
+| 函数 | 说明 |
+|------|------|
+| `airy_mtx_init(m)` | 初始化互斥锁 |
+| `airy_mtx_lock(m)` | 加锁 |
+| `airy_mtx_trylock(m)` | 尝试加锁（非阻塞） |
+| `airy_mtx_unlock(m)` | 解锁 |
+| `airy_mtx_destroy(m)` | 销毁互斥锁 |
+
+> 非递归锁，同线程重复加锁将死锁。
 
 ### 安全内存管理
 
@@ -130,7 +132,7 @@ utils/
 
 | 函数 | 说明 |
 |------|------|
-| `cupolas_strdup(str)` | NULL 安全的字符串复制 |
+| `AIRY_STRDUP(str)`（commons 内存域）| NULL 安全的字符串复制 |
 | `cupolas_strlcpy(dest, src, len)` | 安全字符串拷贝（始终 null 终止） |
 | `cupolas_memset_s(ptr, len)` | 安全内存清零（防止编译器优化移除） |
 | `cupolas_get_timestamp_ms()` | 获取当前时间戳（毫秒） |
@@ -146,8 +148,8 @@ utils/
 int my_function(my_config_t *config) {
     CUPOLAS_CHECK_NULL(config);
 
-    CUPOLAS_MUTEX_TYPE lock;
-    CUPOLAS_MUTEX_INIT(&lock);
+    airy_mtx_t lock;
+    airy_mtx_init(&lock);
 
     my_data_t *data = CUPOLAS_ALLOC_STRUCT(my_data_t);
     if (CUPOLAS_UNLIKELY(data == NULL)) {
@@ -155,15 +157,15 @@ int my_function(my_config_t *config) {
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
-    CUPOLAS_MUTEX_LOCK(&lock);
+    airy_mtx_lock(&lock);
     /* 临界区... */
-    CUPOLAS_MUTEX_UNLOCK(&lock);
+    airy_mtx_unlock(&lock);
 
     /* 安全清零敏感数据 */
     cupolas_memset_s(data->secret, sizeof(data->secret));
 
     CUPOLAS_FREE(data);
-    CUPOLAS_MUTEX_DESTROY(&lock);
+    airy_mtx_destroy(&lock);
     return 0;
 }
 ```

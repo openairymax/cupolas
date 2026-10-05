@@ -58,7 +58,7 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
     if (!arr)
         return NULL;
 
-    char *dup = cupolas_strdup(content);
+    char *dup = AIRY_STRDUP(content);
     if (!dup) {
         AIRY_FREE(arr);
         return NULL;
@@ -91,7 +91,7 @@ static char **cupolas_parse_string_array(const char *content, size_t *count)
                 }
                 arr = new_arr;
             }
-            arr[*count] = cupolas_strdup(token);
+            arr[*count] = AIRY_STRDUP(token);
             if (arr[*count])
                 (*count)++;
         }
@@ -151,12 +151,12 @@ static int cupolas_parse_yaml_line(const char *line, char **key, char **value, i
 
 static void handle_agent_id(cupolas_entitlements_info_t *info, const char *value)
 {
-    info->agent_id = cupolas_strdup(value);
+    info->agent_id = AIRY_STRDUP(value);
 }
 
 static void handle_version(cupolas_entitlements_info_t *info, const char *value)
 {
-    info->version = cupolas_strdup(value);
+    info->version = AIRY_STRDUP(value);
 }
 
 static void handle_not_before(cupolas_entitlements_info_t *info, const char *value)
@@ -242,7 +242,7 @@ int cupolas_parse_entitlements_content(const char *content,
 {
     AIRY_MEMSET(info, 0, sizeof(*info));
 
-    char *dup = cupolas_strdup(content);
+    char *dup = AIRY_STRDUP(content);
     if (!dup)
         return CUPOLAS_ENT_PARSE_ERROR;
 

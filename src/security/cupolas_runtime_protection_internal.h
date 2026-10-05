@@ -10,10 +10,11 @@
 #ifndef CUPOLAS_RUNTIME_PROTECTION_INTERNAL_H
 #define CUPOLAS_RUNTIME_PROTECTION_INTERNAL_H
 
+#include "platform.h"
 #include "cupolas_runtime_protection.h"
 
 #include "atomic_compat.h"
-#include "../platform/platform.h"
+#include "platform.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -68,14 +69,14 @@ typedef struct {
     uint8_t data_hash[32];
     int hashes_computed;
 
-    cupolas_thread_t integrity_thread;
+    airy_thread_t integrity_thread;
     atomic_int integrity_stop;
     int integrity_thread_active;
 
     void (*violation_callback)(const cupolas_violation_event_t *event);
     void (*integrity_callback)(int result);
 
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 } cupolas_runtime_prot_state_t;
 
 /* Global protection state, owned by cupolas_runtime_protection.c. */

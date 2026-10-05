@@ -3,11 +3,11 @@
 
 /**
  * @file test_sandbox.c
- * @brief cupolas_sandbox 单元测试（Landlock + seccomp）
+ * @brief airy_native_sandbox 单元测试（Landlock + seccomp）
  *
  * 验证：
- * - cupolas_sandbox_init: 清零为禁用默认
- * - cupolas_sandbox_apply: NULL / disabled 为零开销 no-op
+ * - airy_native_sandbox_init: 清零为禁用默认
+ * - airy_native_sandbox_apply: NULL / disabled 为零开销 no-op
  * - enabled 沙箱：命令在 Landlock 默认只读 + rw_paths 下正常执行
  * - 写限制：rw_paths 内可写、外部只读路径写入被拒（Linux 内核支持时）
  * - deny_network：网络 syscall 被 seccomp 拦截（Linux 内核支持时）
@@ -16,7 +16,7 @@
  * SKIP（apply 返回非 0），不误报失败。
  */
 
-#include "platform/sandbox.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,8 +68,8 @@ static int g_tests_skipped = 0;
 
 static void test_sandbox_init(void)
 {
-    cupolas_sandbox_t sb;
-    cupolas_sandbox_init(&sb);
+    airy_native_sandbox_t sb;
+    airy_native_sandbox_init(&sb);
     TEST_ASSERT(sb.enabled == 0, "init clears enabled", "not zero");
     TEST_ASSERT(sb.deny_network == 0, "init clears deny_network", "not zero");
     TEST_ASSERT(sb.ro_paths == NULL, "init clears ro_paths", "not NULL");
@@ -79,23 +79,23 @@ static void test_sandbox_init(void)
 
 static void test_sandbox_noop(void)
 {
-    TEST_ASSERT(cupolas_sandbox_apply(NULL) == 0, "apply(NULL) is no-op", "failed");
-    cupolas_sandbox_t sb;
-    cupolas_sandbox_init(&sb);
-    TEST_ASSERT(cupolas_sandbox_apply(&sb) == 0, "apply(disabled) is no-op", "failed");
+    TEST_ASSERT(airy_native_sandbox_apply(NULL) == 0, "apply(NULL) is no-op", "failed");
+    airy_native_sandbox_t sb;
+    airy_native_sandbox_init(&sb);
+    TEST_ASSERT(airy_native_sandbox_apply(&sb) == 0, "apply(disabled) is no-op", "failed");
     TEST_PASS("sandbox disabled / NULL is zero-overhead no-op");
 }
 
 #if defined(__linux__)
 
 /* 子进程内应用沙箱并执行命令；返回子进程退出码（-1 = fork/wait 失败）。 */
-static int run_in_sandbox(const cupolas_sandbox_t *sb, char *const argv[])
+static int run_in_sandbox(const airy_native_sandbox_t *sb, char *const argv[])
 {
     pid_t pid = fork();
     if (pid < 0)
         return -1;
     if (pid == 0) {
-        if (cupolas_sandbox_apply(sb) != 0)
+        if (airy_native_sandbox_apply(sb) != 0)
             _exit(126); /* 沙箱应用失败（如内核不支持 Landlock） */
         execvp(argv[0], argv);
         _exit(127); /* exec 失败 */
@@ -138,14 +138,14 @@ static void test_sandbox_write_restriction(void)
     snprintf(rw_file, sizeof(rw_file), "%s/probe.txt", rw_dir);
 
     const char *rw_paths[] = {rw_dir, NULL};
-    cupolas_sandbox_t sb;
-    cupolas_sandbox_init(&sb);
+    airy_native_sandbox_t sb;
+    airy_native_sandbox_init(&sb);
     sb.enabled = 1;
     sb.rw_paths = rw_paths;
 
     pid_t pid = fork();
     if (pid == 0) {
-        if (cupolas_sandbox_apply(&sb) != 0)
+        if (airy_native_sandbox_apply(&sb) != 0)
             _exit(126); /* 内核不支持 Landlock：父进程将 SKIP */
         probe_write(rw_file, outside_file);
     }
@@ -167,14 +167,14 @@ static void test_sandbox_write_restriction(void)
 
 static void test_sandbox_deny_network(void)
 {
-    cupolas_sandbox_t sb;
-    cupolas_sandbox_init(&sb);
+    airy_native_sandbox_t sb;
+    airy_native_sandbox_init(&sb);
     sb.enabled = 1;
     sb.deny_network = 1;
 
     pid_t pid = fork();
     if (pid == 0) {
-        if (cupolas_sandbox_apply(&sb) != 0)
+        if (airy_native_sandbox_apply(&sb) != 0)
             _exit(126);
         int fd = socket(AF_INET, SOCK_STREAM, 0);
         if (fd >= 0) {
@@ -199,8 +199,8 @@ static void test_sandbox_enabled_exec(void)
 {
     char *const argv[] = {"/bin/echo", "sandbox-ok", NULL};
     const char *rw_paths[] = {"/tmp", NULL};
-    cupolas_sandbox_t sb;
-    cupolas_sandbox_init(&sb);
+    airy_native_sandbox_t sb;
+    airy_native_sandbox_init(&sb);
     sb.enabled = 1;
     sb.rw_paths = rw_paths;
 

@@ -10,6 +10,7 @@
  * policy.activate 原子提交运行集 + 版本固化 + epoch+1。
  */
 
+#include "airy_memory.h"
 #include "dpolicy_internal.h"
 
 #include <cjson/cJSON.h>

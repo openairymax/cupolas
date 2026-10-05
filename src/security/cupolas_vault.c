@@ -11,6 +11,7 @@
  * @brief Secure credential storage (iOS Keychain-like) implementation.
  */
 
+#include "airy_memory.h"
 #include "cupolas_vault_internal.h"
 
 static vault_global_ctx_t g_vault_ctx = {0};
@@ -29,7 +30,7 @@ static uint8_t g_vault_oom_data[VAULT_OOM_PREALLOC_SLOTS][VAULT_OOM_PREALLOC_DAT
 
 static bool g_vault_oom_used[VAULT_OOM_PREALLOC_SLOTS];
 
-static cupolas_mutex_t g_vault_oom_lock;
+static airy_mtx_t g_vault_oom_lock;
 
 static bool g_vault_oom_initialized = false;
 
@@ -45,7 +46,7 @@ static void vault_oom_pool_init(void)
         return;
     }
 
-    cupolas_mutex_init(&g_vault_oom_lock);
+    airy_mtx_init(&g_vault_oom_lock);
 
     AIRY_MEMSET(g_vault_oom_entries, 0, sizeof(g_vault_oom_entries));
     AIRY_MEMSET(g_vault_oom_data, 0, sizeof(g_vault_oom_data));
@@ -70,18 +71,18 @@ static credential_entry_t *vault_oom_pool_alloc(void)
         return NULL;
     }
 
-    cupolas_mutex_lock(&g_vault_oom_lock);
+    airy_mtx_lock(&g_vault_oom_lock);
 
     for (int i = 0; i < VAULT_OOM_PREALLOC_SLOTS; i++) {
         if (!g_vault_oom_used[i]) {
             g_vault_oom_used[i] = true;
             AIRY_MEMSET(&g_vault_oom_entries[i], 0, sizeof(credential_entry_t));
-            cupolas_mutex_unlock(&g_vault_oom_lock);
+            airy_mtx_unlock(&g_vault_oom_lock);
             return &g_vault_oom_entries[i];
         }
     }
 
-    cupolas_mutex_unlock(&g_vault_oom_lock);
+    airy_mtx_unlock(&g_vault_oom_lock);
     return NULL;
 }
 
@@ -123,9 +124,9 @@ static void vault_oom_pool_free(credential_entry_t *entry)
         return;
     }
 
-    cupolas_mutex_lock(&g_vault_oom_lock);
+    airy_mtx_lock(&g_vault_oom_lock);
     g_vault_oom_used[index] = false;
-    cupolas_mutex_unlock(&g_vault_oom_lock);
+    airy_mtx_unlock(&g_vault_oom_lock);
 }
 #pragma GCC diagnostic pop
 
@@ -152,7 +153,7 @@ int cupolas_vault_init(const cupolas_vault_config_t *config)
             g_vault_ctx.default_config.max_retry_count = 3;
         }
 
-        cupolas_rwlock_init(&g_vault_ctx.global_lock);
+        airy_rwlock_init(&g_vault_ctx.global_lock);
 
         vault_oom_pool_init();
 
@@ -176,7 +177,7 @@ void cupolas_vault_cleanup(void)
         return;
     }
 
-    cupolas_rwlock_destroy(&g_vault_ctx.global_lock);
+    airy_rwlock_destroy(&g_vault_ctx.global_lock);
     AIRY_MEMSET(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 }
 
@@ -215,7 +216,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     }
     v->entry_count = 0;
 
-    cupolas_rwlock_init(&v->lock);
+    airy_rwlock_init(&v->lock);
     AIRY_MEMCPY(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
 
     if (password) {
@@ -226,7 +227,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
         AIRY_MEMCPY(salt, id_hash, SALT_SIZE);
         if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                               AES_KEY_SIZE, v->master_key) != 1) {
-            cupolas_rwlock_destroy(&v->lock);
+            airy_rwlock_destroy(&v->lock);
             AIRY_FREE(v->entries);
             AIRY_FREE(v->vault_id);
             AIRY_FREE(v);
@@ -234,7 +235,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
             return AIRY_ERR_UNKNOWN;
         }
 #else
-        cupolas_rwlock_destroy(&v->lock);
+        airy_rwlock_destroy(&v->lock);
         AIRY_FREE(v->entries);
         AIRY_FREE(v->vault_id);
         AIRY_FREE(v);
@@ -253,7 +254,7 @@ void cupolas_vault_close(cupolas_vault_t *vault)
         return;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     AIRY_FREE(vault->vault_id);
 
@@ -273,8 +274,8 @@ void cupolas_vault_close(cupolas_vault_t *vault)
 
     AIRY_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
 
-    cupolas_rwlock_unlock(&vault->lock);
-    cupolas_rwlock_destroy(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
+    airy_rwlock_destroy(&vault->lock);
 
     AIRY_FREE(vault);
 }
@@ -286,10 +287,10 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
     AIRY_MEMSET(vault->master_key, 0, AES_KEY_SIZE);
     vault->is_locked = true;
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
 
     return 0;
 }
@@ -302,7 +303,7 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
 #ifdef CUPOLAS_USE_OPENSSL
     uint8_t salt[SALT_SIZE] = {0};
@@ -311,19 +312,19 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
     AIRY_MEMCPY(salt, id_hash, SALT_SIZE);
     if (PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE, 100000, EVP_sha256(),
                           AES_KEY_SIZE, vault->master_key) != 1) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         AIRY_LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s",
                   vault->vault_id ? vault->vault_id : "(null)");
         return AIRY_ERR_UNKNOWN;
     }
 #else
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     AIRY_LOG_ERROR("cupolas_vault_unlock: crypto unavailable for vault_id=%s",
               vault->vault_id ? vault->vault_id : "(null)");
     return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
     vault->is_locked = false;
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
 
     return 0;
 }
@@ -334,9 +335,9 @@ bool cupolas_vault_is_locked(cupolas_vault_t *vault)
         return true;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
     bool locked = vault->is_locked;
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
 
     return locked;
 }

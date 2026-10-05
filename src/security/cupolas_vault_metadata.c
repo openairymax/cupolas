@@ -7,6 +7,7 @@
  *        management.
  */
 
+#include "airy_memory.h"
 #include "cupolas_vault_internal.h"
 
 int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
@@ -16,11 +17,11 @@ int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_INVALID_PARAM;
     }
 
@@ -31,7 +32,7 @@ int cupolas_vault_get_metadata(cupolas_vault_t *vault, const char *cred_id,
     metadata->expires_at = entry->metadata.expires_at;
     metadata->is_accessible = !vault->is_locked;
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }
 
@@ -55,7 +56,7 @@ int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
 
     size_t match_count = 0;
     for (size_t i = 0; i < vault->entry_count; i++) {
@@ -67,13 +68,13 @@ int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
     if (match_count == 0) {
         *metadata_array = NULL;
         *count = 0;
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return 0;
     }
 
     cupolas_vault_metadata_t *arr = AIRY_CALLOC(match_count, sizeof(cupolas_vault_metadata_t));
     if (!arr) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_INVALID_PARAM;
     }
 
@@ -91,7 +92,7 @@ int cupolas_vault_list(cupolas_vault_t *vault, cupolas_vault_cred_type_t type,
     *metadata_array = arr;
     *count = match_count;
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }
 

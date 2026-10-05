@@ -9,7 +9,8 @@
 #ifndef CUPOLAS_PERMISSION_RULE_H
 #define CUPOLAS_PERMISSION_RULE_H
 
-#include "../platform/platform.h"
+#include "atomic_compat.h"
+#include "platform.h"
 
 #include <stddef.h>
 
@@ -45,10 +46,10 @@ typedef struct permission_rule {
  */
 typedef struct rule_manager {
     permission_rule_t *rules; /**< Linked list of rules */
-    cupolas_rwlock_t rwlock; /**< Read-write lock for thread safety */
+    airy_rwlock_t rwlock; /**< Read-write lock for thread safety */
     char *path; /**< Path to rules configuration file */
     uint64_t last_mtime; /**< Last modification time of config file */
-    cupolas_atomic32_t version; /**< Rule version counter */
+    atomic_int version; /**< Rule version counter */
 } rule_manager_t;
 
 /**

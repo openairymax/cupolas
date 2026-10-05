@@ -9,7 +9,8 @@
 #ifndef CUPOLAS_PERMISSION_ENGINE_H
 #define CUPOLAS_PERMISSION_ENGINE_H
 
-#include "../platform/platform.h"
+#include "atomic_compat.h"
+#include "platform.h"
 #include "permission.h"
 #include "permission_cache.h"
 #include "permission_rule.h"
@@ -30,10 +31,10 @@ extern "C" {
 struct permission_engine {
     rule_manager_t *rules; /**< Rule manager (loaded from YAML) */
     cache_manager_t *cache; /**< LRU cache for permission results */
-    cupolas_rwlock_t rwlock; /**< Read-write lock for thread safety */
+    airy_rwlock_t rwlock; /**< Read-write lock for thread safety */
     char *rules_path; /**< Path to rules configuration file */
     uint64_t last_load_time; /**< Last reload timestamp (milliseconds) */
-    cupolas_atomic32_t ref_count; /**< Reference count for memory management */
+    atomic_int ref_count; /**< Reference count for memory management */
 };
 
 #ifdef __cplusplus

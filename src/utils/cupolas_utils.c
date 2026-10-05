@@ -10,8 +10,9 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-/* <strings.h>（strcasecmp 等）为 POSIX 专有；MSVC 无此头（C1083），
- * 大小写不敏感比较统一走 cupolas_strcasecmp（platform_util.c）。 */
+/* 大小写不敏感比较统一用标准 strcasecmp：POSIX 由 <strings.h> 提供，
+ * Windows 由 compat.h 映射到 _stricmp（MSVC 无 <strings.h>）。 */
+#include "../../../commons/utils/compat/compat.h"
 #if !defined(_WIN32)
 #include <strings.h>
 #endif
@@ -134,11 +135,11 @@ void cupolas_log_message(const char *level, const char *format, ...)
         return;
 
     int log_level = LOG_LEVEL_INFO;
-    if (cupolas_strcasecmp(level, "ERROR") == 0 || cupolas_strcasecmp(level, "FATAL") == 0)
+    if (strcasecmp(level, "ERROR") == 0 || strcasecmp(level, "FATAL") == 0)
         log_level = LOG_LEVEL_ERROR;
-    else if (cupolas_strcasecmp(level, "WARN") == 0 || cupolas_strcasecmp(level, "WARNING") == 0)
+    else if (strcasecmp(level, "WARN") == 0 || strcasecmp(level, "WARNING") == 0)
         log_level = LOG_LEVEL_WARN;
-    else if (cupolas_strcasecmp(level, "DEBUG") == 0)
+    else if (strcasecmp(level, "DEBUG") == 0)
         log_level = LOG_LEVEL_DEBUG;
 
     char prefixed_fmt[4096];

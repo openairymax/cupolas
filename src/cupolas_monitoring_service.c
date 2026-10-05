@@ -19,7 +19,6 @@
 
 #include "cupolas_metrics.h"
 
-#include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "error.h"
 
@@ -34,12 +33,12 @@ static int handle_metrics_endpoint(const cupolas_endpoint_request_t *req,
 {
     cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)req->user_data;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
 
     char buf[HTTP_RESPONSE_BUF];
     size_t len = metrics_export_prometheus(buf, sizeof(buf));
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     if (len > 0) {
         resp->status_code = 200;
@@ -111,10 +110,10 @@ int cupolas_monitoring_register_health_check(cupolas_monitoring_t *mgr, const ch
     if (!mgr || !name || !callback)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
 
     if (mgr->health_check_count >= MAX_HEALTH_CHECKS) {
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
         return AIRY_EINVAL;
     }
 
@@ -123,7 +122,7 @@ int cupolas_monitoring_register_health_check(cupolas_monitoring_t *mgr, const ch
     entry->callback = callback;
     entry->registered = true;
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return 0;
 }
@@ -134,7 +133,7 @@ int cupolas_monitoring_check_health(cupolas_monitoring_t *mgr, health_check_resu
     if (!mgr || !results || max_results == 0)
         return 0;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
 
     size_t count = 0;
     for (size_t i = 0; i < mgr->health_check_count && count < max_results; i++) {
@@ -148,7 +147,7 @@ int cupolas_monitoring_check_health(cupolas_monitoring_t *mgr, health_check_resu
         }
     }
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return (int)count;
 }

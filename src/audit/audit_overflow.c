@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
+#include "atomic_compat.h"
 #include "cupolas.h"
 /*
  *
@@ -10,6 +11,7 @@
 #include "audit_overflow.h"
 
 #include "platform.h"
+#include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
@@ -34,8 +36,8 @@ struct overflow_handler {
     uint64_t events_written;
     uint64_t disk_write_errors;
     uint64_t total_events_received;
-    cupolas_mutex_t lock;
-    cupolas_thread_t flush_thread;
+    airy_mtx_t lock;
+    airy_thread_t flush_thread;
     volatile bool running;
     overflow_callback_t callback;
     void *callback_user_data;
@@ -45,7 +47,7 @@ struct overflow_handler {
 static void get_timestamp_filename(char *buffer, size_t buffer_size)
 {
     time_t now = time(NULL);
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
     struct tm *tm_info = localtime(&now);
 #else
     struct tm tm_buf;
@@ -63,16 +65,16 @@ static int ensure_overflow_dir(const char *dir)
     if (!dir)
         AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
-    /* 目录创建收敛至 cupolas_file_mkdir 递归通道（audit_rotator 同范式）。
+    /* 目录创建收敛至 airy_mkdir_p 递归通道（audit_rotator 同范式）。
      * 历史单级 mkdir：父级缺失即 ENOENT，回退路径同样单级且忽略返回值，
      * fopen 失败致 overflow_handler_create 返回 NULL——windows run
      * 36393198095 audit_overflow_tests 首轮 0xc0000409 即此形态，
      * 恰因同批测试套件先补建了 tmp 根目录才在重跑时通过。
      * 已存在属成功语义（同名非目录由后续 fopen 失败兜底）。 */
-    if (cupolas_file_mkdir(dir, true) == 0)
+    if (airy_mkdir_p(dir) == 0)
         return 0;
 
-    return cupolas_file_exists(dir) ? 0 : -1;
+    return airy_file_exists(dir) ? 0 : -1;
 }
 
 static FILE *open_new_overflow_file(overflow_handler_t *handler)
@@ -191,16 +193,16 @@ static void *flush_thread_func(void *arg)
     overflow_handler_t *handler = (overflow_handler_t *)arg;
 
     while (handler->running) {
-        cupolas_sleep_ms(handler->flush_interval_ms);
+        airy_sleep_ms(handler->flush_interval_ms);
 
-        cupolas_mutex_lock(&handler->lock);
+        airy_mtx_lock(&handler->lock);
 
         if (handler->current_file) {
             fflush(handler->current_file);
-            handler->stats.last_flush_time_ms = cupolas_time_ms();
+            handler->stats.last_flush_time_ms = airy_time_wall_ms();
         }
 
-        cupolas_mutex_unlock(&handler->lock);
+        airy_mtx_unlock(&handler->lock);
     }
 
     return NULL;
@@ -210,7 +212,7 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
                                             uint32_t flush_interval_ms)
 {
     overflow_handler_t *handler =
-        (overflow_handler_t *)cupolas_mem_alloc(sizeof(overflow_handler_t));
+        (overflow_handler_t *)AIRY_CALLOC(1, sizeof(overflow_handler_t));
     if (!handler)
         return NULL;
 
@@ -232,25 +234,25 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
         ensure_overflow_dir(handler->overflow_dir);
     }
 
-    if (cupolas_mutex_init(&handler->lock) != cupolas_OK) {
-        cupolas_mem_free(handler);
+    if (airy_mtx_init(&handler->lock) != cupolas_OK) {
+        AIRY_FREE(handler);
         return NULL;
     }
 
     get_timestamp_filename(handler->current_filename, sizeof(handler->current_filename));
 
     if (open_new_overflow_file(handler) == NULL) {
-        cupolas_mutex_destroy(&handler->lock);
-        cupolas_mem_free(handler);
+        airy_mtx_destroy(&handler->lock);
+        AIRY_FREE(handler);
         return NULL;
     }
 
     handler->running = true;
-    if (cupolas_thread_create(&handler->flush_thread, flush_thread_func, handler) != cupolas_OK) {
+    if (airy_platform_thread_create(&handler->flush_thread, flush_thread_func, handler) != cupolas_OK) {
         handler->running = false;
         fclose(handler->current_file);
-        cupolas_mutex_destroy(&handler->lock);
-        cupolas_mem_free(handler);
+        airy_mtx_destroy(&handler->lock);
+        AIRY_FREE(handler);
         return NULL;
     }
 
@@ -265,10 +267,10 @@ void overflow_handler_destroy(overflow_handler_t *handler)
     handler->running = false;
 
     if (handler->flush_thread) {
-        cupolas_thread_join(handler->flush_thread, NULL);
+        airy_platform_thread_join(handler->flush_thread, NULL);
     }
 
-    cupolas_mutex_lock(&handler->lock);
+    airy_mtx_lock(&handler->lock);
 
     if (handler->current_file) {
         fflush(handler->current_file);
@@ -276,10 +278,10 @@ void overflow_handler_destroy(overflow_handler_t *handler)
         handler->current_file = NULL;
     }
 
-    cupolas_mutex_unlock(&handler->lock);
+    airy_mtx_unlock(&handler->lock);
 
-    cupolas_mutex_destroy(&handler->lock);
-    cupolas_mem_free(handler);
+    airy_mtx_destroy(&handler->lock);
+    AIRY_FREE(handler);
 }
 
 int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
@@ -287,13 +289,13 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     if (!handler || !entry)
         AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
 
-    cupolas_mutex_lock(&handler->lock);
+    airy_mtx_lock(&handler->lock);
 
     handler->total_events_received++;
 
     if (!handler->current_file || handler->current_file_size >= handler->max_file_size_bytes) {
         if (open_new_overflow_file(handler) == NULL) {
-            cupolas_mutex_unlock(&handler->lock);
+            airy_mtx_unlock(&handler->lock);
             AIRY_RET_ERR(AIRY_ERR_IO);
         }
     }
@@ -301,7 +303,7 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     int written = write_entry_to_file(handler->current_file, entry);
     if (written < 0) {
         handler->disk_write_errors++;
-        cupolas_mutex_unlock(&handler->lock);
+        airy_mtx_unlock(&handler->lock);
         AIRY_RET_ERR(AIRY_ERR_IO);
     }
 
@@ -309,7 +311,7 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     handler->events_written++;
     handler->stats.events_written_to_disk++;
 
-    cupolas_mutex_unlock(&handler->lock);
+    airy_mtx_unlock(&handler->lock);
 
     return 0;
 }
@@ -319,14 +321,14 @@ void overflow_handler_flush(overflow_handler_t *handler)
     if (!handler)
         return;
 
-    cupolas_mutex_lock(&handler->lock);
+    airy_mtx_lock(&handler->lock);
 
     if (handler->current_file) {
         fflush(handler->current_file);
-        handler->stats.last_flush_time_ms = cupolas_time_ms();
+        handler->stats.last_flush_time_ms = airy_time_wall_ms();
     }
 
-    cupolas_mutex_unlock(&handler->lock);
+    airy_mtx_unlock(&handler->lock);
 }
 
 void overflow_handler_get_stats(overflow_handler_t *handler, overflow_stats_t *stats)
@@ -334,7 +336,7 @@ void overflow_handler_get_stats(overflow_handler_t *handler, overflow_stats_t *s
     if (!handler || !stats)
         return;
 
-    cupolas_mutex_lock(&handler->lock);
+    airy_mtx_lock(&handler->lock);
 
     stats->total_events_received = handler->total_events_received;
     stats->events_written_to_disk = handler->stats.events_written_to_disk;
@@ -342,7 +344,7 @@ void overflow_handler_get_stats(overflow_handler_t *handler, overflow_stats_t *s
     stats->disk_write_errors = handler->disk_write_errors;
     stats->last_flush_time_ms = handler->stats.last_flush_time_ms;
 
-    cupolas_mutex_unlock(&handler->lock);
+    airy_mtx_unlock(&handler->lock);
 }
 
 void overflow_handler_reset_stats(overflow_handler_t *handler)
@@ -350,14 +352,14 @@ void overflow_handler_reset_stats(overflow_handler_t *handler)
     if (!handler)
         return;
 
-    cupolas_mutex_lock(&handler->lock);
+    airy_mtx_lock(&handler->lock);
 
     handler->total_events_received = 0;
     handler->stats.events_written_to_disk = 0;
     handler->stats.events_dropped = 0;
     handler->disk_write_errors = 0;
 
-    cupolas_mutex_unlock(&handler->lock);
+    airy_mtx_unlock(&handler->lock);
 }
 
 const char *overflow_get_dir(const overflow_handler_t *handler)
@@ -400,15 +402,15 @@ struct audit_queue_ex {
     size_t max_size;
     overflow_callback_t overflow_callback;
     void *callback_user_data;
-    cupolas_atomic64_t total_dropped;
+    atomic_int64_t total_dropped;
     overflow_level_t current_level;
-    cupolas_mutex_t level_lock;
+    airy_mtx_t level_lock;
 };
 
 audit_queue_ex_t *audit_queue_ex_create(size_t max_size, const char *overflow_dir,
                                         size_t max_file_size_mb)
 {
-    audit_queue_ex_t *queue_ex = (audit_queue_ex_t *)cupolas_mem_alloc(sizeof(audit_queue_ex_t));
+    audit_queue_ex_t *queue_ex = (audit_queue_ex_t *)AIRY_CALLOC(1, sizeof(audit_queue_ex_t));
     if (!queue_ex)
         return NULL;
 
@@ -416,7 +418,7 @@ audit_queue_ex_t *audit_queue_ex_create(size_t max_size, const char *overflow_di
 
     queue_ex->queue = audit_queue_create(max_size);
     if (!queue_ex->queue) {
-        cupolas_mem_free(queue_ex);
+        AIRY_FREE(queue_ex);
         return NULL;
     }
 
@@ -426,11 +428,11 @@ audit_queue_ex_t *audit_queue_ex_create(size_t max_size, const char *overflow_di
         queue_ex->overflow = overflow_handler_create(overflow_dir, max_file_size_mb, 1000);
     }
 
-    if (cupolas_mutex_init(&queue_ex->level_lock) != cupolas_OK) {
+    if (airy_mtx_init(&queue_ex->level_lock) != cupolas_OK) {
         if (queue_ex->overflow)
             overflow_handler_destroy(queue_ex->overflow);
         audit_queue_destroy(queue_ex->queue);
-        cupolas_mem_free(queue_ex);
+        AIRY_FREE(queue_ex);
         return NULL;
     }
 
@@ -448,9 +450,9 @@ void audit_queue_ex_destroy(audit_queue_ex_t *queue)
 
     audit_queue_destroy(queue->queue);
 
-    cupolas_mutex_destroy(&queue->level_lock);
+    airy_mtx_destroy(&queue->level_lock);
 
-    cupolas_mem_free(queue);
+    AIRY_FREE(queue);
 }
 
 int audit_queue_ex_push(audit_queue_ex_t *queue, audit_entry_t *entry)
@@ -477,9 +479,9 @@ int audit_queue_ex_push_with_callback(audit_queue_ex_t *queue, audit_entry_t *en
             overflow_handler_write(queue->overflow, entry);
             audit_entry_destroy(entry);
 
-            cupolas_mutex_lock(&queue->level_lock);
+            airy_mtx_lock(&queue->level_lock);
             queue->current_level = level;
-            cupolas_mutex_unlock(&queue->level_lock);
+            airy_mtx_unlock(&queue->level_lock);
 
             if (cb) {
                 cb(level, audit_queue_size(queue->queue), queue->max_size, cb_user_data);
@@ -490,11 +492,11 @@ int audit_queue_ex_push_with_callback(audit_queue_ex_t *queue, audit_entry_t *en
             /* 审计条目不得静默丢失：丢弃路径同样必须销毁条目，
              * 否则内存泄漏且违反审计链完整性。 */
             audit_entry_destroy(entry);
-            cupolas_atomic_add64(&queue->total_dropped, 1);
+            atomic_fetch_add_64(&queue->total_dropped, 1, memory_order_seq_cst);
 
-            cupolas_mutex_lock(&queue->level_lock);
+            airy_mtx_lock(&queue->level_lock);
             queue->current_level = level;
-            cupolas_mutex_unlock(&queue->level_lock);
+            airy_mtx_unlock(&queue->level_lock);
 
             if (cb) {
                 cb(level, audit_queue_size(queue->queue), queue->max_size, cb_user_data);
@@ -507,17 +509,17 @@ int audit_queue_ex_push_with_callback(audit_queue_ex_t *queue, audit_entry_t *en
     overflow_level_t level =
         overflow_handler_check_level(audit_queue_size(queue->queue), queue->max_size);
 
-    cupolas_mutex_lock(&queue->level_lock);
+    airy_mtx_lock(&queue->level_lock);
     overflow_level_t prev_level = queue->current_level;
     if (level != prev_level) {
         queue->current_level = level;
-        cupolas_mutex_unlock(&queue->level_lock);
+        airy_mtx_unlock(&queue->level_lock);
 
         if (cb && level > prev_level) {
             cb(level, audit_queue_size(queue->queue), queue->max_size, cb_user_data);
         }
     } else {
-        cupolas_mutex_unlock(&queue->level_lock);
+        airy_mtx_unlock(&queue->level_lock);
     }
 
     return result;
@@ -580,7 +582,7 @@ void audit_queue_ex_get_stats(audit_queue_ex_t *queue, uint64_t *pushed, uint64_
     }
 
     if (dropped) {
-        *dropped = cupolas_atomic_load64(&queue->total_dropped);
+        *dropped = atomic_load_64(&queue->total_dropped, memory_order_seq_cst);
     }
 }
 
@@ -589,9 +591,9 @@ overflow_level_t audit_queue_ex_get_overflow_level(audit_queue_ex_t *queue)
     if (!queue)
         return OVERFLOW_LEVEL_NORMAL;
 
-    cupolas_mutex_lock(&queue->level_lock);
+    airy_mtx_lock(&queue->level_lock);
     overflow_level_t level = queue->current_level;
-    cupolas_mutex_unlock(&queue->level_lock);
+    airy_mtx_unlock(&queue->level_lock);
 
     return level;
 }

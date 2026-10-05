@@ -20,7 +20,8 @@
 #ifndef CUPOLAS_WORKBENCH_H
 #define CUPOLAS_WORKBENCH_H
 
-#include "../platform/platform.h"
+#include "platform.h"
+#include "security/cupolas_error.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -51,8 +52,6 @@ typedef struct workbench_limits {
 /* Workbench Configuration */
 typedef struct workbench_config {
     const char *working_dir;
-    const char **env_vars;
-    size_t env_count;
     uint32_t timeout_ms;
     size_t max_output_size;
     bool redirect_stdin;
@@ -60,7 +59,7 @@ typedef struct workbench_config {
     bool redirect_stderr;
     workbench_limits_t limits; /* Resource limits */
     bool enable_limits; /* Enable resource control */
-    cupolas_sandbox_t sandbox; /* 原生沙箱（Landlock + seccomp）；enabled=0 关闭 */
+    airy_native_sandbox_t sandbox; /* 原生沙箱（Landlock + seccomp）；enabled=0 关闭 */
 } workbench_config_t;
 
 /* Workbench Execution Result */

@@ -9,7 +9,7 @@
 #ifndef CUPOLAS_SANITIZER_RULES_H
 #define CUPOLAS_SANITIZER_RULES_H
 
-#include "../platform/platform.h"
+#include "platform.h"
 
 #include <stddef.h>
 

@@ -23,6 +23,7 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
 #include "cupolas_runtime_protection.h"
 #include "cupolas_runtime_protection_internal.h"
 
@@ -170,9 +171,9 @@ static int rtp_state_hash(uint8_t out[RTP_HASH_LEN])
     unsigned int md_len = 0;
 
     AIRY_MEMSET(buf, 0, sizeof(buf));
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     rtp_state_snapshot(buf, &len);
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     if (EVP_Digest(buf, len, out, &md_len, EVP_sha256(), NULL) != 1 || md_len != RTP_HASH_LEN)
         return AIRY_EIO;
@@ -210,10 +211,10 @@ static int rtp_wx_scan(void)
 
 static int rtp_fail(int rc, const char *detail)
 {
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.stats.integrity_failures++;
     g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_COMPROMISED;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     cupolas_record_violation(CUPOLAS_VIOLATION_INTEGRITY, detail, NULL);
 
@@ -231,7 +232,7 @@ static void *rtp_integrity_thread(void *arg)
     uint32_t elapsed = 0;
 
     while (!atomic_load(&g_runtime_prot.integrity_stop)) {
-        cupolas_sleep_ms(RTP_TICK_MS);
+        airy_sleep_ms(RTP_TICK_MS);
         elapsed += RTP_TICK_MS;
         if (elapsed >= interval) {
             elapsed = 0;
@@ -263,9 +264,9 @@ int cupolas_verify_code(const uint8_t *expected_hash)
     if (rc != 0)
         return rc;
 
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.stats.integrity_checks++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     return (CRYPTO_memcmp(cur, expected_hash, RTP_HASH_LEN) == 0) ? 0 : AIRY_EACCES;
 }
@@ -280,18 +281,18 @@ int cupolas_verify_data(const uint8_t *expected_hash)
     if (rc != 0)
         return rc;
 
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.stats.integrity_checks++;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     return (CRYPTO_memcmp(cur, expected_hash, RTP_HASH_LEN) == 0) ? 0 : AIRY_EACCES;
 }
 
 int cupolas_integ_check(void)
 {
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     if (!g_runtime_prot.hashes_computed) {
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
+        airy_mtx_unlock(&g_runtime_prot.lock);
         return AIRY_EINVAL;
     }
     uint8_t base[RTP_HASH_LEN];
@@ -301,7 +302,7 @@ int cupolas_integ_check(void)
     bool wx_on = g_runtime_prot.manager.integrity.enable_ro_sections;
     AIRY_MEMCPY(base, g_runtime_prot.code_hash, RTP_HASH_LEN);
     AIRY_MEMCPY(base_data, g_runtime_prot.data_hash, RTP_HASH_LEN);
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     int rc = 0;
     if (code_on)
@@ -329,20 +330,20 @@ int cupolas_integ_enable(const cupolas_integrity_config_t *config)
 
     cupolas_integ_stop();
 
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     AIRY_MEMSET(g_runtime_prot.code_hash, 0, RTP_HASH_LEN);
     AIRY_MEMSET(g_runtime_prot.data_hash, 0, RTP_HASH_LEN);
     g_runtime_prot.hashes_computed = 1;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     if (config->enable_code_integrity) {
         uint8_t hash[RTP_HASH_LEN];
         int rc = cupolas_integ_hash(hash);
         if (rc != 0)
             return rc;
-        cupolas_mutex_lock(&g_runtime_prot.lock);
+        airy_mtx_lock(&g_runtime_prot.lock);
         AIRY_MEMCPY(g_runtime_prot.code_hash, hash, RTP_HASH_LEN);
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
+        airy_mtx_unlock(&g_runtime_prot.lock);
     }
 
     if (config->enable_data_integrity) {
@@ -350,9 +351,9 @@ int cupolas_integ_enable(const cupolas_integrity_config_t *config)
         int rc = rtp_state_hash(hash);
         if (rc != 0)
             return rc;
-        cupolas_mutex_lock(&g_runtime_prot.lock);
+        airy_mtx_lock(&g_runtime_prot.lock);
         AIRY_MEMCPY(g_runtime_prot.data_hash, hash, RTP_HASH_LEN);
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
+        airy_mtx_unlock(&g_runtime_prot.lock);
     }
 
     if (config->enable_ro_sections) {
@@ -365,7 +366,7 @@ int cupolas_integ_enable(const cupolas_integrity_config_t *config)
 
     if (config->enable_self_check) {
         atomic_store(&g_runtime_prot.integrity_stop, 0);
-        if (cupolas_thread_create(&g_runtime_prot.integrity_thread, rtp_integrity_thread, NULL) !=
+        if (airy_platform_thread_create(&g_runtime_prot.integrity_thread, rtp_integrity_thread, NULL) !=
             0)
             return AIRY_EIO;
         g_runtime_prot.integrity_thread_active = 1;
@@ -376,9 +377,9 @@ int cupolas_integ_enable(const cupolas_integrity_config_t *config)
 
 int cupolas_integ_set_cb(void (*callback)(int result))
 {
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.integrity_callback = callback;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
     return 0;
 }
 
@@ -388,6 +389,6 @@ void cupolas_integ_stop(void)
         return;
 
     atomic_store(&g_runtime_prot.integrity_stop, 1);
-    cupolas_thread_join(g_runtime_prot.integrity_thread, NULL);
+    airy_platform_thread_join(g_runtime_prot.integrity_thread, NULL);
     g_runtime_prot.integrity_thread_active = 0;
 }

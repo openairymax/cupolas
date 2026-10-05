@@ -19,7 +19,7 @@
 #ifndef CUPOLAS_SANITIZER_H
 #define CUPOLAS_SANITIZER_H
 
-#include "../platform/platform.h"
+#include "platform.h"
 
 #include <stdbool.h>
 #include <stddef.h>

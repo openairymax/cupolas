@@ -14,7 +14,7 @@
 #ifndef CUPOLAS_PERMISSION_H
 #define CUPOLAS_PERMISSION_H
 
-#include "../platform/platform.h"
+#include "platform.h"
 
 #include <stddef.h>
 #include <stdint.h>

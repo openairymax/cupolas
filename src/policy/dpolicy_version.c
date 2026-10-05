@@ -9,6 +9,7 @@
  * epoch 单调 +1；版本号 vN 即 epoch+1 的固化标签。
  */
 
+#include "airy_memory.h"
 #include "dpolicy_internal.h"
 
 #include <stdio.h>

@@ -13,6 +13,8 @@
  * - Audit Trail (audit/)
  */
 
+#include "platform_misc.h"
+#include "atomic_compat.h"
 #include "cupolas.h"
 
 #include "audit/audit.h"
@@ -20,7 +22,7 @@
 #include "error.h"
 #include "guards/guard_integration.h"
 #include "permission/permission.h"
-#include "platform/platform.h"
+#include "platform.h"
 #include "sanitizer/sanitizer.h"
 #include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
@@ -80,14 +82,14 @@ static struct {
     sanitizer_t *san;
     workbench_t *wb;
     audit_logger_t *audit;
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 } g_cupolas = {0};
 
 /* N3 fix: DCLP guards the concurrent cupolas_init() entry.
  * State machine: 0 = uninitialized, 2 = initializing, 1 = ready.
  * CAS ensures only one thread runs the initialization; the others spin
  * until the state becomes 1. Follows the DCLP pattern of core_init.c. */
-static cupolas_atomic32_t g_cupolas_init_state = 0;
+static atomic_int g_cupolas_init_state = 0;
 
 #define CUPOLAS_INIT_SPIN_MAX_RETRIES 10000000UL
 
@@ -119,10 +121,10 @@ static int cupolas_init_fail(const char *what, airy_err_t *error)
         *error = AIRY_ERR_OUT_OF_MEMORY;
     cupolas_init_reclaim();
 
-    cupolas_mutex_unlock(&g_cupolas.lock);
-    cupolas_mutex_destroy(&g_cupolas.lock);
+    airy_mtx_unlock(&g_cupolas.lock);
+    airy_mtx_destroy(&g_cupolas.lock);
 
-    cupolas_atomic_store32(&g_cupolas_init_state, 0);
+    atomic_store_32(&g_cupolas_init_state, 0, memory_order_seq_cst);
     CUPOLAS_LOG_ERROR("cupolas_init: %s failed", what);
     return cupolas_ERR_OUT_OF_MEMORY;
 }
@@ -132,19 +134,22 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
     CUPOLAS_LOG_INFO("cupolas_init%s: initializing security dome (config=%s)",
                      with_perm ? "" : "_pep", config_path ? config_path : "default");
 
-    if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
+    if (atomic_load_32(&g_cupolas_init_state, memory_order_seq_cst) == 1) {
         return CUPOLAS_OK;
     }
 
-    if (!cupolas_atomic_cas32(&g_cupolas_init_state, 0, 2)) {
+    int expected = 0;
+    if (!atomic_compare_exchange_strong_32(&g_cupolas_init_state, &expected, 2,
+                                           memory_order_seq_cst,
+                                           memory_order_seq_cst)) {
 
-        if (cupolas_atomic_load32(&g_cupolas_init_state) == 1) {
+        if (atomic_load_32(&g_cupolas_init_state, memory_order_seq_cst) == 1) {
             return CUPOLAS_OK;
         }
 
         unsigned long spin_count = 0;
-        while (cupolas_atomic_load32(&g_cupolas_init_state) == 2) {
-            cupolas_sleep_us(1);
+        while (atomic_load_32(&g_cupolas_init_state, memory_order_seq_cst) == 2) {
+            airy_sleep_us(1);
             if (++spin_count >= CUPOLAS_INIT_SPIN_MAX_RETRIES) {
                 /* V4.0-S3 fix: on timeout do not CAS-reset 2->0, only fail.
                  * The V3.0-N2 CAS 2->0 reset raced: after a timed-out thread
@@ -163,7 +168,7 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
          * the initializing thread failed (stored 0 on the error path); the
          * waiter must not return CUPOLAS_OK, or the caller would operate on
          * an uninitialized security dome. */
-        if (cupolas_atomic_load32(&g_cupolas_init_state) != 1) {
+        if (atomic_load_32(&g_cupolas_init_state, memory_order_seq_cst) != 1) {
             if (error)
                 *error = AIRY_ERR_SYS_NOT_INIT;
             CUPOLAS_LOG_ERROR("cupolas_init: initialization failed by other thread (state=0)");
@@ -174,16 +179,16 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
 
     __builtin_memset(&g_cupolas, 0, sizeof(g_cupolas));
 
-    if (cupolas_mutex_init(&g_cupolas.lock) != 0) {
+    if (airy_mtx_init(&g_cupolas.lock) != 0) {
         if (error)
             *error = AIRY_ERR_IO;
         CUPOLAS_LOG_ERROR("cupolas_init: mutex init failed");
 
-        cupolas_atomic_store32(&g_cupolas_init_state, 0);
+        atomic_store_32(&g_cupolas_init_state, 0, memory_order_seq_cst);
         return cupolas_ERR_UNKNOWN;
     }
 
-    cupolas_mutex_lock(&g_cupolas.lock);
+    airy_mtx_lock(&g_cupolas.lock);
 
     cupolas_internal_config_init_defaults(&g_cupolas.config);
 
@@ -197,10 +202,10 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
                 cupolas_config_destroy(g_cupolas.config_mgr);
                 g_cupolas.config_mgr = NULL;
 
-                cupolas_mutex_unlock(&g_cupolas.lock);
-                cupolas_mutex_destroy(&g_cupolas.lock);
+                airy_mtx_unlock(&g_cupolas.lock);
+                airy_mtx_destroy(&g_cupolas.lock);
 
-                cupolas_atomic_store32(&g_cupolas_init_state, 0);
+                atomic_store_32(&g_cupolas_init_state, 0, memory_order_seq_cst);
                 return result;
             }
         }
@@ -234,12 +239,12 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
     }
 
     g_cupolas.initialized = 1;
-    cupolas_mutex_unlock(&g_cupolas.lock);
+    airy_mtx_unlock(&g_cupolas.lock);
 
     /* N3 fix: publish the ready state (2->1) to wake up spinning threads.
      * Must happen after unlock so waiters observe initialized=1 and state=1
      * consistently. */
-    cupolas_atomic_store32(&g_cupolas_init_state, 1);
+    atomic_store_32(&g_cupolas_init_state, 1, memory_order_seq_cst);
 
     if (with_perm)
         CUPOLAS_LOG_INFO(
@@ -268,7 +273,7 @@ void cupolas_cleanup(void)
     }
 
     CUPOLAS_LOG_INFO("cupolas_cleanup: shutting down security dome...");
-    cupolas_mutex_lock(&g_cupolas.lock);
+    airy_mtx_lock(&g_cupolas.lock);
 
     if (g_cupolas.audit) {
         audit_logger_flush(g_cupolas.audit);
@@ -305,11 +310,11 @@ void cupolas_cleanup(void)
     cupolas_internal_config_cleanup(&g_cupolas.config);
 
     g_cupolas.initialized = 0;
-    cupolas_mutex_unlock(&g_cupolas.lock);
+    airy_mtx_unlock(&g_cupolas.lock);
 
-    cupolas_mutex_destroy(&g_cupolas.lock);
+    airy_mtx_destroy(&g_cupolas.lock);
 
-    cupolas_atomic_store32(&g_cupolas_init_state, 0);
+    atomic_store_32(&g_cupolas_init_state, 0, memory_order_seq_cst);
     CUPOLAS_LOG_INFO("cupolas_cleanup: security dome shutdown complete");
 }
 
@@ -414,15 +419,15 @@ int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_mutex_lock(&g_cupolas.lock);
+    airy_mtx_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized || !g_cupolas.san) {
-        cupolas_mutex_unlock(&g_cupolas.lock);
+        airy_mtx_unlock(&g_cupolas.lock);
         CUPOLAS_LOG_ERROR("cupolas_sanitize_input: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
 
     sanitize_result_t result = sanitizer_sanitize(g_cupolas.san, input, output, output_size, NULL);
-    cupolas_mutex_unlock(&g_cupolas.lock);
+    airy_mtx_unlock(&g_cupolas.lock);
 
     if (g_cupolas.audit) {
         audit_logger_log(g_cupolas.audit, AUDIT_EVENT_SANITIZER, "system", "sanitize_input", input,
@@ -487,9 +492,9 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
         return cupolas_ERR_INVALID_PARAM;
     }
 
-    cupolas_mutex_lock(&g_cupolas.lock);
+    airy_mtx_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized) {
-        cupolas_mutex_unlock(&g_cupolas.lock);
+        airy_mtx_unlock(&g_cupolas.lock);
         CUPOLAS_LOG_ERROR("cupolas_execute_command: not initialized");
         return cupolas_ERR_STATE_ERROR;
     }
@@ -514,7 +519,7 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
             audit_logger_log(g_cupolas.audit, AUDIT_EVENT_WORKBENCH, "system", "execute_command",
                              command, "guard_block", cupolas_ERR_PERMISSION_DENIED);
         }
-        cupolas_mutex_unlock(&g_cupolas.lock);
+        airy_mtx_unlock(&g_cupolas.lock);
         return cupolas_ERR_PERMISSION_DENIED;
     }
 
@@ -524,7 +529,7 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
     if (!g_cupolas.wb) {
         g_cupolas.wb = workbench_create(&wbcfg);
         if (!g_cupolas.wb) {
-            cupolas_mutex_unlock(&g_cupolas.lock);
+            airy_mtx_unlock(&g_cupolas.lock);
             return cupolas_ERR_OUT_OF_MEMORY;
         }
     }
@@ -551,7 +556,7 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
                          command, NULL, ret);
     }
 
-    cupolas_mutex_unlock(&g_cupolas.lock);
+    airy_mtx_unlock(&g_cupolas.lock);
     return ret;
 }
 

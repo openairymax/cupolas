@@ -7,6 +7,7 @@
  *        (AES-256-CBC container format).
  */
 
+#include "airy_memory.h"
 #include "cupolas_vault_internal.h"
 
 int cupolas_vault_export(cupolas_vault_t *vault, const char *export_path, const char *password,

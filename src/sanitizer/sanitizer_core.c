@@ -6,9 +6,11 @@
  * @brief Input sanitizer core implementation.
  */
 
+#include "atomic_compat.h"
 #include "sanitizer.h"
 #include "sanitizer_cache.h"
 #include "sanitizer_rules.h"
+#include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 #include "airy_memory.h"
 
@@ -27,9 +29,9 @@
 struct sanitizer {
     sanitizer_rules_t *rules;
     sanitizer_cache_t *cache;
-    cupolas_rwlock_t lock;
-    cupolas_atomic64_t total_sanitized;
-    cupolas_atomic64_t total_rejected;
+    airy_rwlock_t lock;
+    atomic_int64_t total_sanitized;
+    atomic_int64_t total_rejected;
 };
 
 void sanitizer_default_context(sanitize_context_t *ctx)
@@ -48,29 +50,29 @@ void sanitizer_default_context(sanitize_context_t *ctx)
 
 sanitizer_t *sanitizer_create(const char *rules_path)
 {
-    sanitizer_t *san = (sanitizer_t *)cupolas_mem_alloc(sizeof(sanitizer_t));
+    sanitizer_t *san = (sanitizer_t *)AIRY_CALLOC(1, sizeof(sanitizer_t));
     if (!san)
         return NULL;
 
     __builtin_memset(san, 0, sizeof(sanitizer_t));
 
-    if (cupolas_rwlock_init(&san->lock) != cupolas_OK) {
-        cupolas_mem_free(san);
+    if (airy_rwlock_init(&san->lock) != cupolas_OK) {
+        AIRY_FREE(san);
         return NULL;
     }
 
     san->rules = sanitizer_rules_create(rules_path);
     if (!san->rules) {
-        cupolas_rwlock_destroy(&san->lock);
-        cupolas_mem_free(san);
+        airy_rwlock_destroy(&san->lock);
+        AIRY_FREE(san);
         return NULL;
     }
 
     san->cache = sanitizer_cache_create(1024);
     if (!san->cache) {
         sanitizer_rules_destroy(san->rules);
-        cupolas_rwlock_destroy(&san->lock);
-        cupolas_mem_free(san);
+        airy_rwlock_destroy(&san->lock);
+        AIRY_FREE(san);
         return NULL;
     }
 
@@ -82,7 +84,7 @@ void sanitizer_destroy(sanitizer_t *sanitizer)
     if (!sanitizer)
         return;
 
-    cupolas_rwlock_wrlock(&sanitizer->lock);
+    airy_rwlock_wrlock(&sanitizer->lock);
 
     if (sanitizer->rules) {
         sanitizer_rules_destroy(sanitizer->rules);
@@ -91,9 +93,9 @@ void sanitizer_destroy(sanitizer_t *sanitizer)
         sanitizer_cache_destroy(sanitizer->cache);
     }
 
-    cupolas_rwlock_unlock(&sanitizer->lock);
-    cupolas_rwlock_destroy(&sanitizer->lock);
-    cupolas_mem_free(sanitizer);
+    airy_rwlock_unlock(&sanitizer->lock);
+    airy_rwlock_destroy(&sanitizer->lock);
+    AIRY_FREE(sanitizer);
 }
 
 static bool is_html_danger(char c, const sanitize_context_t *ctx)
@@ -339,30 +341,30 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
 
     if (ctx->level >= SANITIZE_LEVEL_MAX) {
         AIRY_LOG_WARN("sanitizer_sanitize: rejected by MAX level - input_len=%zu", input_len);
-        cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+        atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
         return SANITIZE_REJECTED;
     }
 
     if (ctx->max_length > 0 && input_len > ctx->max_length) {
         AIRY_LOG_WARN("sanitizer_sanitize: input truncated/rejected - input_len=%zu, max_length=%zu",
                  input_len, ctx->max_length);
-        cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+        atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
         return SANITIZE_REJECTED;
     }
 
-    cupolas_rwlock_rdlock(&sanitizer->lock);
+    airy_rwlock_rdlock(&sanitizer->lock);
 
     bool cached = false;
     char *cached_output = sanitizer_cache_get(sanitizer->cache, input, ctx->level);
     if (cached_output) {
         AIRY_STRNCPY_TERM(output, cached_output, output_size);
-        cupolas_mem_free(cached_output);
+        AIRY_FREE(cached_output);
         cached = true;
     }
-    cupolas_rwlock_unlock(&sanitizer->lock);
+    airy_rwlock_unlock(&sanitizer->lock);
 
     if (cached) {
-        cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
+        atomic_fetch_add_64(&sanitizer->total_sanitized, 1, memory_order_seq_cst);
         return (strcmp(output, input) != 0) ? SANITIZE_MODIFIED : SANITIZE_OK;
     }
 
@@ -372,7 +374,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         if (!is_whitelisted(input)) {
             AIRY_LOG_WARN("sanitizer_sanitize: rejected by whitelist - input_len=%zu, level=%d",
                      input_len, (int)ctx->level);
-            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
             return SANITIZE_REJECTED;
         }
         AIRY_STRNCPY_TERM(output, input, output_size);
@@ -382,7 +384,7 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         if (escape_rules(input, output, output_size, ctx) != cupolas_OK) {
             AIRY_LOG_ERROR("sanitizer_sanitize: escape rules failed for input_len=%zu, output_size=%zu",
                       input_len, output_size);
-            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
             return SANITIZE_ERROR;
         }
     } else {
@@ -397,25 +399,25 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t *sanitizer, const char *input, 
         if (!tmp) {
             AIRY_LOG_ERROR("sanitizer_sanitize: rule buffer allocation failed - output_size=%zu",
                       output_size);
-            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
             return SANITIZE_ERROR;
         }
 
         int rrc = sanitizer_rules_apply(sanitizer->rules, output, tmp, output_size);
         if (rrc != cupolas_OK) {
             AIRY_FREE(tmp);
-            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
+            atomic_fetch_add_64(&sanitizer->total_rejected, 1, memory_order_seq_cst);
             return SANITIZE_REJECTED;
         }
         AIRY_STRNCPY_TERM(output, tmp, output_size);
         AIRY_FREE(tmp);
     }
 
-    cupolas_rwlock_wrlock(&sanitizer->lock);
+    airy_rwlock_wrlock(&sanitizer->lock);
     sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
-    cupolas_rwlock_unlock(&sanitizer->lock);
+    airy_rwlock_unlock(&sanitizer->lock);
 
-    cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
+    atomic_fetch_add_64(&sanitizer->total_sanitized, 1, memory_order_seq_cst);
     return (strcmp(output, input) != 0) ? SANITIZE_MODIFIED : SANITIZE_OK;
 }
 
@@ -647,13 +649,13 @@ int sanitizer_add_rule(sanitizer_t *sanitizer, const char *pattern, const char *
         return cupolas_ERROR_INVALID_ARG;
     }
 
-    cupolas_rwlock_wrlock(&sanitizer->lock);
+    airy_rwlock_wrlock(&sanitizer->lock);
     int ret = sanitizer_rules_add(sanitizer->rules, pattern, replacement);
     if (ret != cupolas_OK) {
         AIRY_LOG_ERROR("sanitizer_add_rule: pattern matching error - pattern=%s, ret=%d", pattern, ret);
     }
     sanitizer_cache_clear(sanitizer->cache);
-    cupolas_rwlock_unlock(&sanitizer->lock);
+    airy_rwlock_unlock(&sanitizer->lock);
 
     return ret;
 }
@@ -663,8 +665,8 @@ void sanitizer_clear_rules(sanitizer_t *sanitizer)
     if (!sanitizer)
         return;
 
-    cupolas_rwlock_wrlock(&sanitizer->lock);
+    airy_rwlock_wrlock(&sanitizer->lock);
     sanitizer_rules_clear(sanitizer->rules);
     sanitizer_cache_clear(sanitizer->cache);
-    cupolas_rwlock_unlock(&sanitizer->lock);
+    airy_rwlock_unlock(&sanitizer->lock);
 }

@@ -8,7 +8,7 @@
 
 #include "cupolas_signature.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "cupolas_error.h"
 #include "airy_memory.h"
 #include "utils/cupolas_utils.h"
@@ -48,7 +48,7 @@ static struct {
     trusted_signer_t *trusted_signers;
     size_t trusted_count;
     size_t trusted_capacity;
-    cupolas_rwlock_t lock;
+    airy_rwlock_t lock;
 } g_sig_ctx = {0};
 
 int cupolas_signature_init(const cupolas_sig_config_t *config)
@@ -71,7 +71,7 @@ int cupolas_signature_init(const cupolas_sig_config_t *config)
         g_sig_ctx.config.crl_path = getenv("AIRY_CRL_PATH");
     }
 
-    cupolas_rwlock_init(&g_sig_ctx.lock);
+    airy_rwlock_init(&g_sig_ctx.lock);
 
 #ifdef CUPOLAS_USE_OPENSSL
     OpenSSL_add_all_algorithms();
@@ -88,7 +88,7 @@ void cupolas_signature_cleanup(void)
         return;
     }
 
-    cupolas_rwlock_wrlock(&g_sig_ctx.lock);
+    airy_rwlock_wrlock(&g_sig_ctx.lock);
 
     if (g_sig_ctx.trusted_signers) {
         for (size_t i = 0; i < g_sig_ctx.trusted_count; i++) {
@@ -98,8 +98,8 @@ void cupolas_signature_cleanup(void)
         AIRY_FREE(g_sig_ctx.trusted_signers);
     }
 
-    cupolas_rwlock_unlock(&g_sig_ctx.lock);
-    cupolas_rwlock_destroy(&g_sig_ctx.lock);
+    airy_rwlock_unlock(&g_sig_ctx.lock);
+    airy_rwlock_destroy(&g_sig_ctx.lock);
 
 #ifdef CUPOLAS_USE_OPENSSL
     EVP_cleanup();
@@ -164,7 +164,7 @@ int cupolas_signature_verify_file(const char *file_path, const char *expected_si
     }
 
     if (expected_signer) {
-        cupolas_rwlock_rdlock(&g_sig_ctx.lock);
+        airy_rwlock_rdlock(&g_sig_ctx.lock);
         bool found = false;
         for (size_t i = 0; i < g_sig_ctx.trusted_count; i++) {
             if (strcmp(g_sig_ctx.trusted_signers[i].signer_cn, expected_signer) == 0) {
@@ -172,7 +172,7 @@ int cupolas_signature_verify_file(const char *file_path, const char *expected_si
                 break;
             }
         }
-        cupolas_rwlock_unlock(&g_sig_ctx.lock);
+        airy_rwlock_unlock(&g_sig_ctx.lock);
 
         if (!found) {
             *result = CUPOLAS_SIG_UNTRUSTED;
@@ -352,7 +352,7 @@ bool cupolas_signature_is_trusted_signer(const char *signer_cn)
         return false;
     }
 
-    cupolas_rwlock_rdlock(&g_sig_ctx.lock);
+    airy_rwlock_rdlock(&g_sig_ctx.lock);
     bool found = false;
     for (size_t i = 0; i < g_sig_ctx.trusted_count; i++) {
         if (strcmp(g_sig_ctx.trusted_signers[i].signer_cn, signer_cn) == 0) {
@@ -360,7 +360,7 @@ bool cupolas_signature_is_trusted_signer(const char *signer_cn)
             break;
         }
     }
-    cupolas_rwlock_unlock(&g_sig_ctx.lock);
+    airy_rwlock_unlock(&g_sig_ctx.lock);
 
     return found;
 }
@@ -371,14 +371,14 @@ int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *publ
         return CUPOLAS_SIG_INVALID;
     }
 
-    cupolas_rwlock_wrlock(&g_sig_ctx.lock);
+    airy_rwlock_wrlock(&g_sig_ctx.lock);
 
     if (g_sig_ctx.trusted_count >= g_sig_ctx.trusted_capacity) {
         size_t new_capacity = g_sig_ctx.trusted_capacity == 0 ? 16 : g_sig_ctx.trusted_capacity * 2;
         trusted_signer_t *new_signers =
             AIRY_REALLOC(g_sig_ctx.trusted_signers, new_capacity * sizeof(trusted_signer_t));
         if (!new_signers) {
-            cupolas_rwlock_unlock(&g_sig_ctx.lock);
+            airy_rwlock_unlock(&g_sig_ctx.lock);
             return CUPOLAS_SIG_INVALID;
         }
         g_sig_ctx.trusted_signers = new_signers;
@@ -392,7 +392,7 @@ int cupolas_signature_add_trusted_signer(const char *signer_cn, const char *publ
 
     g_sig_ctx.trusted_count++;
 
-    cupolas_rwlock_unlock(&g_sig_ctx.lock);
+    airy_rwlock_unlock(&g_sig_ctx.lock);
     return 0;
 }
 

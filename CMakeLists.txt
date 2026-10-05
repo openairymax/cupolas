@@ -44,14 +44,6 @@ endif()
 
 set(CUPOLAS_SOURCES
     src/cupolas.c
-    # cupolas platform 按功能域拆分：同步原语/进程与管道/时间/文件系统/内存与原子/错误与字符串
-    src/platform/platform.c
-    src/platform/platform_process.c
-    src/platform/platform_time.c
-    src/platform/platform_fs.c
-    src/platform/platform_mem.c
-    src/platform/platform_util.c
-    src/platform/sandbox.c
     src/utils/cupolas_utils.c
     src/cupolas_metrics.c
     src/cupolas_config.c
@@ -126,8 +118,6 @@ set(CUPOLAS_HEADERS
     src/cupolas_config.h
     src/cupolas_monitoring.h
     src/cupolas_monitoring_internal.h
-    src/platform/platform.h
-    src/platform/sandbox.h
     src/permission/permission.h
     src/permission/permission_engine.h
     src/permission/permission_rule.h
@@ -140,7 +130,6 @@ set(CUPOLAS_HEADERS
     src/sanitizer/sanitizer_rules.h
     src/sanitizer/sanitizer_cache.h
     src/workbench/workbench.h
-    src/workbench/workbench_process.h
     src/workbench/workbench_limits.h
     src/security/cupolas_signature.h
     src/security/cupolas_vault.h

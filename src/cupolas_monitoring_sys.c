@@ -16,11 +16,12 @@
  * - 监控启停（线程生命周期管理）
  */
 
+#include "platform.h"
 #include "cupolas_monitoring_internal.h"
 
 #include "cupolas_metrics.h"
 
-#include "platform/platform.h"
+#include "platform.h"
 #include "utils/cupolas_utils.h"
 #include "error.h"
 
@@ -28,7 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
 #include <psapi.h>
 #include <windows.h>
 #else
@@ -112,7 +113,7 @@ static int get_thread_count(void)
 
 #else
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
 static uint64_t get_process_rss_bytes(void)
 {
     PROCESS_MEMORY_COUNTERS_EX pmc;
@@ -169,7 +170,7 @@ static void *collector_thread_func(void *arg)
         metrics_gauge_set(METRIC_THREAD_COUNT, NULL, (double)get_thread_count());
 
         for (uint32_t i = 0; i < mgr->collect_interval_ms / 100 && mgr->collector_running; i++) {
-            cupolas_sleep_ms(100);
+            airy_sleep_ms(100);
         }
     }
 
@@ -181,15 +182,15 @@ static void *reporter_thread_func(void *arg)
     cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)arg;
 
     while (mgr->reporter_running) {
-        cupolas_sleep_ms(mgr->collect_interval_ms * 2);
+        airy_sleep_ms(mgr->collect_interval_ms * 2);
 
-        cupolas_rwlock_wrlock(&mgr->lock);
+        airy_rwlock_wrlock(&mgr->lock);
 
         metrics_export_prometheus(mgr->metrics_buffer, sizeof(mgr->metrics_buffer) - 1);
         mgr->metrics_buffer_size = strlen(mgr->metrics_buffer);
         mgr->last_report_time = metrics_get_timestamp_ns();
 
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
     }
 
     return NULL;
@@ -200,10 +201,10 @@ int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
     if (!mgr)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
 
     if (mgr->status == MONITORING_STATUS_RUNNING) {
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
         return 0;
     }
 
@@ -234,7 +235,7 @@ int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
     metrics_register(&thread_desc);
 
     mgr->collector_running = true;
-    int ret = cupolas_thread_create(&mgr->collector_thread, collector_thread_func, mgr);
+    int ret = airy_platform_thread_create(&mgr->collector_thread, collector_thread_func, mgr);
     if (ret != 0) {
         CUPOLAS_LOG_ERROR("monitoring: failed to create collector thread");
         mgr->collector_running = false;
@@ -242,7 +243,7 @@ int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
 
     if (mgr->manager.backend == MONITORING_BACKEND_PROMETHEUS ||
         mgr->manager.backend == MONITORING_BACKEND_ALL) {
-        ret = cupolas_thread_create(&mgr->reporter_thread, reporter_thread_func, mgr);
+        ret = airy_platform_thread_create(&mgr->reporter_thread, reporter_thread_func, mgr);
         if (ret != 0) {
             CUPOLAS_LOG_ERROR("monitoring: failed to create reporter thread");
         }
@@ -250,7 +251,7 @@ int cupolas_monitoring_start(cupolas_monitoring_t *mgr)
 
     mgr->status = MONITORING_STATUS_RUNNING;
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     CUPOLAS_LOG("monitoring: started (collect_ms=%u)", mgr->collect_interval_ms);
 
@@ -262,10 +263,10 @@ void cupolas_monitoring_stop(cupolas_monitoring_t *mgr)
     if (!mgr)
         return;
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
 
     if (mgr->status != MONITORING_STATUS_RUNNING && mgr->status != MONITORING_STATUS_STARTING) {
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
         return;
     }
 
@@ -274,19 +275,19 @@ void cupolas_monitoring_stop(cupolas_monitoring_t *mgr)
 
     mgr->collector_running = false;
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     void *retval = NULL;
-    cupolas_thread_join(mgr->reporter_thread, &retval);
+    airy_platform_thread_join(mgr->reporter_thread, &retval);
 
-    cupolas_thread_join(mgr->collector_thread, &retval);
+    airy_platform_thread_join(mgr->collector_thread, &retval);
     (void)retval;
 
     metrics_shutdown();
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
     mgr->status = MONITORING_STATUS_STOPPED;
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     CUPOLAS_LOG("monitoring: stopped");
 }
