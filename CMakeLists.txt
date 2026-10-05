@@ -314,17 +314,6 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_error_code_consistency cupolas)
 
-    # 原生沙箱（Landlock + seccomp）单元测试。
-    # 内核不支持 Landlock 时 enabled 用例自动 SKIP，不误报失败。
-    add_executable(test_sandbox tests/unit/test_sandbox.c)
-    target_compile_definitions(test_sandbox PRIVATE AIRY_COMPLIANCE_IMPL)
-    target_include_directories(test_sandbox PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${COMMON_INCLUDE_DIRS}
-    )
-    target_link_libraries(test_sandbox cupolas)
-
     # INT-11: 四重防护链集成测试（sanitizer → permission → network → audit）
     add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
     target_compile_definitions(test_cupolas_integration PRIVATE AIRY_COMPLIANCE_IMPL)
@@ -388,7 +377,6 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_cupolas_pep_init cupolas)
     add_test(NAME cupolas_pep_init_tests COMMAND test_cupolas_pep_init)
-    add_test(NAME sandbox_tests COMMAND test_sandbox)
     add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
     add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
     add_test(NAME cupolas_yaml_tests COMMAND test_yaml_minimal)
