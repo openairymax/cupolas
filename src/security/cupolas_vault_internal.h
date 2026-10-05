@@ -14,7 +14,7 @@
 #include "cupolas.h"
 #include "cupolas_vault.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "atomic_compat.h"
 #include "cupolas_error.h"
 #include "logging.h"
@@ -67,14 +67,14 @@ struct cupolas_vault {
     credential_entry_t *entries;
     size_t entry_count;
     size_t entry_capacity;
-    cupolas_rwlock_t lock;
+    airy_rwlock_t lock;
     cupolas_vault_config_t config;
 };
 
 typedef struct {
     atomic_int initialized;
     cupolas_vault_config_t default_config;
-    cupolas_rwlock_t global_lock;
+    airy_rwlock_t global_lock;
 } vault_global_ctx_t;
 
 credential_entry_t *find_entry(cupolas_vault_t *vault, const char *cred_id);

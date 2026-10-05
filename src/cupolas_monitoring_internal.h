@@ -18,9 +18,10 @@
 #ifndef CUPOLAS_MONITORING_INTERNAL_H
 #define CUPOLAS_MONITORING_INTERNAL_H
 
+#include "platform.h"
 #include "cupolas_monitoring.h"
 
-#include "platform/platform.h"
+#include "platform.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -43,7 +44,7 @@ struct cupolas_monitoring {
     monitoring_config_t manager;
     monitoring_status_t status;
 
-    cupolas_rwlock_t lock;
+    airy_rwlock_t lock;
 
     char metrics_buffer[MAX_METRICS_BUFFER];
     size_t metrics_buffer_size;
@@ -56,10 +57,10 @@ struct cupolas_monitoring {
     char exclude_patterns[MAX_FILTER_PATTERNS][MAX_PATTERN_LEN];
     size_t exclude_count;
 
-    cupolas_thread_t reporter_thread;
+    airy_thread_t reporter_thread;
     bool reporter_running;
 
-    cupolas_thread_t collector_thread;
+    airy_thread_t collector_thread;
     bool collector_running;
     uint32_t collect_interval_ms;
 

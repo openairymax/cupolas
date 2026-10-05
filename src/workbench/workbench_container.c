@@ -24,16 +24,16 @@
 
 #include "workbench_container.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
+#include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 
-#include <platform.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/types.h>
@@ -146,7 +146,7 @@ void container_config_init(container_config_t *manager)
 void *container_manager_create(const container_config_t *manager)
 {
     container_handle_t *handle =
-        (container_handle_t *)cupolas_mem_alloc(sizeof(container_handle_t));
+        (container_handle_t *)AIRY_CALLOC(1, sizeof(container_handle_t));
     if (!handle) {
         return NULL;
     }
@@ -187,7 +187,7 @@ void container_manager_destroy(void *mgr)
 
     container_remove(mgr);
 
-    cupolas_mem_free(handle);
+    AIRY_FREE(handle);
 }
 
 /**
@@ -615,10 +615,10 @@ void container_result_free(container_result_t *result)
         return;
 
     if (result->stdout_data) {
-        cupolas_mem_free(result->stdout_data);
+        AIRY_FREE(result->stdout_data);
     }
     if (result->stderr_data) {
-        cupolas_mem_free(result->stderr_data);
+        AIRY_FREE(result->stderr_data);
     }
 
     __builtin_memset(result, 0, sizeof(container_result_t));

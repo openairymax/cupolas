@@ -9,7 +9,8 @@
 #ifndef CUPOLAS_AUDIT_QUEUE_H
 #define CUPOLAS_AUDIT_QUEUE_H
 
-#include "../platform/platform.h"
+#include "atomic_compat.h"
+#include "platform.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -66,12 +67,12 @@ typedef struct audit_queue {
     audit_entry_t *tail; /**< Queue tail (for push operations) */
     size_t size; /**< Current number of entries */
     size_t max_size; /**< Maximum capacity (0 = unlimited) */
-    cupolas_mutex_t lock; /**< Mutex for thread safety */
-    cupolas_cond_t not_empty; /**< Condition: queue not empty */
-    cupolas_cond_t not_full; /**< Condition: queue not full */
+    airy_mtx_t lock; /**< Mutex for thread safety */
+    airy_cond_t not_empty; /**< Condition: queue not empty */
+    airy_cond_t not_full; /**< Condition: queue not full */
     bool shutdown; /**< Shutdown flag */
-    cupolas_atomic64_t total_pushed; /**< Total entries pushed */
-    cupolas_atomic64_t total_popped; /**< Total entries popped */
+    atomic_int64_t total_pushed; /**< Total entries pushed */
+    atomic_int64_t total_popped; /**< Total entries popped */
 } audit_queue_t;
 
 /**

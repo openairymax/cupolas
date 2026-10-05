@@ -9,7 +9,8 @@
 #ifndef CUPOLAS_PERMISSION_CACHE_H
 #define CUPOLAS_PERMISSION_CACHE_H
 
-#include "../platform/platform.h"
+#include "atomic_compat.h"
+#include "platform.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -53,9 +54,9 @@ typedef struct cache_manager {
     size_t capacity; /**< Maximum number of entries */
     size_t size; /**< Current number of entries */
     uint32_t ttl_ms; /**< Time-to-live in milliseconds (0=permanent) */
-    cupolas_mutex_t lock; /**< Mutex for thread safety */
-    cupolas_atomic64_t hit_count; /**< Cache hit counter */
-    cupolas_atomic64_t miss_count; /**< Cache miss counter */
+    airy_mtx_t lock; /**< Mutex for thread safety */
+    atomic_int64_t hit_count; /**< Cache hit counter */
+    atomic_int64_t miss_count; /**< Cache miss counter */
 } cache_manager_t;
 
 /**

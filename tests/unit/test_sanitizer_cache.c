@@ -6,6 +6,7 @@
  * test_sanitizer_cache.c - Sanitizer Cache with LRU Unit Tests
  */
 
+#include "airy_memory.h"
 #include "sanitizer_cache.h"
 
 #include <assert.h>
@@ -35,7 +36,7 @@ static void test_cache_put_get(void)
     char *result = sanitizer_cache_get(cache, "input1", SANITIZE_LEVEL_MEDIUM);
     assert(result != NULL);
     assert(strcmp(result, "output1") == 0);
-    cupolas_mem_free(result);
+    AIRY_FREE(result);
 
     sanitizer_cache_destroy(cache);
     printf("PASS\n");
@@ -55,7 +56,7 @@ static void test_cache_lru_eviction(void)
     char *r1 = sanitizer_cache_get(cache, "key1", SANITIZE_LEVEL_MEDIUM);
     assert(r1 != NULL);
     assert(strcmp(r1, "val1") == 0);
-    cupolas_mem_free(r1);
+    AIRY_FREE(r1);
 
     sanitizer_cache_put(cache, "key4", "val4", SANITIZE_LEVEL_MEDIUM);
 
@@ -65,12 +66,12 @@ static void test_cache_lru_eviction(void)
     char *r3 = sanitizer_cache_get(cache, "key1", SANITIZE_LEVEL_MEDIUM);
     assert(r3 != NULL);
     assert(strcmp(r3, "val1") == 0);
-    cupolas_mem_free(r3);
+    AIRY_FREE(r3);
 
     char *r4 = sanitizer_cache_get(cache, "key4", SANITIZE_LEVEL_MEDIUM);
     assert(r4 != NULL);
     assert(strcmp(r4, "val4") == 0);
-    cupolas_mem_free(r4);
+    AIRY_FREE(r4);
 
     sanitizer_cache_destroy(cache);
     printf("PASS\n");
@@ -89,7 +90,7 @@ static void test_cache_update_existing(void)
     char *result = sanitizer_cache_get(cache, "key1", SANITIZE_LEVEL_MEDIUM);
     assert(result != NULL);
     assert(strcmp(result, "val1_updated") == 0);
-    cupolas_mem_free(result);
+    AIRY_FREE(result);
 
     sanitizer_cache_destroy(cache);
     printf("PASS\n");
@@ -128,17 +129,17 @@ static void test_cache_different_levels(void)
     char *r1 = sanitizer_cache_get(cache, "input", SANITIZE_LEVEL_HIGH);
     assert(r1 != NULL);
     assert(strcmp(r1, "output_high") == 0);
-    cupolas_mem_free(r1);
+    AIRY_FREE(r1);
 
     char *r2 = sanitizer_cache_get(cache, "input", SANITIZE_LEVEL_MEDIUM);
     assert(r2 != NULL);
     assert(strcmp(r2, "output_medium") == 0);
-    cupolas_mem_free(r2);
+    AIRY_FREE(r2);
 
     char *r3 = sanitizer_cache_get(cache, "input", SANITIZE_LEVEL_LOW);
     assert(r3 != NULL);
     assert(strcmp(r3, "output_low") == 0);
-    cupolas_mem_free(r3);
+    AIRY_FREE(r3);
 
     sanitizer_cache_destroy(cache);
     printf("PASS\n");

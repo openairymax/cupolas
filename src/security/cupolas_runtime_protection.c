@@ -16,10 +16,11 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
 #include "cupolas_runtime_protection.h"
 #include "cupolas_runtime_protection_internal.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "atomic_compat.h"
 #include "airy_memory.h"
 #include "string_compat.h"
@@ -62,7 +63,7 @@ uint32_t cupolas_rtp_get_tid(void)
 void cupolas_record_violation(cupolas_violation_type_t type, const char *details,
                               const char *syscall_name)
 {
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
 
     if (g_runtime_prot.violations.count >= CUPOLAS_MAX_VIOLATION_HISTORY) {
         g_runtime_prot.violations.head =
@@ -77,26 +78,26 @@ void cupolas_record_violation(cupolas_violation_type_t type, const char *details
 
     cupolas_violation_event_t *event = &g_runtime_prot.violations.events[idx];
     event->type = type;
-    event->timestamp = cupolas_time_ms();
+    event->timestamp = airy_time_wall_ms();
     event->pid = cupolas_rtp_get_pid();
     event->tid = cupolas_rtp_get_tid();
     if (event->details) {
         AIRY_FREE(event->details);
         event->details = NULL;
     }
-    event->details = details ? cupolas_strdup(details) : NULL;
+    event->details = details ? AIRY_STRDUP(details) : NULL;
     if (event->syscall_name) {
         AIRY_FREE(event->syscall_name);
         event->syscall_name = NULL;
     }
-    event->syscall_name = syscall_name ? cupolas_strdup(syscall_name) : NULL;
+    event->syscall_name = syscall_name ? AIRY_STRDUP(syscall_name) : NULL;
     event->fault_address = NULL;
     event->error_code = 0;
 
     g_runtime_prot.stats.violations_detected++;
 
     void (*cb)(const cupolas_violation_event_t *) = g_runtime_prot.violation_callback;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
 
     if (cb) {
         cb(event);
@@ -112,7 +113,7 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t *manager
     if (atomic_compare_exchange_strong(&g_runtime_prot.initialized, &expected, RTP_INIT_PROGRESS)) {
         AIRY_MEMSET(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 
-        cupolas_mutex_init(&g_runtime_prot.lock);
+        airy_mtx_init(&g_runtime_prot.lock);
 
         if (manager) {
             g_runtime_prot.manager = *manager;
@@ -157,7 +158,7 @@ void cupolas_runtime_protect_cleanup(void)
         AIRY_FREE(g_runtime_prot.violations.events[i].syscall_name);
     }
 
-    CUPOLAS_MUTEX_DESTROY(&g_runtime_prot.lock);
+    airy_mtx_destroy(&g_runtime_prot.lock);
 
     AIRY_MEMSET(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 }
@@ -169,9 +170,9 @@ int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *manag
         if (result != 0)
             return result;
     } else if (manager) {
-        cupolas_mutex_lock(&g_runtime_prot.lock);
+        airy_mtx_lock(&g_runtime_prot.lock);
         g_runtime_prot.manager = *manager;
-        cupolas_mutex_unlock(&g_runtime_prot.lock);
+        airy_mtx_unlock(&g_runtime_prot.lock);
     }
 
     if (g_runtime_prot.manager.memory.enable_dep || g_runtime_prot.manager.memory.enable_aslr) {
@@ -199,9 +200,9 @@ int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t *manag
             return result;
     }
 
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_ACTIVE;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
     return 0;
 }
 
@@ -210,17 +211,17 @@ int cupolas_runtime_protect_disable(void)
     if (atomic_load(&g_runtime_prot.initialized) != RTP_INIT_COMPLETE)
         return AIRY_EINVAL;
 
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_INACTIVE;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
     return 0;
 }
 
 cupolas_protection_status_t cupolas_runtime_protect_get_status(void)
 {
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     cupolas_protection_status_t status = g_runtime_prot.status;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
     return status;
 }
 
@@ -228,9 +229,9 @@ int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t *manager
 {
     if (!manager)
         return AIRY_EINVAL;
-    cupolas_mutex_lock(&g_runtime_prot.lock);
+    airy_mtx_lock(&g_runtime_prot.lock);
     *manager = g_runtime_prot.manager;
-    cupolas_mutex_unlock(&g_runtime_prot.lock);
+    airy_mtx_unlock(&g_runtime_prot.lock);
     return 0;
 }
 
@@ -330,7 +331,7 @@ int cupolas_protection_get_capabilities(char ***capabilities, size_t *count)
     SAFE_MALLOC_ARRAY(*capabilities, *count, sizeof(char *));
 
     for (size_t i = 0; i < *count; i++) {
-        (*capabilities)[i] = cupolas_strdup(caps[i]);
+        (*capabilities)[i] = AIRY_STRDUP(caps[i]);
     }
 
     return 0;

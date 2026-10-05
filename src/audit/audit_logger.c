@@ -6,9 +6,12 @@
  * @brief Audit logger implementation.
  */
 
+#include "platform.h"
+#include "atomic_compat.h"
 #include "audit.h"
 #include "audit_queue.h"
 #include "audit_rotator.h"
+#include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 
 #include "memory_prealloc.h"
@@ -33,7 +36,7 @@
 #define AUDIT_OOM_PREALLOC_EVENTS 64
 
 static char g_last_hash[65] = "0000000000000000000000000000000000000000000000000000000000000000";
-static cupolas_mutex_t g_hash_chain_lock;
+static airy_mtx_t g_hash_chain_lock;
 
 /* ============================================================================
  * SEC-13.2: preallocated OOM audit-event pool.
@@ -49,7 +52,7 @@ static size_t g_audit_oom_write_index = 0;
 
 static size_t g_audit_oom_used_count = 0;
 
-static cupolas_mutex_t g_audit_oom_lock;
+static airy_mtx_t g_audit_oom_lock;
 
 static bool g_audit_oom_initialized = false;
 
@@ -67,7 +70,7 @@ static void audit_oom_pool_init(void)
         return;
     }
 
-    cupolas_mutex_init(&g_audit_oom_lock);
+    airy_mtx_init(&g_audit_oom_lock);
     __builtin_memset(g_audit_oom_entries, 0, sizeof(g_audit_oom_entries));
     g_audit_oom_write_index = 0;
     g_audit_oom_used_count = 0;
@@ -88,14 +91,14 @@ static audit_entry_t *audit_oom_pool_alloc(void)
         return NULL;
     }
 
-    cupolas_mutex_lock(&g_audit_oom_lock);
+    airy_mtx_lock(&g_audit_oom_lock);
 
     if (g_audit_oom_used_count >= AUDIT_OOM_PREALLOC_EVENTS) {
 
         audit_entry_t *entry = &g_audit_oom_entries[g_audit_oom_write_index];
         __builtin_memset(entry, 0, sizeof(audit_entry_t));
         g_audit_oom_write_index = (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
-        cupolas_mutex_unlock(&g_audit_oom_lock);
+        airy_mtx_unlock(&g_audit_oom_lock);
         return entry;
     }
 
@@ -104,7 +107,7 @@ static audit_entry_t *audit_oom_pool_alloc(void)
     g_audit_oom_write_index = (g_audit_oom_write_index + 1) % AUDIT_OOM_PREALLOC_EVENTS;
     g_audit_oom_used_count++;
 
-    cupolas_mutex_unlock(&g_audit_oom_lock);
+    airy_mtx_unlock(&g_audit_oom_lock);
     return entry;
 }
 #pragma GCC diagnostic pop
@@ -175,10 +178,10 @@ static void audit_compute_chain_hash(const audit_entry_t *entry, const char *pre
 struct audit_logger {
     audit_queue_t *queue;
     audit_rotator_t *rotator;
-    cupolas_thread_t writer_thread;
-    cupolas_atomic32_t running;
-    cupolas_atomic64_t total_logged;
-    cupolas_atomic64_t total_failed;
+    airy_thread_t writer_thread;
+    atomic_int running;
+    atomic_int64_t total_logged;
+    atomic_int64_t total_failed;
     char *log_dir;
     char *log_prefix;
     size_t max_file_size;
@@ -190,7 +193,7 @@ static void *audit_writer_thread(void *arg)
     audit_logger_t *logger = (audit_logger_t *)arg;
     audit_entry_t *batch[DEFAULT_BATCH_SIZE];
 
-    while (cupolas_atomic_load32(&logger->running)) {
+    while (atomic_load_32(&logger->running, memory_order_seq_cst)) {
         size_t actual_count = 0;
         int ret =
             audit_queue_timed_pop(logger->queue, &batch[actual_count], DEFAULT_FLUSH_INTERVAL_MS);
@@ -204,13 +207,13 @@ static void *audit_writer_thread(void *arg)
             }
             for (size_t i = 0; i < actual_count; i++) {
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
-                    cupolas_atomic_add64(&logger->total_logged, 1);
+                    atomic_fetch_add_64(&logger->total_logged, 1, memory_order_seq_cst);
                 } else {
                     AIRY_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed, entry_type=%d, "
                               "total_failed=%llu",
                               (int)batch[i]->type,
-                              (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
-                    cupolas_atomic_add64(&logger->total_failed, 1);
+                              (unsigned long long)atomic_load_64(&logger->total_failed, memory_order_seq_cst) + 1);
+                    atomic_fetch_add_64(&logger->total_failed, 1, memory_order_seq_cst);
                 }
                 audit_entry_destroy(batch[i]);
             }
@@ -222,12 +225,12 @@ static void *audit_writer_thread(void *arg)
         audit_entry_t *entry = NULL;
         if (audit_queue_try_pop(logger->queue, &entry) == cupolas_OK) {
             if (audit_rotator_write(logger->rotator, entry) == cupolas_OK) {
-                cupolas_atomic_add64(&logger->total_logged, 1);
+                atomic_fetch_add_64(&logger->total_logged, 1, memory_order_seq_cst);
             } else {
                 AIRY_LOG_ERROR("[CRITICAL] audit_writer_thread: audit write failed during shutdown, "
                           "total_failed=%llu",
-                          (unsigned long long)cupolas_atomic_load64(&logger->total_failed) + 1);
-                cupolas_atomic_add64(&logger->total_failed, 1);
+                          (unsigned long long)atomic_load_64(&logger->total_failed, memory_order_seq_cst) + 1);
+                atomic_fetch_add_64(&logger->total_failed, 1, memory_order_seq_cst);
             }
             audit_entry_destroy(entry);
         }
@@ -270,9 +273,9 @@ static void audit_logger_restore_last_hash(audit_logger_t *logger)
     fclose(f);
 
     if (last_hash[0]) {
-        cupolas_mutex_lock(&g_hash_chain_lock);
+        airy_mtx_lock(&g_hash_chain_lock);
         __builtin_memcpy(g_last_hash, last_hash, sizeof(g_last_hash));
-        cupolas_mutex_unlock(&g_hash_chain_lock);
+        airy_mtx_unlock(&g_hash_chain_lock);
     }
 }
 
@@ -280,26 +283,26 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
                                     size_t max_file_size, int max_files)
 {
 
-    static cupolas_atomic32_t hash_lock_inited = {0};
-    if (cupolas_atomic_load32(&hash_lock_inited) == 0) {
-        cupolas_mutex_init(&g_hash_chain_lock);
-        cupolas_atomic_store32(&hash_lock_inited, 1);
+    static atomic_int hash_lock_inited = {0};
+    if (atomic_load_32(&hash_lock_inited, memory_order_seq_cst) == 0) {
+        airy_mtx_init(&g_hash_chain_lock);
+        atomic_store_32(&hash_lock_inited, 1, memory_order_seq_cst);
     }
 
-    audit_logger_t *logger = (audit_logger_t *)cupolas_mem_alloc(sizeof(audit_logger_t));
+    audit_logger_t *logger = (audit_logger_t *)AIRY_CALLOC(1, sizeof(audit_logger_t));
     if (!logger)
         return NULL;
 
     __builtin_memset(logger, 0, sizeof(audit_logger_t));
 
     if (log_dir) {
-        logger->log_dir = cupolas_strdup(log_dir);
+        logger->log_dir = AIRY_STRDUP(log_dir);
         if (!logger->log_dir)
             goto error;
     }
 
     if (log_prefix) {
-        logger->log_prefix = cupolas_strdup(log_prefix);
+        logger->log_prefix = AIRY_STRDUP(log_prefix);
         if (!logger->log_prefix)
             goto error;
     }
@@ -317,9 +320,9 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
 
     audit_logger_restore_last_hash(logger);
 
-    cupolas_atomic_store32(&logger->running, 1);
+    atomic_store_32(&logger->running, 1, memory_order_seq_cst);
 
-    if (cupolas_thread_create(&logger->writer_thread, audit_writer_thread, logger) != cupolas_OK) {
+    if (airy_platform_thread_create(&logger->writer_thread, audit_writer_thread, logger) != cupolas_OK) {
         goto error;
     }
 
@@ -330,9 +333,9 @@ error:
         audit_queue_destroy(logger->queue);
     if (logger->rotator)
         audit_rotator_destroy(logger->rotator);
-    cupolas_mem_free(logger->log_dir);
-    cupolas_mem_free(logger->log_prefix);
-    cupolas_mem_free(logger);
+    AIRY_FREE(logger->log_dir);
+    AIRY_FREE(logger->log_prefix);
+    AIRY_FREE(logger);
     return NULL;
 }
 
@@ -341,16 +344,16 @@ void audit_logger_destroy(audit_logger_t *logger)
     if (!logger)
         return;
 
-    cupolas_atomic_store32(&logger->running, 0);
+    atomic_store_32(&logger->running, 0, memory_order_seq_cst);
     audit_queue_shutdown(logger->queue, false);
-    cupolas_thread_join(logger->writer_thread, NULL);
+    airy_platform_thread_join(logger->writer_thread, NULL);
 
     audit_queue_destroy(logger->queue);
     audit_rotator_destroy(logger->rotator);
 
-    cupolas_mem_free(logger->log_dir);
-    cupolas_mem_free(logger->log_prefix);
-    cupolas_mem_free(logger);
+    AIRY_FREE(logger->log_dir);
+    AIRY_FREE(logger->log_prefix);
+    AIRY_FREE(logger);
 }
 
 int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char *agent_id,
@@ -397,11 +400,11 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
         return cupolas_ERROR_NO_MEMORY;
     }
 
-    cupolas_mutex_lock(&g_hash_chain_lock);
+    airy_mtx_lock(&g_hash_chain_lock);
     __builtin_memcpy(entry->prev_hash, g_last_hash, sizeof(entry->prev_hash));
     audit_compute_chain_hash(entry, g_last_hash, entry->curr_hash);
     __builtin_memcpy(g_last_hash, entry->curr_hash, sizeof(g_last_hash));
-    cupolas_mutex_unlock(&g_hash_chain_lock);
+    airy_mtx_unlock(&g_hash_chain_lock);
 
     int ret = audit_queue_try_push(logger->queue, entry);
     if (ret != cupolas_OK) {
@@ -409,7 +412,7 @@ int audit_logger_log(audit_logger_t *logger, audit_event_type_t type, const char
                   "type=%d, agent_id=%s, action=%s, ret=%d",
                   (int)type, agent_id ? agent_id : "(null)", action ? action : "(null)", ret);
         audit_entry_destroy(entry);
-        cupolas_atomic_add64(&logger->total_failed, 1);
+        atomic_fetch_add_64(&logger->total_failed, 1, memory_order_seq_cst);
     }
 
     return ret;
@@ -506,7 +509,7 @@ void audit_logger_flush(audit_logger_t *logger)
         return;
 
     while (audit_queue_size(logger->queue) > 0) {
-        cupolas_sleep_ms(10);
+        airy_sleep_ms(10);
     }
 }
 
@@ -521,7 +524,7 @@ void audit_logger_stats(audit_logger_t *logger, uint64_t *total_logged, uint64_t
     }
 
     if (total_logged)
-        *total_logged = cupolas_atomic_load64(&logger->total_logged);
+        *total_logged = atomic_load_64(&logger->total_logged, memory_order_seq_cst);
     if (total_failed)
-        *total_failed = cupolas_atomic_load64(&logger->total_failed);
+        *total_failed = atomic_load_64(&logger->total_failed, memory_order_seq_cst);
 }

@@ -12,7 +12,9 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
 #include "sanitizer_cache.h"
+#include "security/cupolas_error.h"
 
 #include "utils/cupolas_utils.h"
 
@@ -40,7 +42,7 @@ struct sanitizer_cache {
     size_t capacity;
     cache_entry_t lru_head;
     cache_entry_t lru_tail;
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 };
 
 static uint32_t hash_key(const char *key)
@@ -55,7 +57,7 @@ static uint32_t hash_key(const char *key)
 static char *build_key(const char *input, sanitize_level_t level)
 {
     size_t len = strlen(input) + 16;
-    char *key = (char *)cupolas_mem_alloc(len);
+    char *key = (char *)AIRY_CALLOC(1, len);
     if (!key)
         return NULL;
     snprintf(key, len, "%d:%s", (int)level, input);
@@ -106,16 +108,16 @@ static void lru_evict(sanitizer_cache_t *cache)
             *ptr = victim->next;
         }
 
-        cupolas_mem_free(victim->key);
-        cupolas_mem_free(victim->value);
-        cupolas_mem_free(victim);
+        AIRY_FREE(victim->key);
+        AIRY_FREE(victim->value);
+        AIRY_FREE(victim);
         cache->size--;
     }
 }
 
 sanitizer_cache_t *sanitizer_cache_create(size_t capacity)
 {
-    sanitizer_cache_t *cache = (sanitizer_cache_t *)cupolas_mem_alloc(sizeof(sanitizer_cache_t));
+    sanitizer_cache_t *cache = (sanitizer_cache_t *)AIRY_CALLOC(1, sizeof(sanitizer_cache_t));
     if (!cache)
         return NULL;
 
@@ -126,18 +128,18 @@ sanitizer_cache_t *sanitizer_cache_create(size_t capacity)
         cache->bucket_count = 16;
 
     cache->buckets =
-        (cache_entry_t **)cupolas_mem_alloc(cache->bucket_count * sizeof(cache_entry_t *));
+        (cache_entry_t **)AIRY_CALLOC(1, cache->bucket_count * sizeof(cache_entry_t *));
     if (!cache->buckets) {
-        cupolas_mem_free(cache);
+        AIRY_FREE(cache);
         return NULL;
     }
     __builtin_memset(cache->buckets, 0, cache->bucket_count * sizeof(cache_entry_t *));
 
     lru_init(cache);
 
-    if (cupolas_mutex_init(&cache->lock) != cupolas_OK) {
-        cupolas_mem_free(cache->buckets);
-        cupolas_mem_free(cache);
+    if (airy_mtx_init(&cache->lock) != cupolas_OK) {
+        AIRY_FREE(cache->buckets);
+        AIRY_FREE(cache);
         return NULL;
     }
 
@@ -149,24 +151,24 @@ void sanitizer_cache_destroy(sanitizer_cache_t *cache)
     if (!cache)
         return;
 
-    cupolas_mutex_lock(&cache->lock);
+    airy_mtx_lock(&cache->lock);
 
     for (size_t i = 0; i < cache->bucket_count; i++) {
         cache_entry_t *entry = cache->buckets[i];
         while (entry) {
             cache_entry_t *next = entry->next;
-            cupolas_mem_free(entry->key);
-            cupolas_mem_free(entry->value);
-            cupolas_mem_free(entry);
+            AIRY_FREE(entry->key);
+            AIRY_FREE(entry->value);
+            AIRY_FREE(entry);
             entry = next;
         }
     }
 
-    cupolas_mem_free(cache->buckets);
+    AIRY_FREE(cache->buckets);
 
-    cupolas_mutex_unlock(&cache->lock);
-    cupolas_mutex_destroy(&cache->lock);
-    cupolas_mem_free(cache);
+    airy_mtx_unlock(&cache->lock);
+    airy_mtx_destroy(&cache->lock);
+    AIRY_FREE(cache);
 }
 
 void sanitizer_cache_clear(sanitizer_cache_t *cache)
@@ -174,15 +176,15 @@ void sanitizer_cache_clear(sanitizer_cache_t *cache)
     if (!cache)
         return;
 
-    cupolas_mutex_lock(&cache->lock);
+    airy_mtx_lock(&cache->lock);
 
     for (size_t i = 0; i < cache->bucket_count; i++) {
         cache_entry_t *entry = cache->buckets[i];
         while (entry) {
             cache_entry_t *next = entry->next;
-            cupolas_mem_free(entry->key);
-            cupolas_mem_free(entry->value);
-            cupolas_mem_free(entry);
+            AIRY_FREE(entry->key);
+            AIRY_FREE(entry->value);
+            AIRY_FREE(entry);
             entry = next;
         }
         cache->buckets[i] = NULL;
@@ -190,7 +192,7 @@ void sanitizer_cache_clear(sanitizer_cache_t *cache)
     cache->size = 0;
     lru_init(cache);
 
-    cupolas_mutex_unlock(&cache->lock);
+    airy_mtx_unlock(&cache->lock);
 }
 
 char *sanitizer_cache_get(sanitizer_cache_t *cache, const char *input, sanitize_level_t level)
@@ -202,7 +204,7 @@ char *sanitizer_cache_get(sanitizer_cache_t *cache, const char *input, sanitize_
     if (!key)
         return NULL;
 
-    cupolas_mutex_lock(&cache->lock);
+    airy_mtx_lock(&cache->lock);
 
     uint32_t hash = hash_key(key);
     size_t idx = hash % cache->bucket_count;
@@ -210,24 +212,24 @@ char *sanitizer_cache_get(sanitizer_cache_t *cache, const char *input, sanitize_
     cache_entry_t *entry = cache->buckets[idx];
     while (entry) {
         if (strcmp(entry->key, key) == 0) {
-            uint64_t now = cupolas_time_ms();
+            uint64_t now = airy_time_wall_ms();
             if (now - entry->timestamp_ms > CACHE_TTL_MS) {
-                cupolas_mutex_unlock(&cache->lock);
-                cupolas_mem_free(key);
+                airy_mtx_unlock(&cache->lock);
+                AIRY_FREE(key);
                 return NULL;
             }
             entry->last_access_ms = now;
             lru_touch(cache, entry);
-            char *result = cupolas_strdup(entry->value);
-            cupolas_mutex_unlock(&cache->lock);
-            cupolas_mem_free(key);
+            char *result = AIRY_STRDUP(entry->value);
+            airy_mtx_unlock(&cache->lock);
+            AIRY_FREE(key);
             return result;
         }
         entry = entry->next;
     }
 
-    cupolas_mutex_unlock(&cache->lock);
-    cupolas_mem_free(key);
+    airy_mtx_unlock(&cache->lock);
+    AIRY_FREE(key);
     return NULL;
 }
 
@@ -241,7 +243,7 @@ void sanitizer_cache_put(sanitizer_cache_t *cache, const char *input, const char
     if (!key)
         return;
 
-    cupolas_mutex_lock(&cache->lock);
+    airy_mtx_lock(&cache->lock);
 
     uint32_t hash = hash_key(key);
     size_t idx = hash % cache->bucket_count;
@@ -249,13 +251,13 @@ void sanitizer_cache_put(sanitizer_cache_t *cache, const char *input, const char
     cache_entry_t *entry = cache->buckets[idx];
     while (entry) {
         if (strcmp(entry->key, key) == 0) {
-            cupolas_mem_free(entry->value);
-            entry->value = cupolas_strdup(output);
-            entry->timestamp_ms = cupolas_time_ms();
+            AIRY_FREE(entry->value);
+            entry->value = AIRY_STRDUP(output);
+            entry->timestamp_ms = airy_time_wall_ms();
             entry->last_access_ms = entry->timestamp_ms;
             lru_touch(cache, entry);
-            cupolas_mutex_unlock(&cache->lock);
-            cupolas_mem_free(key);
+            airy_mtx_unlock(&cache->lock);
+            AIRY_FREE(key);
             return;
         }
         entry = entry->next;
@@ -265,16 +267,16 @@ void sanitizer_cache_put(sanitizer_cache_t *cache, const char *input, const char
         lru_evict(cache);
     }
 
-    entry = (cache_entry_t *)cupolas_mem_alloc(sizeof(cache_entry_t));
+    entry = (cache_entry_t *)AIRY_CALLOC(1, sizeof(cache_entry_t));
     if (!entry) {
-        cupolas_mutex_unlock(&cache->lock);
-        cupolas_mem_free(key);
+        airy_mtx_unlock(&cache->lock);
+        AIRY_FREE(key);
         return;
     }
 
     entry->key = key;
-    entry->value = cupolas_strdup(output);
-    entry->timestamp_ms = cupolas_time_ms();
+    entry->value = AIRY_STRDUP(output);
+    entry->timestamp_ms = airy_time_wall_ms();
     entry->last_access_ms = entry->timestamp_ms;
     entry->next = cache->buckets[idx];
     entry->prev = NULL;
@@ -282,5 +284,5 @@ void sanitizer_cache_put(sanitizer_cache_t *cache, const char *input, const char
     lru_add(cache, entry);
     cache->size++;
 
-    cupolas_mutex_unlock(&cache->lock);
+    airy_mtx_unlock(&cache->lock);
 }

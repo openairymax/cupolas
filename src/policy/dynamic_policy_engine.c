@@ -15,6 +15,7 @@
  * 时间窗口 + enabled 门控。
  */
 
+#include "airy_memory.h"
 #include "dpolicy_internal.h"
 
 #include <cjson/cJSON.h>

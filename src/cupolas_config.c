@@ -18,11 +18,11 @@
  * - Auto-reload mechanism
  */
 
+#include "platform.h"
 #include "cupolas_config.h"
 
 #include "cupolas_metrics.h"
 #include "airy_memory.h"
-#include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "yaml_minimal.h"
 
@@ -31,7 +31,7 @@
 #include <string.h>
 #include <time.h>
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/stat.h>
@@ -72,10 +72,10 @@ struct cupolas_config {
     config_watcher_t watchers[MAX_WATCHERS];
     int next_watcher_id;
 
-    cupolas_rwlock_t lock;
+    airy_rwlock_t lock;
     char last_error[MAX_ERROR_MSG];
 
-    cupolas_thread_t monitor_thread;
+    airy_thread_t monitor_thread;
     bool monitor_running;
 };
 
@@ -103,7 +103,7 @@ const char *cupolas_config_status_string(config_status_t status)
 
 cupolas_config_t *cupolas_config_create(const char *config_dir)
 {
-    cupolas_config_t *cfg = (cupolas_config_t *)cupolas_mem_alloc(sizeof(cupolas_config_t));
+    cupolas_config_t *cfg = (cupolas_config_t *)AIRY_CALLOC(1, sizeof(cupolas_config_t));
     if (!cfg) {
         return NULL;
     }
@@ -115,7 +115,7 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
     } else {
         /* R-6 同族缺陷：默认配置目录必须走运行期 AIRY_HOME 路径系统，
          * 而非编译期宏 AIRY_CONFIG_DIR（= /etc/agentrt）。 */
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s\\cupolas\\conf",
                  airy_config_dir());
 #else
@@ -123,7 +123,7 @@ cupolas_config_t *cupolas_config_create(const char *config_dir)
 #endif
     }
 
-    cupolas_rwlock_init(&cfg->lock);
+    airy_rwlock_init(&cfg->lock);
 
     for (int i = 0; i <= CONFIG_TYPE_ALL; i++) {
         cfg->entries[i].type = (config_type_t)i;
@@ -151,7 +151,7 @@ void cupolas_config_destroy(cupolas_config_t *cfg)
         cfg->entries[i].file_path[0] = '\0';
     }
 
-    cupolas_rwlock_destroy(&cfg->lock);
+    airy_rwlock_destroy(&cfg->lock);
 
     AIRY_FREE(cfg);
 }
@@ -161,7 +161,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     if (type == CONFIG_TYPE_ALL) {
         int loaded = 0;
@@ -170,12 +170,12 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
                 loaded++;
             }
         }
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return loaded > 0 ? 0 : -1;
     }
 
     if (type >= CONFIG_TYPE_ALL || type < 0) {
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return AIRY_EINVAL;
     }
 
@@ -195,13 +195,13 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
 #pragma GCC diagnostic pop
     }
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA attr;
     if (!GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
         snprintf(cfg->last_error, sizeof(cfg->last_error), "Configuration file not found: %s",
                  entry->file_path);
         entry->status = CONFIG_STATUS_ERROR;
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return AIRY_EINVAL;
     }
 #else
@@ -210,7 +210,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
         snprintf(cfg->last_error, sizeof(cfg->last_error), "Configuration file not found: %s",
                  entry->file_path);
         entry->status = CONFIG_STATUS_ERROR;
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return AIRY_EINVAL;
     }
 #endif
@@ -241,7 +241,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
     if (!doc) {
         snprintf(cfg->last_error, sizeof(cfg->last_error), "Memory allocation failed");
         entry->status = CONFIG_STATUS_ERROR;
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return AIRY_EINVAL;
     }
 
@@ -251,13 +251,13 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
                  err ? err : "unknown");
         yaml_destroy(doc);
         entry->status = CONFIG_STATUS_ERROR;
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return AIRY_EINVAL;
     }
 
     entry->data = doc;
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
     ULARGE_INTEGER ft;
     ft.LowPart = attr.ftLastWriteTime.dwLowDateTime;
     ft.HighPart = attr.ftLastWriteTime.dwHighDateTime;
@@ -273,7 +273,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
 
     entry->status = CONFIG_STATUS_APPLIED;
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return 0;
 }
@@ -283,7 +283,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
@@ -299,7 +299,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
             snprintf(cfg->last_error, sizeof(cfg->last_error),
                      "Reload %s: memory allocation failed", config_type_names[type]);
             entry->status = CONFIG_STATUS_ERROR;
-            cupolas_rwlock_unlock(&cfg->lock);
+            airy_rwlock_unlock(&cfg->lock);
             return AIRY_EINVAL;
         }
 
@@ -310,7 +310,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
                      config_type_names[type], err ? err : "unknown");
             yaml_destroy(doc);
             entry->status = CONFIG_STATUS_ROLLBACK;
-            cupolas_rwlock_unlock(&cfg->lock);
+            airy_rwlock_unlock(&cfg->lock);
             return AIRY_EINVAL;
         }
 
@@ -326,11 +326,11 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
             if (cupolas_config_reload(cfg, (config_type_t)i) == 0)
                 reloaded++;
         }
-        cupolas_rwlock_unlock(&cfg->lock);
+        airy_rwlock_unlock(&cfg->lock);
         return reloaded > 0 ? 0 : -1;
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
     return 0;
 }
 
@@ -340,7 +340,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
     if (!cfg || !result)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     __builtin_memset(result, 0, sizeof(config_validation_result_t));
 
@@ -353,7 +353,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
             result->valid = false;
             result->errors = &err;
             result->error_count = 1;
-            cupolas_rwlock_unlock(&cfg->lock);
+            airy_rwlock_unlock(&cfg->lock);
             return AIRY_EINVAL;
         }
 
@@ -415,7 +415,7 @@ int cupolas_config_validate(cupolas_config_t *cfg, config_type_t type,
         result->valid = false;
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return result->valid ? 0 : -1;
 }
@@ -425,14 +425,14 @@ int cupolas_config_apply(cupolas_config_t *cfg, config_type_t type)
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
         entry->status = CONFIG_STATUS_APPLIED;
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return 0;
 }
@@ -442,7 +442,7 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
@@ -496,7 +496,7 @@ int cupolas_config_rollback(cupolas_config_t *cfg, config_type_t type)
         snprintf(cfg->last_error, sizeof(cfg->last_error), "Rolled back all config types");
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return 0;
 }
@@ -506,14 +506,14 @@ int cupolas_config_get_version(cupolas_config_t *cfg, config_type_t type, config
     if (!cfg || !version)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t *entry = &cfg->entries[type];
         __builtin_memcpy(version, &entry->version, sizeof(config_version_t));
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return 0;
 }
@@ -524,7 +524,7 @@ int cupolas_config_watch(cupolas_config_t *cfg, config_type_t type, config_obser
     if (!cfg || !callback)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     int watcher_id = -1;
     for (int i = 0; i < MAX_WATCHERS; i++) {
@@ -539,7 +539,7 @@ int cupolas_config_watch(cupolas_config_t *cfg, config_type_t type, config_obser
         }
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return watcher_id;
 }
@@ -549,17 +549,17 @@ int cupolas_config_unwatch(cupolas_config_t *cfg, int watcher_id)
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     for (int i = 0; i < MAX_WATCHERS; i++) {
         if (cfg->watchers[i].id == watcher_id) {
             cfg->watchers[i].active = false;
-            cupolas_rwlock_unlock(&cfg->lock);
+            airy_rwlock_unlock(&cfg->lock);
             return 0;
         }
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return AIRY_EINVAL;
 }
@@ -569,14 +569,14 @@ config_status_t cupolas_config_get_status(cupolas_config_t *cfg, config_type_t t
     if (!cfg)
         return CONFIG_STATUS_ERROR;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     config_status_t status = CONFIG_STATUS_OK;
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         status = cfg->entries[type].status;
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return status;
 }
@@ -586,7 +586,7 @@ int cupolas_config_set_auto_reload(cupolas_config_t *cfg, config_type_t type, ui
     if (!cfg)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     if (interval_ms > 0) {
         cfg->monitor_running = true;
@@ -594,7 +594,7 @@ int cupolas_config_set_auto_reload(cupolas_config_t *cfg, config_type_t type, ui
         cfg->monitor_running = false;
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return 0;
 }
@@ -604,7 +604,7 @@ int cupolas_config_check_reload(cupolas_config_t *cfg, config_type_t type)
     if (!cfg)
         return 0;
 
-    cupolas_rwlock_wrlock(&cfg->lock);
+    airy_rwlock_wrlock(&cfg->lock);
 
     int changed = 0;
     for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
@@ -614,7 +614,7 @@ int cupolas_config_check_reload(cupolas_config_t *cfg, config_type_t type)
 
         config_entry_t *entry = &cfg->entries[i];
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
         WIN32_FILE_ATTRIBUTE_DATA attr;
         if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
             ULARGE_INTEGER ft;
@@ -642,7 +642,7 @@ int cupolas_config_check_reload(cupolas_config_t *cfg, config_type_t type)
 #endif
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return changed;
 }
@@ -652,9 +652,9 @@ const char *cupolas_config_get_last_error(cupolas_config_t *cfg)
     if (!cfg)
         return NULL;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
     const char *error = cfg->last_error[0] ? cfg->last_error : NULL;
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return error;
 }
@@ -672,7 +672,7 @@ size_t cupolas_config_export_json(cupolas_config_t *cfg, config_type_t type, cha
     if (!cfg || !buffer || size == 0)
         return 0;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     size_t offset = snprintf(buffer, size, "{\"configs\":[");
 
@@ -694,7 +694,7 @@ size_t cupolas_config_export_json(cupolas_config_t *cfg, config_type_t type, cha
 
     offset += snprintf(buffer + offset, size - offset, "]}");
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return offset;
 }
@@ -705,7 +705,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t *cfg, config_type_t type, cha
     if (!cfg || !buffer || size == 0)
         return 0;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     buffer[0] = '\0';
     size_t offset = 0;
@@ -752,7 +752,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t *cfg, config_type_t type, cha
         }
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
     return offset;
 }
 
@@ -766,7 +766,7 @@ bool cupolas_config_validate_all(cupolas_config_t *cfg)
     if (!cfg)
         return false;
 
-    cupolas_rwlock_rdlock(&cfg->lock);
+    airy_rwlock_rdlock(&cfg->lock);
 
     bool all_valid = true;
     for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
@@ -776,7 +776,7 @@ bool cupolas_config_validate_all(cupolas_config_t *cfg)
         }
     }
 
-    cupolas_rwlock_unlock(&cfg->lock);
+    airy_rwlock_unlock(&cfg->lock);
 
     return all_valid;
 }

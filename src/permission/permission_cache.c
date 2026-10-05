@@ -6,7 +6,11 @@
  * @brief Permission cache implementation: hash-based LRU cache.
  */
 
+#include "platform.h"
+#include "atomic_compat.h"
+#include "airy_memory.h"
 #include "permission_cache.h"
+#include "security/cupolas_error.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +40,7 @@ static char *build_cache_key(const char *agent_id, const char *action, const cha
     size_t context_len = context ? strlen(context) : 0;
 
     size_t total_len = agent_len + 1 + action_len + 1 + resource_len + 1 + context_len + 1;
-    char *key = (char *)cupolas_mem_alloc(total_len);
+    char *key = (char *)AIRY_CALLOC(1, total_len);
     if (!key)
         return NULL;
 
@@ -80,7 +84,7 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
         capacity = 1024;
     }
 
-    cache_manager_t *cm = (cache_manager_t *)cupolas_mem_alloc(sizeof(cache_manager_t));
+    cache_manager_t *cm = (cache_manager_t *)AIRY_CALLOC(1, sizeof(cache_manager_t));
     if (!cm)
         return NULL;
 
@@ -94,9 +98,9 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
         bucket_count = MAX_BUCKET_COUNT;
     }
 
-    cm->buckets = (cache_entry_t **)cupolas_mem_alloc(bucket_count * sizeof(cache_entry_t *));
+    cm->buckets = (cache_entry_t **)AIRY_CALLOC(1, bucket_count * sizeof(cache_entry_t *));
     if (!cm->buckets) {
-        cupolas_mem_free(cm);
+        AIRY_FREE(cm);
         return NULL;
     }
     __builtin_memset(cm->buckets, 0, bucket_count * sizeof(cache_entry_t *));
@@ -105,9 +109,9 @@ cache_manager_t *cache_manager_create(size_t capacity, uint32_t ttl_ms)
     cm->capacity = capacity;
     cm->ttl_ms = ttl_ms;
 
-    if (cupolas_mutex_init(&cm->lock) != cupolas_OK) {
-        cupolas_mem_free(cm->buckets);
-        cupolas_mem_free(cm);
+    if (airy_mtx_init(&cm->lock) != cupolas_OK) {
+        AIRY_FREE(cm->buckets);
+        AIRY_FREE(cm);
         return NULL;
     }
 
@@ -119,21 +123,21 @@ void cache_manager_destroy(cache_manager_t *cm)
     if (!cm)
         return;
 
-    cupolas_mutex_lock(&cm->lock);
+    airy_mtx_lock(&cm->lock);
 
     cache_entry_t *entry = cm->head;
     while (entry) {
         cache_entry_t *next = entry->next;
-        cupolas_mem_free(entry->key);
-        cupolas_mem_free(entry);
+        AIRY_FREE(entry->key);
+        AIRY_FREE(entry);
         entry = next;
     }
 
-    cupolas_mem_free(cm->buckets);
+    AIRY_FREE(cm->buckets);
 
-    cupolas_mutex_unlock(&cm->lock);
-    cupolas_mutex_destroy(&cm->lock);
-    cupolas_mem_free(cm);
+    airy_mtx_unlock(&cm->lock);
+    airy_mtx_destroy(&cm->lock);
+    AIRY_FREE(cm);
 }
 
 static void move_to_head(cache_manager_t *cm, cache_entry_t *entry)
@@ -187,8 +191,8 @@ static void remove_entry(cache_manager_t *cm, cache_entry_t *entry)
         cm->tail = entry->prev;
     }
 
-    cupolas_mem_free(entry->key);
-    cupolas_mem_free(entry);
+    AIRY_FREE(entry->key);
+    AIRY_FREE(entry);
     cm->size--;
 }
 
@@ -222,33 +226,33 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
 
     uint32_t hash = hash_string(key);
 
-    cupolas_mutex_lock(&cm->lock);
+    airy_mtx_lock(&cm->lock);
 
     cache_entry_t *entry = find_entry(cm, hash, key);
 
     if (entry) {
         if (cm->ttl_ms > 0) {
-            uint64_t now = cupolas_time_ms();
+            uint64_t now = airy_time_wall_ms();
             if (now - entry->timestamp_ms > cm->ttl_ms) {
                 remove_entry(cm, entry);
-                cupolas_atomic_add64(&cm->miss_count, 1);
-                cupolas_mutex_unlock(&cm->lock);
-                cupolas_mem_free(key);
+                atomic_fetch_add_64(&cm->miss_count, 1, memory_order_seq_cst);
+                airy_mtx_unlock(&cm->lock);
+                AIRY_FREE(key);
                 return -1;
             }
         }
 
         move_to_head(cm, entry);
         int result = entry->result;
-        cupolas_atomic_add64(&cm->hit_count, 1);
-        cupolas_mutex_unlock(&cm->lock);
-        cupolas_mem_free(key);
+        atomic_fetch_add_64(&cm->hit_count, 1, memory_order_seq_cst);
+        airy_mtx_unlock(&cm->lock);
+        AIRY_FREE(key);
         return result;
     }
 
-    cupolas_atomic_add64(&cm->miss_count, 1);
-    cupolas_mutex_unlock(&cm->lock);
-    cupolas_mem_free(key);
+    atomic_fetch_add_64(&cm->miss_count, 1, memory_order_seq_cst);
+    airy_mtx_unlock(&cm->lock);
+    AIRY_FREE(key);
     return -1;
 }
 
@@ -264,16 +268,16 @@ void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *ac
 
     uint32_t hash = hash_string(key);
 
-    cupolas_mutex_lock(&cm->lock);
+    airy_mtx_lock(&cm->lock);
 
     cache_entry_t *entry = find_entry(cm, hash, key);
 
     if (entry) {
         entry->result = result;
-        entry->timestamp_ms = cupolas_time_ms();
+        entry->timestamp_ms = airy_time_wall_ms();
         move_to_head(cm, entry);
-        cupolas_mutex_unlock(&cm->lock);
-        cupolas_mem_free(key);
+        airy_mtx_unlock(&cm->lock);
+        AIRY_FREE(key);
         return;
     }
 
@@ -281,16 +285,16 @@ void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *ac
         remove_entry(cm, cm->tail);
     }
 
-    entry = (cache_entry_t *)cupolas_mem_alloc(sizeof(cache_entry_t));
+    entry = (cache_entry_t *)AIRY_CALLOC(1, sizeof(cache_entry_t));
     if (!entry) {
-        cupolas_mutex_unlock(&cm->lock);
-        cupolas_mem_free(key);
+        airy_mtx_unlock(&cm->lock);
+        AIRY_FREE(key);
         return;
     }
 
     entry->key = key;
     entry->result = result;
-    entry->timestamp_ms = cupolas_time_ms();
+    entry->timestamp_ms = airy_time_wall_ms();
     entry->hash = hash;
     entry->prev = NULL;
     entry->next = cm->head;
@@ -310,7 +314,7 @@ void cache_manager_put(cache_manager_t *cm, const char *agent_id, const char *ac
 
     cm->size++;
 
-    cupolas_mutex_unlock(&cm->lock);
+    airy_mtx_unlock(&cm->lock);
 }
 
 void cache_manager_clear(cache_manager_t *cm)
@@ -318,13 +322,13 @@ void cache_manager_clear(cache_manager_t *cm)
     if (!cm)
         return;
 
-    cupolas_mutex_lock(&cm->lock);
+    airy_mtx_lock(&cm->lock);
 
     cache_entry_t *entry = cm->head;
     while (entry) {
         cache_entry_t *next = entry->next;
-        cupolas_mem_free(entry->key);
-        cupolas_mem_free(entry);
+        AIRY_FREE(entry->key);
+        AIRY_FREE(entry);
         entry = next;
     }
 
@@ -333,7 +337,7 @@ void cache_manager_clear(cache_manager_t *cm)
     cm->tail = NULL;
     cm->size = 0;
 
-    cupolas_mutex_unlock(&cm->lock);
+    airy_mtx_unlock(&cm->lock);
 }
 
 void cache_manager_stats(cache_manager_t *cm, uint64_t *hit_count, uint64_t *miss_count)
@@ -347,7 +351,7 @@ void cache_manager_stats(cache_manager_t *cm, uint64_t *hit_count, uint64_t *mis
     }
 
     if (hit_count)
-        *hit_count = cupolas_atomic_load64(&cm->hit_count);
+        *hit_count = atomic_load_64(&cm->hit_count, memory_order_seq_cst);
     if (miss_count)
-        *miss_count = cupolas_atomic_load64(&cm->miss_count);
+        *miss_count = atomic_load_64(&cm->miss_count, memory_order_seq_cst);
 }

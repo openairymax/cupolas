@@ -24,18 +24,18 @@
  * int my_function(my_config_t* config) {
  *     CUPOLAS_CHECK_NULL(config);
  *
- *     CUPOLAS_MUTEX_TYPE lock;
- *     CUPOLAS_MUTEX_INIT(&lock);
+ *     airy_mtx_t lock;
+ *     airy_mtx_init(&lock);
  *
  *     my_data_t* data = CUPOLAS_ALLOC_STRUCT(my_data_t);
  *     if (!data) return AIRY_ERR_OUT_OF_MEMORY;
  *
- *     CUPOLAS_MUTEX_LOCK(&lock);
+ *     airy_mtx_lock(&lock);
  *     // Critical section...
- *     CUPOLAS_MUTEX_UNLOCK(&lock);
+ *     airy_mtx_unlock(&lock);
  *
  *     CUPOLAS_FREE(data);
- *     CUPOLAS_MUTEX_DESTROY(&lock);
+ *     airy_mtx_destroy(&lock);
  *     return 0;
  * }
  * @endcode
@@ -58,28 +58,15 @@
 extern "C" {
 #endif
 
-/* ============================================================================
- * Platform Abstraction Layer - Unified Thread Synchronization Primitives
- * ============================================================================
+/* Thread synchronization comes from the commons platform domain:
+ * the airy_mtx_* family declared in <platform_sync.h>. Cupolas keeps
+ * no platform wrapper of its own.
  *
- * Uses cupolas platform abstraction layer for cross-platform mutex support.
- *
- * @warning Not recursive: calling LOCK twice on same thread will deadlock
- *
- * @threadsafe All operations are thread-safe when used correctly
+ * @warning airy_mtx_* is not recursive: locking twice on the same
+ * thread will deadlock
  */
 
-#include "../platform/platform.h"
-
-#define CUPOLAS_MUTEX_TYPE cupolas_mutex_t
-
-#define CUPOLAS_MUTEX_INIT(m) cupolas_mutex_init(m)
-
-#define CUPOLAS_MUTEX_LOCK(m) cupolas_mutex_lock(m)
-
-#define CUPOLAS_MUTEX_UNLOCK(m) cupolas_mutex_unlock(m)
-
-#define CUPOLAS_MUTEX_DESTROY(m) cupolas_mutex_destroy(m)
+#include <platform_sync.h>
 
 /* ============================================================================
  * Memory Management Macros - Unified Allocation and Deallocation
@@ -590,22 +577,6 @@ extern "C" {
  * Implemented in cupolas_utils.c
  * These provide runtime functionality beyond what macros can offer.
  */
-
-/**
- * @brief Safely duplicate a string (NULL-safe)
- * @param str Source string (may be NULL)
- * @return Newly allocated copy, or NULL if str is NULL or allocation fails
- * @ownership Caller must free result with CUPOLAS_FREE()
- *
- * @code
- * char* copy = cupolas_strdup(original);
- * if (copy) {
- *     // Use copy...
- *     CUPOLAS_FREE(copy);
- * }
- * @endcode
- */
-char *cupolas_strdup(const char *str);
 
 /**
  * @brief Safe string copy with size limit (strlcpy implementation)

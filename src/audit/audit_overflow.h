@@ -9,7 +9,7 @@
 #ifndef CUPOLAS_AUDIT_OVERFLOW_H
 #define CUPOLAS_AUDIT_OVERFLOW_H
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "audit_queue.h"
 
 #include <stdbool.h>

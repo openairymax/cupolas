@@ -6,7 +6,10 @@
  * @brief Permission engine implementation.
  */
 
+#include "platform.h"
+#include "atomic_compat.h"
 #include "permission_engine.h"
+#include "security/cupolas_error.h"
 
 #include "utils/cupolas_utils.h"
 
@@ -24,44 +27,44 @@
 permission_engine_t *permission_engine_create(const char *rules_path)
 {
     permission_engine_t *engine =
-        (permission_engine_t *)cupolas_mem_alloc(sizeof(permission_engine_t));
+        (permission_engine_t *)AIRY_CALLOC(1, sizeof(permission_engine_t));
     if (!engine)
         return NULL;
 
     __builtin_memset(engine, 0, sizeof(permission_engine_t));
 
-    if (cupolas_rwlock_init(&engine->rwlock) != cupolas_OK) {
-        cupolas_mem_free(engine);
+    if (airy_rwlock_init(&engine->rwlock) != cupolas_OK) {
+        AIRY_FREE(engine);
         return NULL;
     }
 
     engine->rules = rule_manager_create(rules_path);
     if (!engine->rules) {
-        cupolas_rwlock_destroy(&engine->rwlock);
-        cupolas_mem_free(engine);
+        airy_rwlock_destroy(&engine->rwlock);
+        AIRY_FREE(engine);
         return NULL;
     }
 
     engine->cache = cache_manager_create(DEFAULT_CACHE_CAPACITY, DEFAULT_CACHE_TTL_MS);
     if (!engine->cache) {
         rule_manager_destroy(engine->rules);
-        cupolas_rwlock_destroy(&engine->rwlock);
-        cupolas_mem_free(engine);
+        airy_rwlock_destroy(&engine->rwlock);
+        AIRY_FREE(engine);
         return NULL;
     }
 
     if (rules_path) {
-        engine->rules_path = cupolas_strdup(rules_path);
+        engine->rules_path = AIRY_STRDUP(rules_path);
         if (!engine->rules_path) {
             cache_manager_destroy(engine->cache);
             rule_manager_destroy(engine->rules);
-            cupolas_rwlock_destroy(&engine->rwlock);
-            cupolas_mem_free(engine);
+            airy_rwlock_destroy(&engine->rwlock);
+            AIRY_FREE(engine);
             return NULL;
         }
     }
 
-    cupolas_atomic_store32(&engine->ref_count, 1);
+    atomic_store_32(&engine->ref_count, 1, memory_order_seq_cst);
 
     return engine;
 }
@@ -84,15 +87,15 @@ void permission_engine_destroy(permission_engine_t *engine)
     if (!engine)
         return;
 
-    /* sub32 returns the new decremented value: > 0 means references remain
-     * and the engine must not be destroyed; the old implementation only
-     * checked > 1, destroying too early when the new value was 1 (still
-     * referenced) -- a UAF race. */
-    if (cupolas_atomic_sub32(&engine->ref_count, 1) > 0) {
+    /* fetch_sub returns the pre-decrement value: remaining > 0 means other
+     * references are still held and the engine must not be destroyed. */
+    int remaining = atomic_fetch_sub_32(&engine->ref_count, 1,
+                                        memory_order_seq_cst) - 1;
+    if (remaining > 0) {
         return;
     }
 
-    cupolas_rwlock_wrlock(&engine->rwlock);
+    airy_rwlock_wrlock(&engine->rwlock);
 
     if (engine->rules) {
         rule_manager_destroy(engine->rules);
@@ -104,11 +107,11 @@ void permission_engine_destroy(permission_engine_t *engine)
         engine->cache = NULL;
     }
 
-    cupolas_mem_free(engine->rules_path);
+    AIRY_FREE(engine->rules_path);
 
-    cupolas_rwlock_unlock(&engine->rwlock);
-    cupolas_rwlock_destroy(&engine->rwlock);
-    cupolas_mem_free(engine);
+    airy_rwlock_unlock(&engine->rwlock);
+    airy_rwlock_destroy(&engine->rwlock);
+    AIRY_FREE(engine);
 }
 
 /**
@@ -128,7 +131,7 @@ permission_engine_t *permission_engine_ref(permission_engine_t *engine)
     if (!engine)
         return NULL;
 
-    cupolas_atomic_inc32(&engine->ref_count);
+    atomic_fetch_add_32(&engine->ref_count, 1, memory_order_seq_cst);
     return engine;
 }
 
@@ -231,7 +234,7 @@ int permission_engine_reload(permission_engine_t *engine)
     int ret = rule_manager_reload(engine->rules);
     if (ret == cupolas_OK) {
         cache_manager_clear(engine->cache);
-        engine->last_load_time = cupolas_time_ms();
+        engine->last_load_time = airy_time_wall_ms();
     }
 
     return ret;

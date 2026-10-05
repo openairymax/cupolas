@@ -36,8 +36,6 @@ workbench/
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `working_dir` | `const char *` | 工作目录 |
-| `env_vars` | `const char **` | 环境变量数组 |
-| `env_count` | `size_t` | 环境变量数量 |
 | `timeout_ms` | `uint32_t` | 执行超时（毫秒） |
 | `max_output_size` | `size_t` | 最大输出大小 |
 | `redirect_stdin` | `bool` | 重定向标准输入 |

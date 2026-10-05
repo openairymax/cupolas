@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 // SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 
+#include "platform.h"
+#include "atomic_compat.h"
 #include "cupolas.h"
 /*
  *
@@ -20,7 +22,7 @@
 
 #include "cupolas_metrics.h"
 
-#include "platform/platform.h"
+#include "platform.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
@@ -28,7 +30,7 @@
 #include <string.h>
 #include <time.h>
 
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/resource.h>
@@ -82,10 +84,10 @@ typedef struct metric_entry {
     double *buckets;
     size_t bucket_count;
 
-    cupolas_atomic64_t counter_value;
-    cupolas_atomic64_t gauge_value;
-    cupolas_atomic64_t histogram_count;
-    cupolas_atomic64_t histogram_sum_ns;
+    atomic_int64_t counter_value;
+    atomic_int64_t gauge_value;
+    atomic_int64_t histogram_count;
+    atomic_int64_t histogram_sum_ns;
 
     bool registered;
 } metric_entry_t;
@@ -95,14 +97,14 @@ typedef struct metrics_state {
     size_t entry_count;
     uint32_t sampling_interval_ms;
 
-    cupolas_thread_t collector_thread;
+    airy_thread_t collector_thread;
     bool collector_running;
 } metrics_state_t;
 
 static metrics_state_t g_metrics = {0};
-static volatile cupolas_atomic32_t g_init_state = 0;
-static cupolas_rwlock_t g_metrics_lock = {0};
-static cupolas_once_t g_metrics_once = CUPOLAS_ONCE_INIT;
+static volatile atomic_int g_init_state = 0;
+static airy_rwlock_t g_metrics_lock = {0};
+static airy_once_t g_metrics_once = AIRY_ONCE_INIT;
 
 static const double DEFAULT_BUCKETS[] = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
                                          0.5,   1.0,  2.5,   5.0,  10.0};
@@ -112,13 +114,13 @@ static void metrics_init_once(void)
 {
     __builtin_memset(&g_metrics, 0, sizeof(g_metrics));
     g_metrics.sampling_interval_ms = 1000;
-    cupolas_rwlock_init(&g_metrics_lock);
+    airy_rwlock_init(&g_metrics_lock);
     g_init_state = 1;
 }
 
 int metrics_init(uint32_t sampling_interval_ms)
 {
-    cupolas_call_once(&g_metrics_once, metrics_init_once);
+    airy_call_once(&g_metrics_once, metrics_init_once);
 
     if (sampling_interval_ms > 0) {
         g_metrics.sampling_interval_ms = sampling_interval_ms;
@@ -135,28 +137,28 @@ void metrics_shutdown(void)
 
     g_metrics.collector_running = false;
 
-    cupolas_rwlock_destroy(&g_metrics_lock);
+    airy_rwlock_destroy(&g_metrics_lock);
 
     g_init_state = 0;
 }
 
 static metric_entry_t *find_or_create_entry(const char *name)
 {
-    cupolas_rwlock_rdlock(&g_metrics_lock);
+    airy_rwlock_rdlock(&g_metrics_lock);
 
     for (size_t i = 0; i < g_metrics.entry_count; i++) {
         if (strcmp(g_metrics.entries[i].name, name) == 0) {
-            cupolas_rwlock_unlock(&g_metrics_lock);
+            airy_rwlock_unlock(&g_metrics_lock);
             return &g_metrics.entries[i];
         }
     }
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 
-    cupolas_rwlock_wrlock(&g_metrics_lock);
+    airy_rwlock_wrlock(&g_metrics_lock);
 
     if (g_metrics.entry_count >= MAX_METRICS) {
-        cupolas_rwlock_unlock(&g_metrics_lock);
+        airy_rwlock_unlock(&g_metrics_lock);
         return NULL;
     }
 
@@ -164,7 +166,7 @@ static metric_entry_t *find_or_create_entry(const char *name)
     __builtin_memset(entry, 0, sizeof(metric_entry_t));
     entry->name = name;
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 
     return entry;
 }
@@ -180,7 +182,7 @@ int metrics_register(const metric_desc_t *desc)
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_wrlock(&g_metrics_lock);
+    airy_rwlock_wrlock(&g_metrics_lock);
 
     entry->type = desc->type;
     entry->help = desc->help;
@@ -190,7 +192,7 @@ int metrics_register(const metric_desc_t *desc)
     entry->bucket_count = desc->bucket_count > 0 ? desc->bucket_count : DEFAULT_BUCKET_COUNT;
     entry->registered = true;
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 
     return 0;
 }
@@ -204,7 +206,7 @@ void metrics_counter_inc(const char *name, const char **label_values, double cou
     if (!entry)
         return;
 
-    cupolas_atomic_add64(&entry->counter_value, (int64_t)(count * 1000));
+    atomic_fetch_add_64(&entry->counter_value, (int64_t)(count * 1000), memory_order_seq_cst);
 }
 
 void metrics_gauge_set(const char *name, const char **label_values, double value)
@@ -216,7 +218,7 @@ void metrics_gauge_set(const char *name, const char **label_values, double value
     if (!entry)
         return;
 
-    cupolas_atomic_store64(&entry->gauge_value, (int64_t)(value * 1000));
+    atomic_store_64(&entry->gauge_value, (int64_t)(value * 1000), memory_order_seq_cst);
 }
 
 void metrics_gauge_add(const char *name, const char **label_values, double value)
@@ -228,7 +230,7 @@ void metrics_gauge_add(const char *name, const char **label_values, double value
     if (!entry)
         return;
 
-    cupolas_atomic_add64(&entry->gauge_value, (int64_t)(value * 1000));
+    atomic_fetch_add_64(&entry->gauge_value, (int64_t)(value * 1000), memory_order_seq_cst);
 }
 
 void metrics_gauge_sub(const char *name, const char **label_values, double value)
@@ -240,7 +242,7 @@ void metrics_gauge_sub(const char *name, const char **label_values, double value
     if (!entry)
         return;
 
-    cupolas_atomic_sub64(&entry->gauge_value, (int64_t)(value * 1000));
+    atomic_fetch_sub_64(&entry->gauge_value, (int64_t)(value * 1000), memory_order_seq_cst);
 }
 
 void metrics_histogram_observe(const char *name, const char **label_values, double value)
@@ -252,8 +254,8 @@ void metrics_histogram_observe(const char *name, const char **label_values, doub
     if (!entry)
         return;
 
-    cupolas_atomic_add64(&entry->histogram_count, 1);
-    cupolas_atomic_add64(&entry->histogram_sum_ns, (int64_t)(value * 1000000000));
+    atomic_fetch_add_64(&entry->histogram_count, 1, memory_order_seq_cst);
+    atomic_fetch_add_64(&entry->histogram_sum_ns, (int64_t)(value * 1000000000), memory_order_seq_cst);
 }
 
 void metrics_summary_observe(const char *name, const char **label_values, double value)
@@ -265,13 +267,13 @@ void metrics_summary_observe(const char *name, const char **label_values, double
     if (!entry)
         return;
 
-    cupolas_atomic_add64(&entry->histogram_count, 1);
-    cupolas_atomic_add64(&entry->histogram_sum_ns, (int64_t)(value * 1000000000));
+    atomic_fetch_add_64(&entry->histogram_count, 1, memory_order_seq_cst);
+    atomic_fetch_add_64(&entry->histogram_sum_ns, (int64_t)(value * 1000000000), memory_order_seq_cst);
 }
 
 uint64_t metrics_get_timestamp_ns(void)
 {
-#if cupolas_PLATFORM_WINDOWS
+#if AIRY_PLATFORM_WINDOWS
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     ULONGLONG ticks = ((ULONGLONG)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
@@ -294,7 +296,7 @@ metric_iterator_t *metrics_iter_create(const char *pattern)
     if (g_init_state == 0)
         return NULL;
     metric_iterator_internal_t *iter =
-        (metric_iterator_internal_t *)cupolas_mem_alloc(sizeof(metric_iterator_internal_t));
+        (metric_iterator_internal_t *)AIRY_CALLOC(1, sizeof(metric_iterator_internal_t));
     if (!iter)
         return NULL;
     __builtin_memset(iter, 0, sizeof(metric_iterator_internal_t));
@@ -311,7 +313,7 @@ bool metrics_iter_next(metric_iterator_t *iter, metric_sample_t *sample)
     metric_iterator_internal_t *internal = (metric_iterator_internal_t *)iter;
     const metrics_state_t *state = internal->state;
 
-    cupolas_rwlock_rdlock(&g_metrics_lock);
+    airy_rwlock_rdlock(&g_metrics_lock);
 
     while (internal->current_index < state->entry_count) {
         metric_entry_t *entry = (metric_entry_t *)&state->entries[internal->current_index];
@@ -325,22 +327,22 @@ bool metrics_iter_next(metric_iterator_t *iter, metric_sample_t *sample)
 
         switch (entry->type) {
         case METRIC_TYPE_COUNTER:
-            sample->value = cupolas_atomic_load64(&entry->counter_value) / 1000.0;
+            sample->value = atomic_load_64(&entry->counter_value, memory_order_seq_cst) / 1000.0;
             break;
         case METRIC_TYPE_GAUGE:
-            sample->value = cupolas_atomic_load64(&entry->gauge_value) / 1000.0;
+            sample->value = atomic_load_64(&entry->gauge_value, memory_order_seq_cst) / 1000.0;
             break;
         case METRIC_TYPE_HISTOGRAM:
         case METRIC_TYPE_SUMMARY:
-            sample->value = cupolas_atomic_load64(&entry->histogram_sum_ns) / 1000000000.0;
+            sample->value = atomic_load_64(&entry->histogram_sum_ns, memory_order_seq_cst) / 1000000000.0;
             break;
         }
 
-        cupolas_rwlock_unlock(&g_metrics_lock);
+        airy_rwlock_unlock(&g_metrics_lock);
         return true;
     }
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
     return false;
 }
 
@@ -348,7 +350,7 @@ void metrics_iter_destroy(metric_iterator_t *iter)
 {
     if (!iter)
         return;
-    cupolas_mem_free(iter);
+    AIRY_FREE(iter);
 }
 
 size_t metrics_export_prometheus(char *buffer, size_t size)
@@ -360,7 +362,7 @@ size_t metrics_export_prometheus(char *buffer, size_t size)
     size_t offset = 0;
     uint64_t now = metrics_get_timestamp_ns() / 1000000000;
 
-    cupolas_rwlock_rdlock(&g_metrics_lock);
+    airy_rwlock_rdlock(&g_metrics_lock);
 
     for (size_t i = 0; i < g_metrics.entry_count && offset < size - 1; i++) {
         metric_entry_t *entry = &g_metrics.entries[i];
@@ -390,8 +392,8 @@ size_t metrics_export_prometheus(char *buffer, size_t size)
 
         offset += snprintf(buffer + offset, size - offset, "# TYPE %s %s\n", entry->name, type_str);
 
-        double counter_val = cupolas_atomic_load64(&entry->counter_value) / 1000.0;
-        double gauge_val = cupolas_atomic_load64(&entry->gauge_value) / 1000.0;
+        double counter_val = atomic_load_64(&entry->counter_value, memory_order_seq_cst) / 1000.0;
+        double gauge_val = atomic_load_64(&entry->gauge_value, memory_order_seq_cst) / 1000.0;
 
         if (entry->type == METRIC_TYPE_COUNTER) {
             offset += snprintf(buffer + offset, size - offset, "%s %f %lu\n", entry->name,
@@ -400,8 +402,8 @@ size_t metrics_export_prometheus(char *buffer, size_t size)
             offset += snprintf(buffer + offset, size - offset, "%s %f %lu\n", entry->name,
                                gauge_val, (unsigned long)now);
         } else if (entry->type == METRIC_TYPE_HISTOGRAM) {
-            int64_t count = cupolas_atomic_load64(&entry->histogram_count);
-            double sum = cupolas_atomic_load64(&entry->histogram_sum_ns) / 1000000000.0;
+            int64_t count = atomic_load_64(&entry->histogram_count, memory_order_seq_cst);
+            double sum = atomic_load_64(&entry->histogram_sum_ns, memory_order_seq_cst) / 1000000000.0;
 
             offset += snprintf(buffer + offset, size - offset, "%s_sum %f %lu\n", entry->name, sum,
                                (unsigned long)now);
@@ -417,7 +419,7 @@ size_t metrics_export_prometheus(char *buffer, size_t size)
         }
     }
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 
     return offset;
 }
@@ -430,7 +432,7 @@ size_t metrics_export_json(char *buffer, size_t size)
 
     size_t offset = snprintf(buffer, size, "{\"metrics\":[");
 
-    cupolas_rwlock_rdlock(&g_metrics_lock);
+    airy_rwlock_rdlock(&g_metrics_lock);
 
     for (size_t i = 0; i < g_metrics.entry_count && offset < size - 1; i++) {
         metric_entry_t *entry = &g_metrics.entries[i];
@@ -446,22 +448,22 @@ size_t metrics_export_json(char *buffer, size_t size)
         offset += snprintf(buffer + offset, size - offset, "{\"name\":\"%s\",\"type\":%d,",
                            entry->name, entry->type);
 
-        double counter_val = cupolas_atomic_load64(&entry->counter_value) / 1000.0;
-        double gauge_val = cupolas_atomic_load64(&entry->gauge_value) / 1000.0;
+        double counter_val = atomic_load_64(&entry->counter_value, memory_order_seq_cst) / 1000.0;
+        double gauge_val = atomic_load_64(&entry->gauge_value, memory_order_seq_cst) / 1000.0;
 
         if (entry->type == METRIC_TYPE_COUNTER) {
             offset += snprintf(buffer + offset, size - offset, "\"value\":%f}", counter_val);
         } else if (entry->type == METRIC_TYPE_GAUGE) {
             offset += snprintf(buffer + offset, size - offset, "\"value\":%f}", gauge_val);
         } else if (entry->type == METRIC_TYPE_HISTOGRAM) {
-            int64_t count = cupolas_atomic_load64(&entry->histogram_count);
-            double sum = cupolas_atomic_load64(&entry->histogram_sum_ns) / 1000000000.0;
+            int64_t count = atomic_load_64(&entry->histogram_count, memory_order_seq_cst);
+            double sum = atomic_load_64(&entry->histogram_sum_ns, memory_order_seq_cst) / 1000000000.0;
             offset +=
                 snprintf(buffer + offset, size - offset, "\"count\":%ld,\"sum\":%f}", count, sum);
         }
     }
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 
     offset += snprintf(buffer + offset, size - offset, "]}");
 
@@ -470,24 +472,24 @@ size_t metrics_export_json(char *buffer, size_t size)
 
 void metrics_reset(void)
 {
-    cupolas_rwlock_wrlock(&g_metrics_lock);
+    airy_rwlock_wrlock(&g_metrics_lock);
 
     for (size_t i = 0; i < g_metrics.entry_count; i++) {
         metric_entry_t *entry = &g_metrics.entries[i];
-        cupolas_atomic_store64(&entry->counter_value, 0);
-        cupolas_atomic_store64(&entry->gauge_value, 0);
-        cupolas_atomic_store64(&entry->histogram_count, 0);
-        cupolas_atomic_store64(&entry->histogram_sum_ns, 0);
+        atomic_store_64(&entry->counter_value, 0, memory_order_seq_cst);
+        atomic_store_64(&entry->gauge_value, 0, memory_order_seq_cst);
+        atomic_store_64(&entry->histogram_count, 0, memory_order_seq_cst);
+        atomic_store_64(&entry->histogram_sum_ns, 0, memory_order_seq_cst);
     }
 
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
 }
 
 size_t metrics_get_count(void)
 {
-    cupolas_rwlock_rdlock(&g_metrics_lock);
+    airy_rwlock_rdlock(&g_metrics_lock);
     size_t count = g_metrics.entry_count;
-    cupolas_rwlock_unlock(&g_metrics_lock);
+    airy_rwlock_unlock(&g_metrics_lock);
     return count;
 }
 

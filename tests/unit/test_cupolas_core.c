@@ -12,18 +12,25 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
+#include "atomic_compat.h"
+#include "airy_memory.h"
 #include "../include/cupolas.h"
 #include "../src/audit/audit.h"
 #include "../src/permission/permission.h"
 #include "../src/permission/permission_cache.h"
-#include "../src/platform/platform.h"
 #include "../src/sanitizer/sanitizer.h"
 #include "../src/workbench/workbench.h"
+#include "../src/security/cupolas_error.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if !defined(_WIN32)
+#include <strings.h>
+#endif
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
@@ -34,75 +41,81 @@
 
 static void test_platform_mutex(void)
 {
-    cupolas_mutex_t mutex;
+    airy_mtx_t mutex;
 
-    assert(cupolas_mutex_init(&mutex) == CUPOLAS_OK);
-    assert(cupolas_mutex_lock(&mutex) == CUPOLAS_OK);
-    assert(cupolas_mutex_unlock(&mutex) == CUPOLAS_OK);
-    assert(cupolas_mutex_destroy(&mutex) == CUPOLAS_OK);
+    assert(airy_mtx_init(&mutex) == CUPOLAS_OK);
+    assert(airy_mtx_lock(&mutex) == CUPOLAS_OK);
+    assert(airy_mtx_unlock(&mutex) == CUPOLAS_OK);
+    airy_mtx_destroy(&mutex);
 
     TEST_PASS("platform_mutex");
 }
 
 static void test_platform_rwlock(void)
 {
-    cupolas_rwlock_t rwlock;
+    airy_rwlock_t rwlock;
 
-    assert(cupolas_rwlock_init(&rwlock) == CUPOLAS_OK);
-    assert(cupolas_rwlock_rdlock(&rwlock) == CUPOLAS_OK);
-    assert(cupolas_rwlock_unlock(&rwlock) == CUPOLAS_OK);
-    assert(cupolas_rwlock_wrlock(&rwlock) == CUPOLAS_OK);
-    assert(cupolas_rwlock_unlock(&rwlock) == CUPOLAS_OK);
-    assert(cupolas_rwlock_destroy(&rwlock) == CUPOLAS_OK);
+    assert(airy_rwlock_init(&rwlock) == CUPOLAS_OK);
+    assert(airy_rwlock_rdlock(&rwlock) == CUPOLAS_OK);
+    assert(airy_rwlock_unlock(&rwlock) == CUPOLAS_OK);
+    assert(airy_rwlock_wrlock(&rwlock) == CUPOLAS_OK);
+    assert(airy_rwlock_unlock(&rwlock) == CUPOLAS_OK);
+    airy_rwlock_destroy(&rwlock);
 
     TEST_PASS("platform_rwlock");
 }
 
 static void test_platform_time(void)
 {
-    cupolas_timestamp_t ts;
+    uint64_t wall1 = airy_time_wall_ms();
+    assert(wall1 > 0);
 
-    assert(cupolas_time_now(&ts) == cupolas_OK);
-    assert(ts.sec > 0);
+    airy_sleep_ms(2);
+    uint64_t wall2 = airy_time_wall_ms();
+    assert(wall2 >= wall1);
 
-    uint64_t ms = cupolas_time_ms();
-    assert(ms > 0);
+    uint64_t mono = airy_time_ms();
+    assert(mono > 0);
 
     TEST_PASS("platform_time");
 }
 
 static void test_platform_atomic(void)
 {
-    cupolas_atomic32_t val32 = 0;
-    cupolas_atomic64_t val64 = 0;
+    atomic_int val32 = 0;
+    atomic_int64_t val64 = 0;
 
-    assert(cupolas_atomic_load32(&val32) == 0);
-    cupolas_atomic_store32(&val32, 42);
-    assert(cupolas_atomic_load32(&val32) == 42);
-    assert(cupolas_atomic_inc32(&val32) == 43);
-    assert(cupolas_atomic_load32(&val32) == 43);
-    assert(cupolas_atomic_dec32(&val32) == 42);
-    assert(cupolas_atomic_load32(&val32) == 42);
-    assert(cupolas_atomic_cas32(&val32, 42, 100) == true);
-    assert(cupolas_atomic_load32(&val32) == 100);
+    assert(atomic_load_32(&val32, memory_order_seq_cst) == 0);
+    atomic_store_32(&val32, 42, memory_order_seq_cst);
+    assert(atomic_load_32(&val32, memory_order_seq_cst) == 42);
+    assert(atomic_fetch_add_32(&val32, 1, memory_order_seq_cst) + 1 == 43);
+    assert(atomic_load_32(&val32, memory_order_seq_cst) == 43);
+    assert(atomic_fetch_sub_32(&val32, 1, memory_order_seq_cst) - 1 == 42);
+    assert(atomic_load_32(&val32, memory_order_seq_cst) == 42);
+    int expected = 42;
+    assert(atomic_compare_exchange_strong_32(&val32, &expected, 100,
+                                             memory_order_seq_cst,
+                                             memory_order_seq_cst));
+    assert(atomic_load_32(&val32, memory_order_seq_cst) == 100);
 
-    cupolas_atomic_store64(&val64, 1000000);
-    assert(cupolas_atomic_load64(&val64) == 1000000);
-    assert(cupolas_atomic_add64(&val64, 500000) == 1500000);
-    assert(cupolas_atomic_load64(&val64) == 1500000);
+    atomic_store_64(&val64, 1000000, memory_order_seq_cst);
+    assert(atomic_load_64(&val64, memory_order_seq_cst) == 1000000);
+    assert(atomic_fetch_add_64(&val64, 500000, memory_order_seq_cst) +
+           500000 == 1500000);
+    assert(atomic_load_64(&val64, memory_order_seq_cst) == 1500000);
 
     TEST_PASS("platform_atomic");
 }
 
 static void test_platform_string(void)
 {
-    char *dup = cupolas_strdup("hello");
+    char *dup = AIRY_STRDUP("hello");
     assert(dup != NULL);
     assert(strcmp(dup, "hello") == 0);
-    cupolas_mem_free(dup);
+    AIRY_FREE(dup);
 
-    assert(cupolas_strcasecmp("Hello", "HELLO") == 0);
-    assert(cupolas_strcasecmp("Hello", "World") != 0);
+    assert(strcasecmp("Hello", "HELLO") == 0);
+    assert(strcasecmp("Hello", "World") != 0);
 
     TEST_PASS("platform_string");
 }

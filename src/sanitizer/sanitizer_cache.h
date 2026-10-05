@@ -9,7 +9,7 @@
 #ifndef CUPOLAS_SANITIZER_CACHE_H
 #define CUPOLAS_SANITIZER_CACHE_H
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include "sanitizer.h"
 
 #include <stddef.h>

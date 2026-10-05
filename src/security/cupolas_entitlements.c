@@ -11,6 +11,7 @@
  *          cupolas_entitlements_crypto.c。
  */
 
+#include "platform.h"
 #include "cupolas_entitlements_internal.h"
 
 #include "cupolas_error.h"
@@ -81,10 +82,10 @@ int cupolas_entitlements_load_string(const char *yaml_content,
     if (!*entitlements)
         return CUPOLAS_ENT_PARSE_ERROR;
 
-    CUPOLAS_MUTEX_INIT(&(*entitlements)->lock);
+    airy_mtx_init(&(*entitlements)->lock);
 
-    (*entitlements)->raw_content = cupolas_strdup(yaml_content);
-    (*entitlements)->load_time = cupolas_time_ms();
+    (*entitlements)->raw_content = AIRY_STRDUP(yaml_content);
+    (*entitlements)->load_time = airy_time_wall_ms();
     (*entitlements)->is_verified = 0;
 
     int result = cupolas_parse_entitlements_content(yaml_content, &(*entitlements)->info);
@@ -141,7 +142,7 @@ void cupolas_entitlements_free(cupolas_entitlements_t *entitlements)
     cupolas_free_string_array(entitlements->info.allowed_capabilities,
                               entitlements->info.cap_count);
 
-    cupolas_mutex_destroy(&entitlements->lock);
+    airy_mtx_destroy(&entitlements->lock);
 
     AIRY_FREE(entitlements);
 }
@@ -321,7 +322,7 @@ int cupolas_entitlements_check_validity(cupolas_entitlements_t *entitlements)
     if (!entitlements)
         return CUPOLAS_ENT_INVALID;
 
-    uint64_t now = cupolas_time_ms() / 1000;
+    uint64_t now = airy_time_wall_ms() / 1000;
 
     if (entitlements->info.not_before > 0 && now < entitlements->info.not_before) {
         return CUPOLAS_ENT_EXPIRED;

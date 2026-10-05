@@ -14,6 +14,7 @@
 #include "../utils/cupolas_utils.h"
 #include "guard_core.h"
 #include "platform.h"
+#include "security/cupolas_error.h"
 #include "airy_memory.h"
 
 #include <stdlib.h>

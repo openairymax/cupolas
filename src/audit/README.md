@@ -61,8 +61,8 @@ audit/
 |------|------|------|
 | `head / tail` | `audit_entry_t *` | 队列头尾指针 |
 | `size / max_size` | `size_t` | 当前/最大容量 |
-| `lock` | `cupolas_mutex_t` | 互斥锁 |
-| `not_empty / not_full` | `cupolas_cond_t` | 条件变量 |
+| `lock` | `airy_mtx_t` | 互斥锁 |
+| `not_empty / not_full` | `airy_cond_t` | 条件变量 |
 | `total_pushed / total_popped` | `cupolas_atomic64_t` | 原子计数器 |
 
 ## 接口说明

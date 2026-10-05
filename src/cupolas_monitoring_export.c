@@ -19,7 +19,6 @@
 
 #include "cupolas_metrics.h"
 
-#include "platform/platform.h"
 
 #include "airy_memory.h"
 
@@ -31,7 +30,7 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t
     if (!mgr || !buffer || size == 0)
         return 0;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
 
     size_t copied = 0;
     if (mgr->metrics_buffer_size > 0 && size > mgr->metrics_buffer_size) {
@@ -39,7 +38,7 @@ size_t cupolas_monitoring_export(cupolas_monitoring_t *mgr, char *buffer, size_t
         copied = mgr->metrics_buffer_size;
     }
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return copied;
 }
@@ -77,10 +76,10 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
         return 0;
     }
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
 
     if (mgr->metrics_buffer_size == 0) {
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
         return 0;
     }
 
@@ -101,7 +100,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                                                            "cupolas");
 
     if (written >= size) {
-        cupolas_rwlock_unlock(&mgr->lock);
+        airy_rwlock_unlock(&mgr->lock);
         return 0;
     }
 
@@ -159,7 +158,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                                 metric_value);
 
                             if (written >= size) {
-                                cupolas_rwlock_unlock(&mgr->lock);
+                                airy_rwlock_unlock(&mgr->lock);
                                 return 0;
                             }
                         }
@@ -179,7 +178,7 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t *mgr, char *buffer, s
                         "}\n",
                         (unsigned long long)mgr->last_report_time);
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return (written < size) ? written : 0;
 }

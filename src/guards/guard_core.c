@@ -6,9 +6,10 @@
  * @brief SafetyGuard Core Implementation
  */
 
+#include "platform.h"
 #include "guard_core.h"
 
-#include "../platform/platform.h"
+#include "security/cupolas_error.h"
 #include "logging.h"
 #include "atomic_compat.h"
 #include "airy_memory.h"
@@ -49,13 +50,13 @@ struct guard_manager_private {
     guard_t **guards;
     size_t guard_count;
     size_t guard_capacity;
-    cupolas_mutex_t lock;
-    cupolas_cond_t cond;
+    airy_mtx_t lock;
+    airy_cond_t cond;
     uint64_t next_guard_id;
     guard_stats_t stats;
     void *result_cache;
     bool initialized;
-    cupolas_thread_t async_thread;
+    airy_thread_t async_thread;
     bool async_running;
     async_request_t *async_queue_head;
     async_request_t *async_queue_tail;
@@ -68,9 +69,9 @@ static void *guard_async_worker(void *arg);
 
 static guard_id_t generate_guard_id(guard_manager_private_t *manager)
 {
-    cupolas_mutex_lock(&manager->lock);
+    airy_mtx_lock(&manager->lock);
     guard_id_t id = ++manager->next_guard_id;
-    cupolas_mutex_unlock(&manager->lock);
+    airy_mtx_unlock(&manager->lock);
     return id;
 }
 
@@ -207,14 +208,14 @@ guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
         return NULL;
     }
 
-    if (cupolas_mutex_init(&manager->lock) != CUPOLAS_OK) {
+    if (airy_mtx_init(&manager->lock) != CUPOLAS_OK) {
         AIRY_FREE(manager->guards);
         AIRY_FREE(manager);
         return NULL;
     }
 
-    if (cupolas_cond_init(&manager->cond) != CUPOLAS_OK) {
-        cupolas_mutex_destroy(&manager->lock);
+    if (airy_cond_init(&manager->cond) != CUPOLAS_OK) {
+        airy_mtx_destroy(&manager->lock);
         AIRY_FREE(manager->guards);
         AIRY_FREE(manager);
         return NULL;
@@ -236,11 +237,11 @@ void guard_manager_destroy(guard_manager_t *manager)
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
     if (priv->async_running) {
-        cupolas_mutex_lock(&priv->lock);
+        airy_mtx_lock(&priv->lock);
         priv->async_running = false;
-        cupolas_cond_signal(&priv->cond);
-        cupolas_mutex_unlock(&priv->lock);
-        cupolas_thread_join(priv->async_thread, NULL);
+        airy_cond_signal(&priv->cond);
+        airy_mtx_unlock(&priv->lock);
+        airy_platform_thread_join(priv->async_thread, NULL);
     }
 
     for (size_t i = 0; i < priv->guard_count; i++) {
@@ -249,8 +250,8 @@ void guard_manager_destroy(guard_manager_t *manager)
         }
     }
 
-    cupolas_mutex_destroy(&priv->lock);
-    cupolas_cond_destroy(&priv->cond);
+    airy_mtx_destroy(&priv->lock);
+    airy_cond_destroy(&priv->cond);
 
     AIRY_FREE(priv->guards);
     AIRY_FREE(priv);
@@ -263,15 +264,15 @@ int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard)
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
 
     if (priv->guard_count >= priv->guard_capacity) {
-        cupolas_mutex_unlock(&priv->lock);
+        airy_mtx_unlock(&priv->lock);
         return cupolas_ERROR_NO_MEMORY;
     }
 
     if (find_guard_index_by_name(priv, guard->name) != SIZE_MAX) {
-        cupolas_mutex_unlock(&priv->lock);
+        airy_mtx_unlock(&priv->lock);
         return cupolas_ERROR_BUSY;
     }
 
@@ -283,7 +284,7 @@ int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard)
         sort_guards_by_priority(priv);
     }
 
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return CUPOLAS_OK;
 }
@@ -295,11 +296,11 @@ int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
 
     size_t index = find_guard_index_by_id(priv, guard_id);
     if (index == SIZE_MAX) {
-        cupolas_mutex_unlock(&priv->lock);
+        airy_mtx_unlock(&priv->lock);
         return cupolas_ERROR_NOT_FOUND;
     }
 
@@ -310,7 +311,7 @@ int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id
     }
     priv->guard_count--;
 
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     guard_destroy(guard);
 
@@ -324,10 +325,10 @@ guard_t *guard_manager_find_guard_by_name(guard_manager_t *manager, const char *
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
     size_t index = find_guard_index_by_name(priv, name);
     guard_t *guard = (index != SIZE_MAX) ? priv->guards[index] : NULL;
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return guard;
 }
@@ -339,10 +340,10 @@ guard_t *guard_manager_find_guard_by_id(guard_manager_t *manager, guard_id_t id)
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
     size_t index = find_guard_index_by_id(priv, id);
     guard_t *guard = (index != SIZE_MAX) ? priv->guards[index] : NULL;
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return guard;
 }
@@ -356,7 +357,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
 
     priv->stats.total_checks++;
 
@@ -422,7 +423,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
 
     *actual_results = result_count;
 
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return CUPOLAS_OK;
 }
@@ -464,11 +465,11 @@ uint64_t guard_manager_check_async(guard_manager_t *manager, const guard_context
         AIRY_FREE(ctx_copy);
     }
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
 
     if (!priv->async_running) {
         priv->async_running = true;
-        cupolas_thread_create(&priv->async_thread, guard_async_worker, priv);
+        airy_platform_thread_create(&priv->async_thread, guard_async_worker, priv);
     }
 
     if (priv->async_queue_tail) {
@@ -478,8 +479,8 @@ uint64_t guard_manager_check_async(guard_manager_t *manager, const guard_context
     }
     priv->async_queue_tail = req;
 
-    cupolas_cond_signal(&priv->cond);
-    cupolas_mutex_unlock(&priv->lock);
+    airy_cond_signal(&priv->cond);
+    airy_mtx_unlock(&priv->lock);
 
     return request_id;
 }
@@ -488,11 +489,11 @@ static void *guard_async_worker(void *arg)
 {
     guard_manager_private_t *priv = (guard_manager_private_t *)arg;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
 
     while (priv->async_running || priv->async_queue_head) {
         while (!priv->async_queue_head && priv->async_running) {
-            cupolas_cond_wait(&priv->cond, &priv->lock);
+            airy_cond_wait(&priv->cond, &priv->lock);
         }
 
         async_request_t *req = priv->async_queue_head;
@@ -503,7 +504,7 @@ static void *guard_async_worker(void *arg)
         if (!priv->async_queue_head)
             priv->async_queue_tail = NULL;
 
-        cupolas_mutex_unlock(&priv->lock);
+        airy_mtx_unlock(&priv->lock);
 
         int result = guard_manager_check_sync((guard_manager_t *)priv, &req->context, req->results,
                                               req->max_results, &req->actual_results);
@@ -516,10 +517,10 @@ static void *guard_async_worker(void *arg)
         AIRY_FREE(req->results);
         AIRY_FREE(req);
 
-        cupolas_mutex_lock(&priv->lock);
+        airy_mtx_lock(&priv->lock);
     }
 
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
     return NULL;
 }
 
@@ -530,9 +531,9 @@ int guard_manager_get_stats(guard_manager_t *manager, guard_stats_t *stats)
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
     *stats = priv->stats;
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return CUPOLAS_OK;
 }
@@ -544,9 +545,9 @@ int guard_manager_reset_stats(guard_manager_t *manager)
 
     guard_manager_private_t *priv = (guard_manager_private_t *)manager;
 
-    cupolas_mutex_lock(&priv->lock);
+    airy_mtx_lock(&priv->lock);
     __builtin_memset(&priv->stats, 0, sizeof(priv->stats));
-    cupolas_mutex_unlock(&priv->lock);
+    airy_mtx_unlock(&priv->lock);
 
     return CUPOLAS_OK;
 }

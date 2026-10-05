@@ -14,6 +14,7 @@
  * HTTP request validation, and secure response-header injection.
  */
 
+#include "airy_memory.h"
 #include "cupolas_network_security_internal.h"
 
 static int cupolas_match_url_pattern(const char *pattern, const char *url)
@@ -33,13 +34,13 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
     if (!host)
         return 0;
 
-    cupolas_mutex_lock(&g_net_security.lock);
+    airy_mtx_lock(&g_net_security.lock);
 
     g_net_security.stats.total_connections++;
 
     if (g_net_security.manager.http.enforce_https && protocol == CUPOLAS_PROTO_TCP) {
         g_net_security.stats.plaintext_blocked++;
-        cupolas_mutex_unlock(&g_net_security.lock);
+        airy_mtx_unlock(&g_net_security.lock);
         return 0;
     }
 
@@ -57,15 +58,15 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
         if (host_match && port_match && proto_match) {
             switch (rule->action) {
             case CUPOLAS_FW_ALLOW:
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 1;
             case CUPOLAS_FW_DENY:
                 g_net_security.stats.blocked_connections++;
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 0;
             case CUPOLAS_FW_LOG:
             case CUPOLAS_FW_RATE_LIMIT:
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 1;
             }
         }
@@ -75,7 +76,7 @@ int cupolas_net_check_access(const char *host, uint16_t port, cupolas_proto_t pr
      * intercepted, preventing all traffic from passing when no firewall
      * rules are configured (security dome default-deny principle). */
     g_net_security.stats.blocked_connections++;
-    cupolas_mutex_unlock(&g_net_security.lock);
+    airy_mtx_unlock(&g_net_security.lock);
     return 0;
 }
 
@@ -99,14 +100,14 @@ int cupolas_net_check_url(const char *url, const char *method)
     if (!url)
         return 0;
 
-    cupolas_mutex_lock(&g_net_security.lock);
+    airy_mtx_lock(&g_net_security.lock);
 
     g_net_security.stats.http_requests++;
 
     if (g_net_security.manager.http.enforce_https) {
         if (strncmp(url, "https://", 8) != 0) {
             g_net_security.stats.plaintext_blocked++;
-            cupolas_mutex_unlock(&g_net_security.lock);
+            airy_mtx_unlock(&g_net_security.lock);
             return 0;
         }
         g_net_security.stats.https_requests++;
@@ -121,25 +122,25 @@ int cupolas_net_check_url(const char *url, const char *method)
         if (rule->url_pattern && cupolas_match_url_pattern(rule->url_pattern, url)) {
             switch (rule->action) {
             case CUPOLAS_FW_ALLOW:
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 1;
             case CUPOLAS_FW_DENY:
                 g_net_security.stats.blocked_connections++;
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 0;
             default:
-                cupolas_mutex_unlock(&g_net_security.lock);
+                airy_mtx_unlock(&g_net_security.lock);
                 return 1;
             }
         }
     }
 
     if (!http_method_allowed(method, 0)) {
-        cupolas_mutex_unlock(&g_net_security.lock);
+        airy_mtx_unlock(&g_net_security.lock);
         return 0;
     }
 
-    cupolas_mutex_unlock(&g_net_security.lock);
+    airy_mtx_unlock(&g_net_security.lock);
     return 1;
 }
 
@@ -210,7 +211,7 @@ int cupolas_http_add_security_headers(const char **headers, size_t header_count,
     }
 
     for (size_t i = 0; i < num_sec_headers; i++) {
-        ((char **)headers)[header_count + i] = cupolas_strdup(security_headers[i]);
+        ((char **)headers)[header_count + i] = AIRY_STRDUP(security_headers[i]);
     }
 
     return 0;

@@ -12,7 +12,9 @@
  * @author SPHARX Ltd. - Airymax Team
  */
 
+#include "platform.h"
 #include "audit_rotator.h"
+#include "security/cupolas_error.h"
 
 #include "utils/cupolas_utils.h"
 
@@ -90,7 +92,7 @@ struct audit_rotator {
     size_t max_file_size;
     int max_files;
     size_t current_size;
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
     int no_file_mode;
 };
 
@@ -114,16 +116,16 @@ static const char *cupolas_audit_event_type_str(audit_event_type_t type)
 
 static char *cupolas_audit_build_filename(const char *dir, const char *prefix, int index)
 {
-    char *path = (char *)cupolas_mem_alloc(MAX_PATH_LEN);
+    char *path = (char *)AIRY_CALLOC(1, MAX_PATH_LEN);
     if (!path)
         return NULL;
 
     if (index < 0) {
-        snprintf(path, MAX_PATH_LEN, "%s%s%s.log", dir ? dir : "", dir ? cupolas_PATH_SEP_STR : "",
+        snprintf(path, MAX_PATH_LEN, "%s%s%s.log", dir ? dir : "", dir ? AIRY_PATH_SEP_STR : "",
                  prefix ? prefix : "audit");
     } else {
         snprintf(path, MAX_PATH_LEN, "%s%s%s.%d.log", dir ? dir : "",
-                 dir ? cupolas_PATH_SEP_STR : "", prefix ? prefix : "audit", index);
+                 dir ? AIRY_PATH_SEP_STR : "", prefix ? prefix : "audit", index);
     }
 
     return path;
@@ -136,18 +138,18 @@ static int cupolas_audit_open_current_file(audit_rotator_t *rotator)
         rotator->fp = NULL;
     }
 
-    cupolas_mem_free(rotator->current_file);
+    AIRY_FREE(rotator->current_file);
     rotator->current_file = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, -1);
     if (!rotator->current_file)
         return cupolas_ERROR_NO_MEMORY;
 
     if (rotator->log_dir) {
-        cupolas_file_mkdir(rotator->log_dir, true);
+        airy_mkdir_p(rotator->log_dir);
     }
 
     rotator->fp = fopen(rotator->current_file, "a");
     if (!rotator->fp) {
-        cupolas_mem_free(rotator->current_file);
+        AIRY_FREE(rotator->current_file);
         rotator->current_file = NULL;
         rotator->no_file_mode = 1;
         return cupolas_OK;
@@ -156,8 +158,8 @@ static int cupolas_audit_open_current_file(audit_rotator_t *rotator)
     rotator->current_size = 0;
     rotator->no_file_mode = 0;
 
-    cupolas_file_stat_t st;
-    if (cupolas_file_stat(rotator->current_file, &st) == cupolas_OK) {
+    airy_file_stat_t st;
+    if (airy_file_stat(rotator->current_file, &st) == 0) {
         rotator->current_size = (size_t)st.size;
     }
 
@@ -178,8 +180,8 @@ static int cupolas_audit_rotate_files(audit_rotator_t *rotator)
     char *oldest =
         cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, rotator->max_files - 1);
     if (oldest) {
-        cupolas_file_remove(oldest);
-        cupolas_mem_free(oldest);
+        airy_file_remove(oldest);
+        AIRY_FREE(oldest);
     }
 
     for (int i = rotator->max_files - 2; i >= 0; i--) {
@@ -187,18 +189,18 @@ static int cupolas_audit_rotate_files(audit_rotator_t *rotator)
         char *new_path = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, i + 1);
 
         if (old_path && new_path) {
-            cupolas_file_rename(old_path, new_path);
+            airy_file_rename(old_path, new_path);
         }
 
-        cupolas_mem_free(old_path);
-        cupolas_mem_free(new_path);
+        AIRY_FREE(old_path);
+        AIRY_FREE(new_path);
     }
 
     char *current_new = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, 0);
     if (current_new && rotator->current_file) {
-        cupolas_file_rename(rotator->current_file, current_new);
+        airy_file_rename(rotator->current_file, current_new);
     }
-    cupolas_mem_free(current_new);
+    AIRY_FREE(current_new);
 
     return cupolas_audit_open_current_file(rotator);
 }
@@ -206,20 +208,20 @@ static int cupolas_audit_rotate_files(audit_rotator_t *rotator)
 audit_rotator_t *audit_rotator_create(const char *log_dir, const char *log_prefix,
                                       size_t max_file_size, int max_files)
 {
-    audit_rotator_t *rotator = (audit_rotator_t *)cupolas_mem_alloc(sizeof(audit_rotator_t));
+    audit_rotator_t *rotator = (audit_rotator_t *)AIRY_CALLOC(1, sizeof(audit_rotator_t));
     if (!rotator)
         return NULL;
 
     __builtin_memset(rotator, 0, sizeof(audit_rotator_t));
 
     if (log_dir) {
-        rotator->log_dir = cupolas_strdup(log_dir);
+        rotator->log_dir = AIRY_STRDUP(log_dir);
         if (!rotator->log_dir)
             goto error;
     }
 
     if (log_prefix) {
-        rotator->log_prefix = cupolas_strdup(log_prefix);
+        rotator->log_prefix = AIRY_STRDUP(log_prefix);
         if (!rotator->log_prefix)
             goto error;
     }
@@ -227,21 +229,21 @@ audit_rotator_t *audit_rotator_create(const char *log_dir, const char *log_prefi
     rotator->max_file_size = max_file_size > 0 ? max_file_size : 10 * 1024 * 1024;
     rotator->max_files = max_files > 0 ? max_files : 10;
 
-    if (cupolas_mutex_init(&rotator->lock) != cupolas_OK) {
+    if (airy_mtx_init(&rotator->lock) != cupolas_OK) {
         goto error;
     }
 
     if (cupolas_audit_open_current_file(rotator) != cupolas_OK) {
-        cupolas_mutex_destroy(&rotator->lock);
+        airy_mtx_destroy(&rotator->lock);
         goto error;
     }
 
     return rotator;
 
 error:
-    cupolas_mem_free(rotator->log_dir);
-    cupolas_mem_free(rotator->log_prefix);
-    cupolas_mem_free(rotator);
+    AIRY_FREE(rotator->log_dir);
+    AIRY_FREE(rotator->log_prefix);
+    AIRY_FREE(rotator);
     return NULL;
 }
 
@@ -250,20 +252,20 @@ void audit_rotator_destroy(audit_rotator_t *rotator)
     if (!rotator)
         return;
 
-    cupolas_mutex_lock(&rotator->lock);
+    airy_mtx_lock(&rotator->lock);
 
     if (rotator->fp) {
         fclose(rotator->fp);
         rotator->fp = NULL;
     }
 
-    cupolas_mem_free(rotator->current_file);
-    cupolas_mem_free(rotator->log_dir);
-    cupolas_mem_free(rotator->log_prefix);
+    AIRY_FREE(rotator->current_file);
+    AIRY_FREE(rotator->log_dir);
+    AIRY_FREE(rotator->log_prefix);
 
-    cupolas_mutex_unlock(&rotator->lock);
-    cupolas_mutex_destroy(&rotator->lock);
-    cupolas_mem_free(rotator);
+    airy_mtx_unlock(&rotator->lock);
+    airy_mtx_destroy(&rotator->lock);
+    AIRY_FREE(rotator);
 }
 
 int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
@@ -271,21 +273,21 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
     if (!rotator || !entry)
         return cupolas_ERROR_INVALID_ARG;
 
-    cupolas_mutex_lock(&rotator->lock);
+    airy_mtx_lock(&rotator->lock);
 
     if (rotator->no_file_mode) {
-        cupolas_mutex_unlock(&rotator->lock);
+        airy_mtx_unlock(&rotator->lock);
         return cupolas_OK;
     }
 
     if (!rotator->fp) {
-        cupolas_mutex_unlock(&rotator->lock);
+        airy_mtx_unlock(&rotator->lock);
         return cupolas_ERROR_IO;
     }
 
     if (rotator->current_size >= rotator->max_file_size) {
         if (cupolas_audit_rotate_files(rotator) != cupolas_OK) {
-            cupolas_mutex_unlock(&rotator->lock);
+            airy_mtx_unlock(&rotator->lock);
             return cupolas_ERROR_IO;
         }
     }
@@ -331,7 +333,7 @@ int audit_rotator_write(audit_rotator_t *rotator, const audit_entry_t *entry)
         }
     }
 
-    cupolas_mutex_unlock(&rotator->lock);
+    airy_mtx_unlock(&rotator->lock);
 
     return written > 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
@@ -341,9 +343,9 @@ int audit_rotator_rotate(audit_rotator_t *rotator)
     if (!rotator)
         return cupolas_ERROR_INVALID_ARG;
 
-    cupolas_mutex_lock(&rotator->lock);
+    airy_mtx_lock(&rotator->lock);
     int ret = cupolas_audit_rotate_files(rotator);
-    cupolas_mutex_unlock(&rotator->lock);
+    airy_mtx_unlock(&rotator->lock);
 
     return ret;
 }
@@ -353,9 +355,9 @@ size_t audit_rotator_current_size(audit_rotator_t *rotator)
     if (!rotator)
         return 0;
 
-    cupolas_mutex_lock(&rotator->lock);
+    airy_mtx_lock(&rotator->lock);
     size_t size = rotator->current_size;
-    cupolas_mutex_unlock(&rotator->lock);
+    airy_mtx_unlock(&rotator->lock);
 
     return size;
 }

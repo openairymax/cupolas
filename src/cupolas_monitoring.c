@@ -21,7 +21,6 @@
 
 #include "cupolas_metrics.h"
 
-#include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "error.h"
 
@@ -32,7 +31,7 @@
 #include <string.h>
 
 static cupolas_monitoring_t *g_monitoring = NULL;
-static cupolas_rwlock_t g_monitoring_lock = {0};
+static airy_rwlock_t g_monitoring_lock = {0};
 
 const char *monitoring_backend_string(monitoring_backend_t backend)
 {
@@ -69,7 +68,7 @@ const char *monitoring_status_string(monitoring_status_t status)
 cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manager)
 {
     cupolas_monitoring_t *mgr =
-        (cupolas_monitoring_t *)cupolas_mem_alloc(sizeof(cupolas_monitoring_t));
+        (cupolas_monitoring_t *)AIRY_CALLOC(1, sizeof(cupolas_monitoring_t));
     if (!mgr) {
         return NULL;
     }
@@ -89,7 +88,7 @@ cupolas_monitoring_t *cupolas_monitoring_create(const monitoring_config_t *manag
     }
 
     mgr->status = MONITORING_STATUS_STOPPED;
-    cupolas_rwlock_init(&mgr->lock);
+    airy_rwlock_init(&mgr->lock);
 
     mgr->collector_running = false;
     mgr->collect_interval_ms = manager ? manager->reporting_interval_ms : 10000;
@@ -106,9 +105,9 @@ void cupolas_monitoring_destroy(cupolas_monitoring_t *mgr)
 
     cupolas_monitoring_stop(mgr);
 
-    cupolas_rwlock_destroy(&mgr->lock);
+    airy_rwlock_destroy(&mgr->lock);
 
-    cupolas_mem_free(mgr);
+    AIRY_FREE(mgr);
 }
 
 monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t *mgr)
@@ -116,9 +115,9 @@ monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t *mgr)
     if (!mgr)
         return MONITORING_STATUS_ERROR;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
     monitoring_status_t status = mgr->status;
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return status;
 }
@@ -128,14 +127,14 @@ int cupolas_monitoring_report(cupolas_monitoring_t *mgr)
     if (!mgr)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
 
     metrics_export_prometheus(mgr->metrics_buffer, sizeof(mgr->metrics_buffer) - 1);
     mgr->metrics_buffer_size = strlen(mgr->metrics_buffer);
 
     mgr->last_report_time = metrics_get_timestamp_ns();
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return 0;
 }
@@ -145,11 +144,11 @@ const char *cupolas_monitoring_get_listen_addr(cupolas_monitoring_t *mgr)
     if (!mgr)
         return NULL;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
     static char addr[128];
     snprintf(addr, sizeof(addr), "%s:%u", mgr->manager.prometheus.listen_addr,
              mgr->manager.prometheus.port);
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return addr;
 }
@@ -160,7 +159,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
     if (!mgr)
         return AIRY_EINVAL;
 
-    cupolas_rwlock_wrlock(&mgr->lock);
+    airy_rwlock_wrlock(&mgr->lock);
 
     mgr->include_count = 0;
     if (include_patterns) {
@@ -180,7 +179,7 @@ int cupolas_monitoring_set_filter(cupolas_monitoring_t *mgr, const char **includ
         }
     }
 
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return 0;
 }
@@ -190,9 +189,9 @@ size_t cupolas_monitoring_get_metric_count(cupolas_monitoring_t *mgr)
     if (!mgr)
         return 0;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
     size_t count = metrics_get_count();
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return count;
 }
@@ -202,9 +201,9 @@ uint64_t cupolas_monitoring_get_last_report_time(cupolas_monitoring_t *mgr)
     if (!mgr)
         return 0;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
     uint64_t time = mgr->last_report_time;
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return time;
 }
@@ -214,9 +213,9 @@ const char *cupolas_monitoring_get_last_error(cupolas_monitoring_t *mgr)
     if (!mgr)
         return NULL;
 
-    cupolas_rwlock_rdlock(&mgr->lock);
+    airy_rwlock_rdlock(&mgr->lock);
     const char *error = mgr->last_error[0] ? mgr->last_error : NULL;
-    cupolas_rwlock_unlock(&mgr->lock);
+    airy_rwlock_unlock(&mgr->lock);
 
     return error;
 }
@@ -224,7 +223,7 @@ const char *cupolas_monitoring_get_last_error(cupolas_monitoring_t *mgr)
 monitoring_config_t *monitoring_config_create_prometheus(uint16_t port)
 {
     monitoring_config_t *manager =
-        (monitoring_config_t *)cupolas_mem_alloc(sizeof(monitoring_config_t));
+        (monitoring_config_t *)AIRY_CALLOC(1, sizeof(monitoring_config_t));
     if (!manager)
         return NULL;
 
@@ -245,7 +244,7 @@ monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint
                                                             const char *service_name)
 {
     monitoring_config_t *manager =
-        (monitoring_config_t *)cupolas_mem_alloc(sizeof(monitoring_config_t));
+        (monitoring_config_t *)AIRY_CALLOC(1, sizeof(monitoring_config_t));
     if (!manager)
         return NULL;
 
@@ -263,40 +262,40 @@ monitoring_config_t *monitoring_config_create_opentelemetry(const char *endpoint
 
 void monitoring_config_destroy(monitoring_config_t *manager)
 {
-    cupolas_mem_free(manager);
+    AIRY_FREE(manager);
 }
 
 cupolas_monitoring_t *cupolas_monitoring_get_instance(void)
 {
-    cupolas_rwlock_rdlock(&g_monitoring_lock);
+    airy_rwlock_rdlock(&g_monitoring_lock);
     cupolas_monitoring_t *instance = g_monitoring;
-    cupolas_rwlock_unlock(&g_monitoring_lock);
+    airy_rwlock_unlock(&g_monitoring_lock);
     return instance;
 }
 
 int cupolas_monitoring_init_instance(const monitoring_config_t *manager)
 {
-    cupolas_rwlock_wrlock(&g_monitoring_lock);
+    airy_rwlock_wrlock(&g_monitoring_lock);
 
     if (g_monitoring) {
-        cupolas_rwlock_unlock(&g_monitoring_lock);
+        airy_rwlock_unlock(&g_monitoring_lock);
         return 0;
     }
 
     g_monitoring = cupolas_monitoring_create(manager);
     if (!g_monitoring) {
-        cupolas_rwlock_unlock(&g_monitoring_lock);
+        airy_rwlock_unlock(&g_monitoring_lock);
         return AIRY_EINVAL;
     }
 
-    cupolas_rwlock_unlock(&g_monitoring_lock);
+    airy_rwlock_unlock(&g_monitoring_lock);
 
     return cupolas_monitoring_start(g_monitoring);
 }
 
 void cupolas_monitoring_shutdown_instance(void)
 {
-    cupolas_rwlock_wrlock(&g_monitoring_lock);
+    airy_rwlock_wrlock(&g_monitoring_lock);
 
     if (g_monitoring) {
         cupolas_monitoring_stop(g_monitoring);
@@ -304,5 +303,5 @@ void cupolas_monitoring_shutdown_instance(void)
         g_monitoring = NULL;
     }
 
-    cupolas_rwlock_unlock(&g_monitoring_lock);
+    airy_rwlock_unlock(&g_monitoring_lock);
 }

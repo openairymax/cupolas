@@ -7,6 +7,7 @@
  *        and validation.
  */
 
+#include "airy_memory.h"
 #include "cupolas_vault_internal.h"
 
 bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, const char *agent_id,
@@ -18,11 +19,11 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
         return false;
     }
 
-    cupolas_rwlock_rdlock(&vault->lock);
+    airy_rwlock_rdlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return false;
     }
 
@@ -30,7 +31,7 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
      * to any agent. The creator/user must explicitly grant_access to get
      * the corresponding operation permissions. */
     if (entry->acl.count == 0) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         AIRY_LOG_WARN("cupolas_vault_check_access: no ACL entries for cred_id=%s, access denied by "
                  "default (agent_id=%s)",
                  cred_id, agent_id);
@@ -44,18 +45,18 @@ bool cupolas_vault_check_access(cupolas_vault_t *vault, const char *cred_id, con
                 AIRY_LOG_WARN("cupolas_vault_check_access: expired credential detected for agent_id=%s, "
                          "cred_id=%s, expires_at=%llu",
                          agent_id, cred_id, (unsigned long long)acl->expires_at);
-                cupolas_rwlock_unlock(&vault->lock);
+                airy_rwlock_unlock(&vault->lock);
                 return false;
             }
 
             if ((acl->operations & (uint32_t)operation) != 0) {
-                cupolas_rwlock_unlock(&vault->lock);
+                airy_rwlock_unlock(&vault->lock);
                 return true;
             }
         }
     }
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     AIRY_LOG_WARN("cupolas_vault_check_access: access denied for agent_id=%s, cred_id=%s, operation=%d",
              agent_id, cred_id, (int)operation);
     return false;
@@ -70,11 +71,11 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_INVALID_PARAM;
     }
 
@@ -82,7 +83,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
         if (strcmp(entry->acl.entries[i].agent_id, agent_id) == 0) {
             entry->acl.entries[i].operations = operations;
             entry->acl.entries[i].expires_at = expires_at;
-            cupolas_rwlock_unlock(&vault->lock);
+            airy_rwlock_unlock(&vault->lock);
             return 0;
         }
     }
@@ -91,7 +92,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
     cupolas_vault_acl_entry_t *new_entries =
         AIRY_REALLOC(entry->acl.entries, new_count * sizeof(cupolas_vault_acl_entry_t));
     if (!new_entries) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_NULL_POINTER;
     }
 
@@ -103,7 +104,7 @@ int cupolas_vault_grant_access(cupolas_vault_t *vault, const char *cred_id, cons
     entry->acl.entries[entry->acl.count].max_access_count = 0;
     entry->acl.count = new_count;
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return 0;
 }
 
@@ -115,11 +116,11 @@ int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, con
         return AIRY_ERR_UNKNOWN;
     }
 
-    cupolas_rwlock_wrlock(&vault->lock);
+    airy_rwlock_wrlock(&vault->lock);
 
     credential_entry_t *entry = find_entry(vault, cred_id);
     if (!entry) {
-        cupolas_rwlock_unlock(&vault->lock);
+        airy_rwlock_unlock(&vault->lock);
         return cupolas_ERR_INVALID_PARAM;
     }
 
@@ -129,11 +130,11 @@ int cupolas_vault_revoke_access(cupolas_vault_t *vault, const char *cred_id, con
             AIRY_MEMMOVE(&entry->acl.entries[i], &entry->acl.entries[i + 1],
                               (entry->acl.count - i - 1) * sizeof(cupolas_vault_acl_entry_t));
             entry->acl.count--;
-            cupolas_rwlock_unlock(&vault->lock);
+            airy_rwlock_unlock(&vault->lock);
             return 0;
         }
     }
 
-    cupolas_rwlock_unlock(&vault->lock);
+    airy_rwlock_unlock(&vault->lock);
     return cupolas_ERR_NULL_POINTER;
 }

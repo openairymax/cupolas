@@ -15,6 +15,7 @@
  * cipher-suite policy, and version-string conversion.
  */
 
+#include "airy_memory.h"
 #include "cupolas_network_security_internal.h"
 
 #include <ctype.h>
@@ -55,7 +56,7 @@ int cupolas_net_security_init(const cupolas_tls_config_t *manager)
 
     AIRY_MEMSET(&g_net_security, 0, sizeof(g_net_security));
 
-    CUPOLAS_MUTEX_INIT(&g_net_security.lock);
+    airy_mtx_init(&g_net_security.lock);
 #ifdef _WIN32
     WSADATA wsa_data;
     WSAStartup(MAKEWORD(2, 2), &wsa_data);
@@ -111,7 +112,7 @@ void cupolas_net_security_cleanup(void)
     EVP_cleanup();
     ERR_free_strings();
 
-    CUPOLAS_MUTEX_DESTROY(&g_net_security.lock);
+    airy_mtx_destroy(&g_net_security.lock);
 #ifdef _WIN32
     WSACleanup();
 #endif
@@ -222,7 +223,7 @@ int cupolas_tls_verify_cert(const char *cert_path, const char *hostname,
     }
 
     if (hostname) {
-        char *hostname_dup = cupolas_strdup(hostname);
+        char *hostname_dup = AIRY_STRDUP(hostname);
         int match = X509_check_host(cert, hostname_dup, strlen(hostname_dup), 0, NULL);
         AIRY_FREE(hostname_dup);
 
@@ -402,7 +403,7 @@ int cupolas_tls_get_cipher_suites(char ***suites, size_t *count)
         return AIRY_ERR_UNKNOWN;
 
     for (size_t i = 0; i < *count; i++) {
-        (*suites)[i] = cupolas_strdup(default_suites[i]);
+        (*suites)[i] = AIRY_STRDUP(default_suites[i]);
     }
 
     return 0;

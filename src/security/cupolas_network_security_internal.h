@@ -12,7 +12,7 @@
 #include "cupolas.h"
 #include "cupolas_network_security.h"
 
-#include "../platform/platform.h"
+#include "platform.h"
 #include <platform.h>
 #include "airy_memory.h"
 #include "utils/cupolas_utils.h"
@@ -68,7 +68,7 @@ typedef struct {
     void (*ids_callback)(const char *alert_type, const char *details,
                          const cupolas_connection_info_t *conn);
 
-    cupolas_mutex_t lock;
+    airy_mtx_t lock;
 } cupolas_net_security_state_t;
 
 extern cupolas_net_security_state_t g_net_security;

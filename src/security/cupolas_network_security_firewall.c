@@ -13,6 +13,7 @@
  * Implements add/delete/update/query/list management of filter rules.
  */
 
+#include "airy_memory.h"
 #include "cupolas_network_security_internal.h"
 
 int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
@@ -20,26 +21,26 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
     if (!rule)
         return AIRY_ERR_UNKNOWN;
 
-    cupolas_mutex_lock(&g_net_security.lock);
+    airy_mtx_lock(&g_net_security.lock);
     if (g_net_security.filter_rule_count >= cupolas_MAX_FILTER_RULES) {
-        cupolas_mutex_unlock(&g_net_security.lock);
+        airy_mtx_unlock(&g_net_security.lock);
         return AIRY_ERR_UNKNOWN;
     }
 
     filter_rule_entry_t *entry = &g_net_security.filter_rules[g_net_security.filter_rule_count];
     AIRY_MEMSET(entry, 0, sizeof(*entry));
 
-    entry->rule.rule_id = cupolas_strdup(rule->rule_id);
-    entry->rule.description = cupolas_strdup(rule->description);
-    entry->rule.src_ip_pattern = cupolas_strdup(rule->src_ip_pattern);
-    entry->rule.dst_ip_pattern = cupolas_strdup(rule->dst_ip_pattern);
+    entry->rule.rule_id = AIRY_STRDUP(rule->rule_id);
+    entry->rule.description = AIRY_STRDUP(rule->description);
+    entry->rule.src_ip_pattern = AIRY_STRDUP(rule->src_ip_pattern);
+    entry->rule.dst_ip_pattern = AIRY_STRDUP(rule->dst_ip_pattern);
     entry->rule.src_port_start = rule->src_port_start;
     entry->rule.src_port_end = rule->src_port_end;
     entry->rule.dst_port_start = rule->dst_port_start;
     entry->rule.dst_port_end = rule->dst_port_end;
     entry->rule.protocol = rule->protocol;
-    entry->rule.host_pattern = cupolas_strdup(rule->host_pattern);
-    entry->rule.url_pattern = cupolas_strdup(rule->url_pattern);
+    entry->rule.host_pattern = AIRY_STRDUP(rule->host_pattern);
+    entry->rule.url_pattern = AIRY_STRDUP(rule->url_pattern);
     entry->rule.action = rule->action;
     entry->rule.priority = rule->priority;
     entry->rule.enabled = rule->enabled;
@@ -48,7 +49,7 @@ int cupolas_net_add_rule(const cupolas_net_filter_rule_t *rule)
     entry->active = 1;
 
     g_net_security.filter_rule_count++;
-    cupolas_mutex_unlock(&g_net_security.lock);
+    airy_mtx_unlock(&g_net_security.lock);
     return 0;
 }
 
@@ -57,7 +58,7 @@ int cupolas_net_remove_rule(const char *rule_id)
     if (!rule_id)
         return AIRY_ERR_UNKNOWN;
 
-    cupolas_mutex_lock(&g_net_security.lock);
+    airy_mtx_lock(&g_net_security.lock);
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
@@ -68,12 +69,12 @@ int cupolas_net_remove_rule(const char *rule_id)
                 g_net_security.filter_rules[j] = g_net_security.filter_rules[j + 1];
             }
             g_net_security.filter_rule_count--;
-            cupolas_mutex_unlock(&g_net_security.lock);
+            airy_mtx_unlock(&g_net_security.lock);
             return 0;
         }
     }
 
-    cupolas_mutex_unlock(&g_net_security.lock);
+    airy_mtx_unlock(&g_net_security.lock);
     return AIRY_ERR_UNKNOWN;
 }
 
@@ -82,38 +83,38 @@ int cupolas_net_update_rule(const char *rule_id, const cupolas_net_filter_rule_t
     if (!rule_id || !rule)
         return AIRY_ERR_UNKNOWN;
 
-    cupolas_mutex_lock(&g_net_security.lock);
+    airy_mtx_lock(&g_net_security.lock);
 
     for (size_t i = 0; i < g_net_security.filter_rule_count; i++) {
         if (g_net_security.filter_rules[i].rule.rule_id &&
             strcmp(g_net_security.filter_rules[i].rule.rule_id, rule_id) == 0) {
             cupolas_free_filter_rule(&g_net_security.filter_rules[i].rule);
 
-            g_net_security.filter_rules[i].rule.rule_id = cupolas_strdup(rule->rule_id);
-            g_net_security.filter_rules[i].rule.description = cupolas_strdup(rule->description);
+            g_net_security.filter_rules[i].rule.rule_id = AIRY_STRDUP(rule->rule_id);
+            g_net_security.filter_rules[i].rule.description = AIRY_STRDUP(rule->description);
             g_net_security.filter_rules[i].rule.src_ip_pattern =
-                cupolas_strdup(rule->src_ip_pattern);
+                AIRY_STRDUP(rule->src_ip_pattern);
             g_net_security.filter_rules[i].rule.dst_ip_pattern =
-                cupolas_strdup(rule->dst_ip_pattern);
+                AIRY_STRDUP(rule->dst_ip_pattern);
             g_net_security.filter_rules[i].rule.src_port_start = rule->src_port_start;
             g_net_security.filter_rules[i].rule.src_port_end = rule->src_port_end;
             g_net_security.filter_rules[i].rule.dst_port_start = rule->dst_port_start;
             g_net_security.filter_rules[i].rule.dst_port_end = rule->dst_port_end;
             g_net_security.filter_rules[i].rule.protocol = rule->protocol;
-            g_net_security.filter_rules[i].rule.host_pattern = cupolas_strdup(rule->host_pattern);
-            g_net_security.filter_rules[i].rule.url_pattern = cupolas_strdup(rule->url_pattern);
+            g_net_security.filter_rules[i].rule.host_pattern = AIRY_STRDUP(rule->host_pattern);
+            g_net_security.filter_rules[i].rule.url_pattern = AIRY_STRDUP(rule->url_pattern);
             g_net_security.filter_rules[i].rule.action = rule->action;
             g_net_security.filter_rules[i].rule.priority = rule->priority;
             g_net_security.filter_rules[i].rule.enabled = rule->enabled;
             g_net_security.filter_rules[i].rule.rate_limit = rule->rate_limit;
             g_net_security.filter_rules[i].rule.burst_limit = rule->burst_limit;
 
-            cupolas_mutex_unlock(&g_net_security.lock);
+            airy_mtx_unlock(&g_net_security.lock);
             return 0;
         }
     }
 
-    cupolas_mutex_unlock(&g_net_security.lock);
+    airy_mtx_unlock(&g_net_security.lock);
     return AIRY_ERR_UNKNOWN;
 }
 
