@@ -18,6 +18,19 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 调用方须持有 ctx->lock；按 resource_id 线性查表，未命中返回 NULL。
+ * 原先 set/check/consume/release 四处各有一份同构查表循环，收敛为单一
+ * 来源，避免四处副本在比较语义上各自漂移。 */
+static safety_quota_t *quota_find(safety_guard_context_t *ctx, const char *resource_id)
+{
+    for (size_t i = 0; i < ctx->quota_count; i++) {
+        if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
+            return &ctx->quotas[i];
+        }
+    }
+    return NULL;
+}
+
 int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id, int64_t limit,
                            uint64_t reset_interval_ms)
 {
@@ -25,20 +38,21 @@ int safety_guard_set_quota(safety_guard_context_t *ctx, const char *resource_id,
         return AIRY_ERR_INVALID_PARAM;
 
     airy_mtx_lock(&ctx->lock);
-    for (size_t i = 0; i < ctx->quota_count; i++) {
-        if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
-            ctx->quotas[i].limit = limit;
-            ctx->quotas[i].reset_interval_ms = reset_interval_ms;
-            airy_mtx_unlock(&ctx->lock);
-            return 0;
-        }
+
+    safety_quota_t *q = quota_find(ctx, resource_id);
+    if (q) {
+        q->limit = limit;
+        q->reset_interval_ms = reset_interval_ms;
+        airy_mtx_unlock(&ctx->lock);
+        return 0;
     }
 
     if (ctx->quota_count >= ctx->quota_capacity) {
         airy_mtx_unlock(&ctx->lock);
         return AIRY_ERR_GENERIC_FAIL;
     }
-    safety_quota_t *q = &ctx->quotas[ctx->quota_count];
+
+    q = &ctx->quotas[ctx->quota_count];
     snprintf(q->resource_id, sizeof(q->resource_id), "%s", resource_id);
     q->limit = limit;
     q->current_usage = 0;
@@ -57,13 +71,14 @@ int safety_guard_check_quota(safety_guard_context_t *ctx, const char *resource_i
         return AIRY_ERR_INVALID_PARAM;
 
     airy_mtx_lock(&ctx->lock);
-    for (size_t i = 0; i < ctx->quota_count; i++) {
-        if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
-            *allowed = (ctx->quotas[i].current_usage + requested) <= ctx->quotas[i].limit;
-            airy_mtx_unlock(&ctx->lock);
-            return 0;
-        }
+
+    safety_quota_t *q = quota_find(ctx, resource_id);
+    if (q) {
+        *allowed = (q->current_usage + requested) <= q->limit;
+        airy_mtx_unlock(&ctx->lock);
+        return 0;
     }
+
     airy_mtx_unlock(&ctx->lock);
     *allowed = true;
     return 0;
@@ -73,14 +88,16 @@ int safety_guard_consume_quota(safety_guard_context_t *ctx, const char *resource
 {
     if (!ctx || !resource_id)
         return AIRY_ERR_INVALID_PARAM;
+
     airy_mtx_lock(&ctx->lock);
-    for (size_t i = 0; i < ctx->quota_count; i++) {
-        if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
-            ctx->quotas[i].current_usage += amount;
-            airy_mtx_unlock(&ctx->lock);
-            return 0;
-        }
+
+    safety_quota_t *q = quota_find(ctx, resource_id);
+    if (q) {
+        q->current_usage += amount;
+        airy_mtx_unlock(&ctx->lock);
+        return 0;
     }
+
     airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
@@ -89,16 +106,18 @@ int safety_guard_release_quota(safety_guard_context_t *ctx, const char *resource
 {
     if (!ctx || !resource_id)
         return AIRY_ERR_INVALID_PARAM;
+
     airy_mtx_lock(&ctx->lock);
-    for (size_t i = 0; i < ctx->quota_count; i++) {
-        if (__builtin_strcmp(ctx->quotas[i].resource_id, resource_id) == 0) {
-            ctx->quotas[i].current_usage -= amount;
-            if (ctx->quotas[i].current_usage < 0)
-                ctx->quotas[i].current_usage = 0;
-            airy_mtx_unlock(&ctx->lock);
-            return 0;
-        }
+
+    safety_quota_t *q = quota_find(ctx, resource_id);
+    if (q) {
+        q->current_usage -= amount;
+        if (q->current_usage < 0)
+            q->current_usage = 0;
+        airy_mtx_unlock(&ctx->lock);
+        return 0;
     }
+
     airy_mtx_unlock(&ctx->lock);
     return AIRY_ERR_NOT_FOUND;
 }
