@@ -62,8 +62,6 @@ cupolas/
     ├── cupolas_metrics.c/.h              # Metric collection
     ├── cupolas_monitoring.c/.h           # Runtime monitoring
     ├── circuit_breaker.c/.h              # Circuit breaker
-    ├── slab.c/.h                         # Slab allocator
-    ├── mempool.c/.h                      # Memory pool
     ├── policy/                           # (PDP) Dynamic policy engine
     │   └── dynamic_policy_engine.c       # Policy load/staging/conflict/activate/rollback
     ├── platform/
@@ -121,7 +119,7 @@ cupolas/
 | **Security Engine** | `src/security/` | Digital signature, key vault, entitlements, runtime protection, network security |
 | **Guards** | `src/guards/` | Extensible detection framework (rule / model / behavior / heuristic / external / composite / custom) |
 | **Core** | `src/cupolas.c` | Module lifecycle, config, metrics, monitoring, circuit breaker |
-| **Utils** | `src/utils/` | Memory mgmt (slab/mempool), error handling, logging, compiler hints, bit ops, time |
+| **Utils** | `src/utils/` | Error handling, logging, compiler hints, bit ops, time |
 
 ### OpenSSL-conditional modules
 
