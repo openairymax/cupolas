@@ -59,7 +59,6 @@ cupolas/
 │   └── test_protection_chain.c           # End-to-end protection-chain test
 └── src/
     ├── cupolas.c                         # Cupolas core implementation
-    ├── cupolas_config.c/.h               # Configuration management
     ├── cupolas_metrics.c/.h              # Metric collection
     ├── cupolas_monitoring.c/.h           # Runtime monitoring
     ├── circuit_breaker.c/.h              # Circuit breaker

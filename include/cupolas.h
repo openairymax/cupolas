@@ -66,7 +66,9 @@ extern "C" {
 
 /**
  * @brief Initialize cupolas module
- * @param[in] config_path Configuration file path (NULL for default config)
+ * @param[in] config_path Reserved for API compatibility; pass NULL. The dome
+ *            resolves its configuration from the platform path system
+ *            ($AIRY_HOME via airy_config_dir()/airy_log_dir()).
  * @param[out] error Optional error code output
  * @return 0 on success, negative on failure
  * @post On success, module is initialized and ready
