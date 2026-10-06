@@ -59,7 +59,6 @@ cupolas/
 │   └── test_protection_chain.c           # 安全链路端到端测试
 └── src/
     ├── cupolas.c                         # Cupolas 核心实现
-    ├── cupolas_config.c/.h               # 配置管理
     ├── cupolas_metrics.c/.h              # 指标采集
     ├── cupolas_monitoring.c/.h           # 运行时监控
     ├── circuit_breaker.c/.h              # 熔断器

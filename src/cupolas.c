@@ -18,7 +18,6 @@
 #include "cupolas.h"
 
 #include "audit/audit.h"
-#include "cupolas_config.h"
 #include "error.h"
 #include "guards/guard_integration.h"
 #include "permission/permission.h"
@@ -77,7 +76,6 @@ static void cupolas_internal_config_cleanup(cupolas_internal_config_t *cfg)
 static struct {
     int initialized;
     cupolas_internal_config_t config;
-    cupolas_config_t *config_mgr;
     permission_engine_t *perm;
     sanitizer_t *san;
     workbench_t *wb;
@@ -107,10 +105,6 @@ static void cupolas_init_reclaim(void)
     if (g_cupolas.perm) {
         permission_engine_destroy(g_cupolas.perm);
         g_cupolas.perm = NULL;
-    }
-    if (g_cupolas.config_mgr) {
-        cupolas_config_destroy(g_cupolas.config_mgr);
-        g_cupolas.config_mgr = NULL;
     }
 }
 
@@ -191,25 +185,6 @@ static int cupolas_init_ex(const char *config_path, airy_err_t *error, int with_
     airy_mtx_lock(&g_cupolas.lock);
 
     cupolas_internal_config_init_defaults(&g_cupolas.config);
-
-    if (config_path && config_path[0] != '\0') {
-        g_cupolas.config_mgr = cupolas_config_create(NULL);
-        if (g_cupolas.config_mgr) {
-            int result = cupolas_config_load(g_cupolas.config_mgr, CONFIG_TYPE_ALL, config_path);
-            if (result != 0) {
-                if (error)
-                    *error = AIRY_ERR_IO;
-                cupolas_config_destroy(g_cupolas.config_mgr);
-                g_cupolas.config_mgr = NULL;
-
-                airy_mtx_unlock(&g_cupolas.lock);
-                airy_mtx_destroy(&g_cupolas.lock);
-
-                atomic_store_32(&g_cupolas_init_state, 0, memory_order_seq_cst);
-                return result;
-            }
-        }
-    }
 
     /* pep 模式不构造本地 permission 引擎——策略
      * 唯一持有者为 PDP（cupolas_d）；本地仅保留 sanitizer/workbench/audit。 */
@@ -300,11 +275,6 @@ void cupolas_cleanup(void)
             g_cupolas.perm = NULL;
         }
         CUPOLAS_LOG_INFO("cupolas_cleanup: [OK] permission engine destroyed");
-    }
-
-    if (g_cupolas.config_mgr) {
-        cupolas_config_destroy(g_cupolas.config_mgr);
-        g_cupolas.config_mgr = NULL;
     }
 
     cupolas_internal_config_cleanup(&g_cupolas.config);
