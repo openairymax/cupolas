@@ -116,12 +116,6 @@ utils/
 | `CUPOLAS_BIT_TEST(x, n)` | 测试第 n 位 |
 | `CUPOLAS_BIT_FLIP(x, n)` | 翻转第 n 位 |
 
-### 时间工具
-
-| 宏 | 说明 |
-|------|------|
-| `CUPOLAS_SLEEP_MS(ms)` | 跨平台毫秒级休眠 |
-
 ### 编译时断言
 
 | 宏 | 说明 |
@@ -135,8 +129,6 @@ utils/
 | `AIRY_STRDUP(str)`（commons 内存域）| NULL 安全的字符串复制 |
 | `cupolas_strlcpy(dest, src, len)` | 安全字符串拷贝（始终 null 终止） |
 | `cupolas_memset_s(ptr, len)` | 安全内存清零（防止编译器优化移除） |
-| `cupolas_get_timestamp_ms()` | 获取当前时间戳（毫秒） |
-| `cupolas_get_timestamp_ns()` | 获取高精度时间戳（纳秒） |
 | `cupolas_hash_string(str)` | djb2 字符串哈希（32 位） |
 | `cupolas_log_message(level, fmt, ...)` | 统一日志函数 |
 

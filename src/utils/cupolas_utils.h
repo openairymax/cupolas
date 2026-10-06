@@ -496,33 +496,6 @@ extern "C" {
 #define CUPOLAS_BIT_FLIP(x, n) ((x) ^= CUPOLAS_BIT(n))
 
 /* ============================================================================
- * Time Utilities - Cross-Platform Sleep
- * ============================================================================
- *
- * Portable sleep function with millisecond precision.
- */
-
-#ifdef _WIN32
-#include <windows.h>
-
-/**
- * @brief Sleep for specified milliseconds (Windows)
- * @param ms Milliseconds to sleep (uint32_t range)
- */
-#define CUPOLAS_SLEEP_MS(ms) Sleep(ms)
-
-#else
-#include <unistd.h>
-
-/**
- * @brief Sleep for specified milliseconds (POSIX)
- * @param ms Milliseconds to sleep
- * @note Uses usleep internally; may have microsecond precision
- */
-#define CUPOLAS_SLEEP_MS(ms) usleep((ms) * 1000)
-
-#endif /* _WIN32 */
-/* ============================================================================
  * Compile-Time Assertions
  * ============================================================================
  *
@@ -612,20 +585,6 @@ int cupolas_host_match(const char *pattern, const char *host);
  * @security Use for erasing sensitive data (passwords, keys)
  */
 void cupolas_memset_s(void *ptr, size_t len);
-
-/**
- * @brief Get current timestamp in milliseconds
- * @return Unix epoch time in milliseconds (uint64_t)
- * @note Monotonic clock preferred when available
- */
-uint64_t cupolas_get_timestamp_ms(void);
-
-/**
- * @brief Get current timestamp in nanoseconds
- * @return Monotonic timestamp in nanoseconds (uint64_t)
- * @note Uses high-resolution performance counters
- */
-uint64_t cupolas_get_timestamp_ns(void);
 
 /**
  * @brief Compute djb2 hash of string

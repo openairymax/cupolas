@@ -46,7 +46,7 @@ int dpol_ver_snapshot(dpolicy_engine_t *e, dpolicy_version_t *v, const char *des
         }
     }
     v->rule_count = e->rule_count;
-    v->created_at = dpol_now_ms();
+    v->created_at = airy_time_wall_ms();
     if (desc && desc[0])
         v->description = AIRY_STRDUP(desc);
     if (by && by[0])

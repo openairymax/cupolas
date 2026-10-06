@@ -15,7 +15,6 @@
 #include <windows.h>
 #else
 #include <pthread.h>
-#include <time.h>
 #include <unistd.h>
 #endif
 
@@ -23,6 +22,8 @@
 #include "cupolas.h"
 #include "permission/permission.h"
 #include "sanitizer/sanitizer.h"
+
+#include "platform.h"
 
 #define STRESS_THREAD_COUNT 64
 #define STRESS_OPS_PER_THREAD 10000
@@ -49,13 +50,7 @@ static void *stress_test_thread(void *arg)
     ctx->fail_count = 0;
 
     for (int i = 0; i < ctx->ops_count; i++) {
-#ifdef _WIN32
-        LARGE_INTEGER start, end, freq;
-        QueryPerformanceCounter(&start);
-#else
-        struct timespec start, end;
-        clock_gettime(CLOCK_MONOTONIC, &start);
-#endif
+        uint64_t start_ns = airy_time_ns();
 
         int perm_result = -1;
         if (g_perm_engine) {
@@ -63,15 +58,8 @@ static void *stress_test_thread(void *arg)
                 permission_engine_check(g_perm_engine, "test_agent", "read", "resource", NULL);
         }
 
-#ifdef _WIN32
-        QueryPerformanceCounter(&end);
-        QueryPerformanceFrequency(&freq);
-        double latency_us = (double)(end.QuadPart - start.QuadPart) * 1000000.0 / freq.QuadPart;
-#else
-        clock_gettime(CLOCK_MONOTONIC, &end);
-        double latency_us =
-            (end.tv_sec - start.tv_sec) * 1000000.0 + (end.tv_nsec - start.tv_nsec) / 1000.0;
-#endif
+        uint64_t end_ns = airy_time_ns();
+        double latency_us = (double)(end_ns - start_ns) / 1000.0;
 
         if (perm_result >= 0) {
             ctx->success_count++;
@@ -114,12 +102,7 @@ void stress_test_concurrent_permission_checks(void)
     int total_fail = 0;
     double total_avg_latency = 0;
 
-#ifdef _WIN32
-    DWORD start_time = GetTickCount();
-#else
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-#endif
+    uint64_t start_ms = airy_time_ms();
 
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
         results[i].thread_id = i;
@@ -148,14 +131,7 @@ void stress_test_concurrent_permission_checks(void)
                results[i].success_count, results[i].fail_count, results[i].avg_latency_us);
     }
 
-#ifdef _WIN32
-    DWORD end_time = GetTickCount();
-    double duration_ms = (double)(end_time - start_time);
-#else
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double duration_ms =
-        (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1000000.0;
-#endif
+    double duration_ms = (double)(airy_time_ms() - start_ms);
 
     printf("\n=== Summary ===\n");
     printf("Total Operations: %d\n", total_success + total_fail);
@@ -191,12 +167,7 @@ void stress_test_concurrent_audit_writes(void)
         results[i].ops_count = STRESS_OPS_PER_THREAD;
     }
 
-#ifdef _WIN32
-    DWORD start_time = GetTickCount();
-#else
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-#endif
+    uint64_t start_ms = airy_time_ms();
 
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
 #ifdef _WIN32
@@ -215,14 +186,7 @@ void stress_test_concurrent_audit_writes(void)
 #endif
     }
 
-#ifdef _WIN32
-    DWORD end_time = GetTickCount();
-    double duration_ms = (double)(end_time - start_time);
-#else
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double duration_ms =
-        (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1000000.0;
-#endif
+    double duration_ms = (double)(airy_time_ms() - start_ms);
 
     printf("Total Duration: %.2f ms\n", duration_ms);
     printf("Throughput: %.2f writes/sec\n",

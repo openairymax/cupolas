@@ -15,7 +15,7 @@
 
 #include "airy_memory.h"
 #include "dynamic_policy_engine.h"
-#include "platform_sync.h"
+#include "platform.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -44,8 +44,6 @@ struct dpolicy_engine_s {
 };
 
 /* ── 跨文件共享内部函数（dpol_ 前缀防静态库符号冲突） ─────────────── */
-
-uint64_t dpol_now_ms(void);
 
 void dpol_rule_free(dpolicy_rule_t *r);
 void dpol_rule_copy(dpolicy_rule_t *dst, const dpolicy_rule_t *src);

@@ -273,16 +273,7 @@ void metrics_summary_observe(const char *name, const char **label_values, double
 
 uint64_t metrics_get_timestamp_ns(void)
 {
-#if AIRY_PLATFORM_WINDOWS
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    ULONGLONG ticks = ((ULONGLONG)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    return ticks * 100;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
-#endif
+    return airy_time_wall_ms() * 1000000ULL;
 }
 
 typedef struct metric_iterator {

@@ -6,7 +6,8 @@
  * @brief Enhanced Runtime Protection - policy check domain: CFI target
  *        registration / verification and seccomp syscall policy rules
  *        (functional domain after cupolas_runtime_protection.c split).
- * @author SPHARX Ltd. - Airymax Team
+ * @author SPHARX Ltd. - Airymax Team
+
  */
 
 #include "cupolas_runtime_protection.h"

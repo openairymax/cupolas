@@ -429,11 +429,9 @@ int limits_get_stats(limit_context_t *ctx, resource_stats_t *stats)
     struct rusage usage;
     if (getrusage(RUSAGE_SELF, &usage) == 0) {
         stats->memory_current = usage.ru_maxrss * 1024;
-    }
-
-    struct timeval tv;
-    if (gettimeofday(&tv, NULL) == 0) {
-        stats->cpu_time_ns = (uint64_t)tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
+        stats->cpu_time_ns = (uint64_t)(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) *
+                                 1000000000ULL +
+                             (uint64_t)(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) * 1000ULL;
     }
 
     /* getdtablesize() is legacy BSD and is not declared by the macOS SDK

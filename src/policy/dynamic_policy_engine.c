@@ -22,7 +22,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 /* ── 内部工具 ─────────────────────────────────────────────────────── */
 
@@ -53,13 +52,6 @@ static int pat_match(const char *pat, const char *text)
         t++;
     }
     return (*t == '\0');
-}
-
-uint64_t dpol_now_ms(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000L);
 }
 
 void dpol_rule_free(dpolicy_rule_t *r)
@@ -97,7 +89,7 @@ void dpol_fire_change(dpolicy_engine_t *e, dpolicy_change_type_t type, const cha
     AIRY_STRNCPY_TERM(rec.rule_id, rule_id ? rule_id : "", sizeof(rec.rule_id));
     rec.old_value_json = (char *)old_json;
     rec.new_value_json = (char *)new_json;
-    rec.timestamp = dpol_now_ms();
+    rec.timestamp = airy_time_wall_ms();
     rec.changed_by = (char *)(by ? by : "");
     e->cb(&rec, e->cb_ud);
 }
@@ -108,9 +100,9 @@ static int rule_matches(const dpolicy_rule_t *r, const char *subject, const char
 {
     if (!r->enabled)
         return 0;
-    if (r->valid_from > 0 && dpol_now_ms() < r->valid_from)
+    if (r->valid_from > 0 && airy_time_wall_ms() < r->valid_from)
         return 0;
-    if (r->valid_until > 0 && dpol_now_ms() > r->valid_until)
+    if (r->valid_until > 0 && airy_time_wall_ms() > r->valid_until)
         return 0;
     if (r->subject_pattern[0] && !pat_match(r->subject_pattern, subject))
         return 0;

@@ -269,7 +269,7 @@ int cupolas_config_load(cupolas_config_t *cfg, config_type_t type, const char *f
     entry->version.major = 1;
     entry->version.minor = 0;
     entry->version.patch = 0;
-    entry->version.timestamp_ns = cupolas_get_timestamp_ns();
+    entry->version.timestamp_ns = airy_time_ns();
 
     entry->status = CONFIG_STATUS_APPLIED;
 
@@ -316,7 +316,7 @@ int cupolas_config_reload(cupolas_config_t *cfg, config_type_t type)
 
         entry->data = doc;
         entry->version.patch++;
-        entry->version.timestamp_ns = cupolas_get_timestamp_ns();
+        entry->version.timestamp_ns = airy_time_ns();
         entry->status = CONFIG_STATUS_APPLIED;
 
         CUPOLAS_LOG("Config reloaded: type=%s", config_type_names[type]);
