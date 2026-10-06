@@ -62,8 +62,6 @@ cupolas/
     ├── cupolas_metrics.c/.h              # 指标采集
     ├── cupolas_monitoring.c/.h           # 运行时监控
     ├── circuit_breaker.c/.h              # 熔断器
-    ├── slab.c/.h                         # Slab 分配器
-    ├── mempool.c/.h                      # 内存池
     ├── policy/                           #（PDP）动态安全策略引擎
     │   └── dynamic_policy_engine.c       # 策略加载/staging/冲突检测/激活/回滚
     ├── platform/
@@ -121,7 +119,7 @@ cupolas/
 | **Security Engine** | `src/security/` | 数字签名、密钥库、entitlements、运行时保护、网络安全 |
 | **Guards** | `src/guards/` | 可扩展检测框架（规则/模型/行为/启发式/外部/复合/自定义） |
 | **Core** | `src/cupolas.c` | 模块生命周期、配置、指标、监控、熔断器 |
-| **Utils** | `src/utils/` | 内存管理（slab/mempool）、错误处理、日志、编译器提示、位操作、时间 |
+| **Utils** | `src/utils/` | 错误处理、日志、编译器提示、位操作、时间 |
 
 ### OpenSSL 条件模块
 

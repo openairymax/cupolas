@@ -73,8 +73,6 @@ set(CUPOLAS_SOURCES
     src/guards/safety_guard_quota.c
     src/guards/safety_guard_audit.c
     src/guards/safety_guard_ctrl.c
-    src/slab.c
-    src/mempool.c
     # 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
     # 按功能域拆分：核心评估与 CRUD / 版本管理 / JSON 导入导出与两段式生效
     src/policy/dynamic_policy_engine.c
@@ -141,8 +139,6 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_error.h
     src/guards/guard_core.h
     src/guards/guard_integration.h
-    src/slab.h
-    src/mempool.h
     include/dynamic_policy_engine.h
     src/policy/dpolicy_internal.h
 )
@@ -161,16 +157,6 @@ set(COMMON_INCLUDE_DIRS
 )
 
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
-
-# 豁免内存子系统实现层：mempool.c 和 slab.c 实现底层内存管理，
-# 必须使用底层 malloc/calloc/memset，需定义 AIRY_COMPLIANCE_IMPL 跳过 poison
-if(AIRY_COMPLIANCE_STRICT)
-    set_source_files_properties(
-        src/mempool.c
-        src/slab.c
-        PROPERTIES COMPILE_DEFINITIONS AIRY_COMPLIANCE_IMPL
-    )
-endif()
 
 if(BUILD_WITH_LOGGING)
     target_compile_definitions(cupolas PRIVATE CUPOLAS_ENABLE_LOGGING=1)
