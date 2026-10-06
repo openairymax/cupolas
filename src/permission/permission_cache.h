@@ -3,13 +3,12 @@
 
 /*
  *
- * permission_cache.h - Permission Cache Internal Interface: Hash-based LRU Implementation
+ * permission_cache.h - Permission Cache Interface
  */
 
 #ifndef CUPOLAS_PERMISSION_CACHE_H
 #define CUPOLAS_PERMISSION_CACHE_H
 
-#include "atomic_compat.h"
 #include "platform.h"
 
 #include <stddef.h>
@@ -20,44 +19,13 @@ extern "C" {
 #endif
 
 /**
- * @brief Cache entry structure for LRU management
+ * @brief Permission cache handle (opaque)
  *
- * Design principles:
- * - O(1) lookup complexity via hash table
- * - LRU eviction policy for memory efficiency
- * - TTL-based expiration for stale data cleanup
- * - Thread-safe with fine-grained locking
+ * Backed by the cache_common LRU atom. The concrete layout is private to
+ * permission_cache.c, so the storage atom can be replaced without touching
+ * any consumer.
  */
-typedef struct cache_entry {
-    char *key; /**< Hash key (agent_id:action:resource:context) */
-    int result; /**< Cached permission result (1=allow, 0=deny) */
-    uint64_t timestamp_ms; /**< Creation timestamp (milliseconds) */
-    uint32_t hash; /**< Pre-computed hash value */
-    struct cache_entry *prev; /**< Previous entry in LRU list */
-    struct cache_entry *next; /**< Next entry in LRU list */
-    struct cache_entry *hnext; /**< Next entry in hash bucket chain */
-} cache_entry_t;
-
-/**
- * @brief Cache manager structure
- *
- * Provides high-performance permission caching with:
- * - Configurable capacity limits
- * - Automatic TTL expiration
- * - Hit/miss statistics for monitoring
- */
-typedef struct cache_manager {
-    cache_entry_t **buckets; /**< Hash table buckets */
-    size_t bucket_count; /**< Number of hash buckets */
-    cache_entry_t *head; /**< LRU list head (most recently used) */
-    cache_entry_t *tail; /**< LRU list tail (least recently used) */
-    size_t capacity; /**< Maximum number of entries */
-    size_t size; /**< Current number of entries */
-    uint32_t ttl_ms; /**< Time-to-live in milliseconds (0=permanent) */
-    airy_mtx_t lock; /**< Mutex for thread safety */
-    atomic_int64_t hit_count; /**< Cache hit counter */
-    atomic_int64_t miss_count; /**< Cache miss counter */
-} cache_manager_t;
+typedef struct cache_manager cache_manager_t;
 
 /**
  * @brief Create permission cache
@@ -102,7 +70,7 @@ int cache_manager_get(cache_manager_t *cm, const char *agent_id, const char *act
  * @param[in] action Action being performed
  * @param[in] resource Resource being accessed
  * @param[in] context Context information
- * @param[in] result Permission result (1=allow, 0=deny)
+ * @param[in] result Permission result (1=allow, 0=deny); other values are not cached
  * @note Thread-safe: Safe to call from multiple threads concurrently
  * @reentrant Yes
  * @ownership All string parameters: caller retains ownership

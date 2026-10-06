@@ -150,6 +150,8 @@ set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/commons)
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/include
+    # cache_common 原子件：sanitizer/permission 缓存策略复用同一 LRU 存储
+    ${COMMON_MODULE_DIR}/utils/cache
     ${COMMON_MODULE_DIR}/utils/error
     ${COMMON_MODULE_DIR}/utils/memory
     ${COMMON_MODULE_DIR}/utils/observability
