@@ -16,10 +16,11 @@
 #include "../src/security/cupolas_signature.h"
 #include "../src/security/cupolas_vault.h"
 
+#include "platform.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define TEST_PASS(...)                                                       \
     do {                                                                     \
@@ -196,15 +197,14 @@ static void test_sanitization_latency(void)
 
     for (int i = 0; test_inputs[i]; i++) {
         char output[512];
-        struct timespec start, end;
 
-        clock_gettime(CLOCK_MONOTONIC, &start);
+        uint64_t start_ns = airy_time_ns();
         for (int j = 0; j < iterations; j++) {
             cupolas_sanitize_input(test_inputs[i], output, sizeof(output));
         }
-        clock_gettime(CLOCK_MONOTONIC, &end);
+        uint64_t end_ns = airy_time_ns();
 
-        double elapsed_us = (end.tv_sec - start.tv_sec) * 1e6 + (end.tv_nsec - start.tv_nsec) / 1e3;
+        double elapsed_us = (double)(end_ns - start_ns) / 1e3;
         double avg_us = elapsed_us / iterations;
         total_us += avg_us;
         measurements++;

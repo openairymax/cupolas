@@ -89,31 +89,6 @@ int cupolas_memcmp_s(const void *ptr1, const void *ptr2, size_t size)
     return 0;
 }
 
-uint64_t cupolas_get_timestamp_ms(void)
-{
-#ifdef _WIN32
-    return GetTickCount64();
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
-#endif
-}
-
-uint64_t cupolas_get_timestamp_ns(void)
-{
-#ifdef _WIN32
-    LARGE_INTEGER frequency, counter;
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&counter);
-    return (uint64_t)(counter.QuadPart * 1000000000ULL / frequency.QuadPart);
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-#endif
-}
-
 uint32_t cupolas_hash_string(const char *str)
 {
     if (!str)

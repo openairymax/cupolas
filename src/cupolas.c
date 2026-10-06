@@ -378,7 +378,7 @@ int cupolas_check_permission(const char *agent_id, const char *action, const cha
                                      .input_data = (void *)action,
                                      .input_size = action ? strlen(action) + 1 : 0,
                                      .context_data = NULL,
-                                     .timestamp = cupolas_get_timestamp_ns()};
+                                     .timestamp = airy_time_ns()};
 
         if (guards_blocking(&guard_ctx)) {
             if (g_cupolas.audit) {
@@ -447,7 +447,7 @@ int cupolas_sanitize_input(const char *input, char *output, size_t output_size)
                                          .input_data = (void *)output,
                                          .input_size = strlen(output) + 1,
                                          .context_data = NULL,
-                                         .timestamp = cupolas_get_timestamp_ns()};
+                                         .timestamp = airy_time_ns()};
 
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx, results,
                                                      CUPOLAS_GUARD_MAX_RESULTS, &actual_results);
@@ -512,7 +512,7 @@ int cupolas_execute_command(const char *command, char *const argv[], int *exit_c
                                  .input_data = cmd_buffer,
                                  .input_size = strlen(cmd_buffer) + 1,
                                  .context_data = NULL,
-                                 .timestamp = cupolas_get_timestamp_ns()};
+                                 .timestamp = airy_time_ns()};
 
     if (guards_blocking(&guard_ctx)) {
         if (g_cupolas.audit) {

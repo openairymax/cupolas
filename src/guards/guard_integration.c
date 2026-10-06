@@ -166,7 +166,7 @@ CUPOLAS_API int cupolas_guards_check(const char *operation, const char *resource
                                  .input_data = (void *)input_data,
                                  .input_size = input_size,
                                  .context_data = NULL,
-                                 .timestamp = cupolas_get_timestamp_ns()};
+                                 .timestamp = airy_time_ns()};
 
     return guard_manager_check_sync(g_guard_manager, &guard_ctx, results, max_results,
                                     actual_results);

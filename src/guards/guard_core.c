@@ -362,7 +362,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
     priv->stats.total_checks++;
 
     size_t result_count = 0;
-    uint64_t start_time = cupolas_get_timestamp_ns();
+    uint64_t start_time = airy_time_ns();
 
     for (size_t i = 0; i < priv->guard_count && result_count < max_results; i++) {
         guard_t *guard = priv->guards[i];
@@ -398,7 +398,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
             priv->stats.error_checks++;
         }
 
-        uint64_t current_time = cupolas_get_timestamp_ns();
+        uint64_t current_time = airy_time_ns();
         uint64_t elapsed = current_time - start_time;
         const uint64_t TIMEOUT_THRESHOLD_NS = 100000000ULL;
 
@@ -413,7 +413,7 @@ int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *co
         }
     }
 
-    uint64_t end_time = cupolas_get_timestamp_ns();
+    uint64_t end_time = airy_time_ns();
     uint64_t detection_time = end_time - start_time;
 
     priv->stats.total_detection_time += detection_time;
@@ -583,7 +583,7 @@ guard_t *guard_create(const char *name, const char *description, guard_type_t ty
 
     __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
 
-    guard->created_time = cupolas_get_timestamp_ns();
+    guard->created_time = airy_time_ns();
 
     return guard;
 }
@@ -653,14 +653,14 @@ int guard_check(guard_t *guard, const guard_context_t *context, guard_result_t *
         return cupolas_ERROR_BUSY;
     }
 
-    guard->last_used_time = cupolas_get_timestamp_ns();
+    guard->last_used_time = airy_time_ns();
 
     if (!guard->ops->check)
         return cupolas_ERROR_NOT_SUPPORTED;
 
-    uint64_t start_time = cupolas_get_timestamp_ns();
+    uint64_t start_time = airy_time_ns();
     int check_result = guard->ops->check(guard->priv_data, context, result);
-    uint64_t end_time = cupolas_get_timestamp_ns();
+    uint64_t end_time = airy_time_ns();
 
     guard->stats.total_checks++;
     guard->stats.total_detection_time += (end_time - start_time);

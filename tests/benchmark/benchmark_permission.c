@@ -19,12 +19,12 @@
 #include "../src/permission/permission.h"
 
 #include "airy_memory.h"
+#include "platform.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define BENCH_ITERS 20000
 #define BENCH_WARMUP 1000
@@ -51,9 +51,7 @@ static void out(const char *fmt, ...)
 
 static uint64_t now_us(void)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    return airy_time_ns() / 1000;
 }
 
 static int cmp_u64(const void *a, const void *b)
