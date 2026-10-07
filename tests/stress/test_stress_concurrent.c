@@ -97,6 +97,7 @@ void stress_test_concurrent_permission_checks(void)
     pthread_t threads[STRESS_THREAD_COUNT];
     thread_ctx_t results[STRESS_THREAD_COUNT];
 #endif
+    int started[STRESS_THREAD_COUNT];
 
     int total_success = 0;
     int total_fail = 0;
@@ -107,15 +108,26 @@ void stress_test_concurrent_permission_checks(void)
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
         results[i].thread_id = i;
         results[i].ops_count = STRESS_OPS_PER_THREAD;
+        results[i].success_count = 0;
+        results[i].fail_count = 0;
+        results[i].avg_latency_us = 0.0;
 
 #ifdef _WIN32
         threads[i] = CreateThread(NULL, 0, stress_test_thread, &results[i], 0, NULL);
+        started[i] = (threads[i] != NULL);
 #else
-        pthread_create(&threads[i], NULL, stress_test_thread, &results[i]);
+        started[i] = (pthread_create(&threads[i], NULL, stress_test_thread, &results[i]) == 0);
 #endif
+        if (!started[i]) {
+            printf("Thread %2d: failed to start\n", i);
+        }
     }
 
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
+        if (!started[i]) {
+            continue;
+        }
+
 #ifdef _WIN32
         WaitForSingleObject(threads[i], INFINITE);
         CloseHandle(threads[i]);
@@ -132,14 +144,15 @@ void stress_test_concurrent_permission_checks(void)
     }
 
     double duration_ms = (double)(airy_time_ms() - start_ms);
+    int total_ops = total_success + total_fail;
 
     printf("\n=== Summary ===\n");
-    printf("Total Operations: %d\n", total_success + total_fail);
+    printf("Total Operations: %d\n", total_ops);
     printf("Successful: %d (%.2f%%)\n", total_success,
-           100.0 * total_success / (total_success + total_fail));
-    printf("Failed: %d (%.2f%%)\n", total_fail, 100.0 * total_fail / (total_success + total_fail));
+           total_ops > 0 ? 100.0 * total_success / total_ops : 0.0);
+    printf("Failed: %d (%.2f%%)\n", total_fail, total_ops > 0 ? 100.0 * total_fail / total_ops : 0.0);
     printf("Total Duration: %.2f ms\n", duration_ms);
-    printf("Throughput: %.2f ops/sec\n", (total_success + total_fail) * 1000.0 / duration_ms);
+    printf("Throughput: %.2f ops/sec\n", duration_ms > 0.0 ? total_ops * 1000.0 / duration_ms : 0.0);
     printf("Average Latency: %.2f us\n", total_avg_latency / STRESS_THREAD_COUNT);
 
     if (g_perm_engine) {
@@ -162,6 +175,8 @@ void stress_test_concurrent_audit_writes(void)
     thread_ctx_t results[STRESS_THREAD_COUNT];
 #endif
 
+    int started[STRESS_THREAD_COUNT];
+
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
         results[i].thread_id = i;
         results[i].ops_count = STRESS_OPS_PER_THREAD;
@@ -172,12 +187,20 @@ void stress_test_concurrent_audit_writes(void)
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
 #ifdef _WIN32
         threads[i] = CreateThread(NULL, 0, stress_test_thread, &results[i], 0, NULL);
+        started[i] = (threads[i] != NULL);
 #else
-        pthread_create(&threads[i], NULL, stress_test_thread, &results[i]);
+        started[i] = (pthread_create(&threads[i], NULL, stress_test_thread, &results[i]) == 0);
 #endif
+        if (!started[i]) {
+            printf("Thread %2d: failed to start\n", i);
+        }
     }
 
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
+        if (!started[i]) {
+            continue;
+        }
+
 #ifdef _WIN32
         WaitForSingleObject(threads[i], INFINITE);
         CloseHandle(threads[i]);
@@ -190,7 +213,9 @@ void stress_test_concurrent_audit_writes(void)
 
     printf("Total Duration: %.2f ms\n", duration_ms);
     printf("Throughput: %.2f writes/sec\n",
-           STRESS_THREAD_COUNT * STRESS_OPS_PER_THREAD * 1000.0 / duration_ms);
+           duration_ms > 0.0
+               ? STRESS_THREAD_COUNT * STRESS_OPS_PER_THREAD * 1000.0 / duration_ms
+               : 0.0);
 }
 
 void stress_test_cache_under_contention(void)
@@ -212,18 +237,28 @@ void stress_test_cache_under_contention(void)
     thread_ctx_t results[STRESS_THREAD_COUNT];
 #endif
 
+    int started[STRESS_THREAD_COUNT];
+
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
         results[i].thread_id = i;
         results[i].ops_count = STRESS_OPS_PER_THREAD;
 
 #ifdef _WIN32
         threads[i] = CreateThread(NULL, 0, stress_test_thread, &results[i], 0, NULL);
+        started[i] = (threads[i] != NULL);
 #else
-        pthread_create(&threads[i], NULL, stress_test_thread, &results[i]);
+        started[i] = (pthread_create(&threads[i], NULL, stress_test_thread, &results[i]) == 0);
 #endif
+        if (!started[i]) {
+            printf("Thread %2d: failed to start\n", i);
+        }
     }
 
     for (int i = 0; i < STRESS_THREAD_COUNT; i++) {
+        if (!started[i]) {
+            continue;
+        }
+
 #ifdef _WIN32
         WaitForSingleObject(threads[i], INFINITE);
         CloseHandle(threads[i]);
