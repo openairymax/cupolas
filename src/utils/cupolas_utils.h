@@ -51,8 +51,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../../commons/utils/error/error.h"
-#include "../../../commons/utils/memory/airy_memory.h"
+#include <error.h>
+#include <airy_memory.h>
 
 #ifdef __cplusplus
 extern "C" {
