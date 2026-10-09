@@ -12,7 +12,7 @@
 #include <stdio.h>
 /* 大小写不敏感比较统一用标准 strcasecmp：POSIX 由 <strings.h> 提供，
  * Windows 由 compat.h 映射到 _stricmp（MSVC 无 <strings.h>）。 */
-#include "../../../commons/utils/compat/compat.h"
+#include <compat.h>
 #if !defined(_WIN32)
 #include <strings.h>
 #endif

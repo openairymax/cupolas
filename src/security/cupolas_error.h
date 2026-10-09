@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../../../commons/utils/error/error.h"
+#include <error.h>
 
 #ifdef __cplusplus
 extern "C" {

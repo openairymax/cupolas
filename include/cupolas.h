@@ -28,8 +28,8 @@
 #ifndef CUPOLAS_H
 #define CUPOLAS_H
 
-#include "../../commons/include/airy_types.h"
-#include "../../commons/utils/error/error.h"
+#include <airy_types.h>
+#include <error.h>
 
 #include <stddef.h>
 

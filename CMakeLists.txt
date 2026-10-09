@@ -1,5 +1,108 @@
 
 
+# =============================================================================
+# cupolas — 安全守卫产品装配壳（products 产品仓）
+#
+# 双模式构建契约（0.1.19 §1.3 机制核外迁；台账 §254c）：
+#   embedded   —— agentrt 根 add_subdirectory 纳入本目录时
+#                 CMAKE_SOURCE_DIR(=agentrt) ≠ CMAKE_CURRENT_SOURCE_DIR(=本目录)，
+#                 下方 preamble 整块跳过；依赖检测、平台宏、合规注入、
+#                 commons 目标均由根统一提供（embedded 形态字节不变、零回归）。
+#   standalone —— cmake -S products/cupolas -B <出树目录> 产品仓独立
+#                 configure/构建/测试；经 AGENTRT_ROOT 复用 agentrt 管理仓的
+#                 cmake 模块与 commons 原子件。
+# =============================================================================
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    cmake_minimum_required(VERSION 3.20)
+
+    # AGENTRT_ROOT 三态：-D 缓存变量 → 环境变量 → 默认相对路径
+    if(NOT AGENTRT_ROOT)
+        if(DEFINED ENV{AGENTRT_ROOT})
+            set(AGENTRT_ROOT "$ENV{AGENTRT_ROOT}")
+        else()
+            set(AGENTRT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../agentrt")
+        endif()
+    endif()
+    get_filename_component(AGENTRT_ROOT "${AGENTRT_ROOT}" ABSOLUTE)
+    if(NOT EXISTS "${AGENTRT_ROOT}/commons/CMakeLists.txt")
+        message(FATAL_ERROR
+            "standalone build requires agentrt commons: AGENTRT_ROOT=${AGENTRT_ROOT} invalid (pass -DAGENTRT_ROOT=<agentrt> or set env AGENTRT_ROOT)")
+    endif()
+
+    # 版本 SSoT：承接 agentrt/VERSION（缺失/非法大声失败，镜像根 DT-13 形态）
+    file(STRINGS "${AGENTRT_ROOT}/VERSION" AIRY_VERSION_RAW LIMIT_COUNT 1)
+    string(STRIP "${AIRY_VERSION_RAW}" AIRY_VERSION_RAW)
+    if(NOT AIRY_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+        message(FATAL_ERROR "版本 SSoT 非法：VERSION 内容 '${AIRY_VERSION_RAW}' 不符合 X.Y.Z")
+    endif()
+    string(REGEX REPLACE "([0-9.]+).*" "\\1" AIRY_VERSION_NUM "${AIRY_VERSION_RAW}")
+    project(AgentOS-Cupolas VERSION ${AIRY_VERSION_NUM} LANGUAGES C)
+
+    # 源码区内严禁构建：in-source 与构建树嵌于源码树内均 FATAL
+    if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+        message(FATAL_ERROR
+            "cupolas in-source builds are not allowed! Use: cmake -S . -B <external-build-dir>")
+    endif()
+    cmake_path(IS_PREFIX CMAKE_SOURCE_DIR "${CMAKE_BINARY_DIR}" NORMALIZE _CUPOLAS_BIN_IN_SRC)
+    if(_CUPOLAS_BIN_IN_SRC)
+        message(FATAL_ERROR
+            "cupolas build directory MUST be outside the source tree: ${CMAKE_BINARY_DIR}")
+    endif()
+
+    if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+        set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    endif()
+
+    # 复用 agentrt cmake 模块：平台检测（POSIX 宏与根一致）+ 依赖检测收口
+    # （AIRY_HAS_* CACHE）与宏双路下发（airy_compile_defs），单一检测点
+    list(APPEND CMAKE_MODULE_PATH "${AGENTRT_ROOT}/cmake")
+    include(airy_print)
+    include(platform)
+    include(dependencies)
+
+    # PkgConfig 顶层自查：函数内 find_package 的 normal 变量不外泄，
+    # 下方 body 兜底检测块（目录作用域）读 ${PkgConfig_FOUND} 须于此可见
+    find_package(PkgConfig QUIET)
+
+    airy_find_required_deps()
+    airy_find_optional_deps()
+    airy_detect_platform()
+    airy_apply_dep_defs()
+
+    # 版本宏 SSoT 注入（commons airyrt_version.h 消费面）
+    add_compile_definitions(AIRYRT_VERSION="${AIRY_VERSION_RAW}")
+
+    # 合规严格模式：镜像根注入面（非 MSVC -include 禁令头；MSVC /FI 强制
+    # 预包含）。embedded 下本块整体跳过，由根注入，无双重下发（IRON-8）
+    option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
+    if(NOT MSVC)
+        if(AIRY_COMPLIANCE_STRICT)
+            add_compile_definitions(AIRY_COMPLIANCE_STRICT)
+            add_compile_options("-include" "${AGENTRT_ROOT}/commons/utils/compliance/banned_functions.h")
+        endif()
+    else()
+        if(EXISTS "${AGENTRT_ROOT}/cmake/windows_preinclude.h")
+            airy_print_ok("[MSVC] Force-include file found: ${AGENTRT_ROOT}/cmake/windows_preinclude.h")
+        else()
+            airy_print_warn("[MSVC] Force-include file NOT FOUND: ${AGENTRT_ROOT}/cmake/windows_preinclude.h")
+        endif()
+        add_compile_options(/FI"${AGENTRT_ROOT}/cmake/windows_preinclude.h")
+    endif()
+
+    enable_testing()
+
+    # commons 原子件装配（standalone 下 airy_common 唯一创建点）。commons
+    # 机制核 tests 的 238 项由 embedded 根树全量覆盖，standalone 不重复承接
+    # ——其测试链接 airy_core 等未挂载的 atoms 目标；以 normal 变量阻断其
+    # tests 挂载（CMP0077 NEW：option() 让位于先存的 normal 变量）。
+    set(BUILD_TESTS OFF)
+    add_subdirectory("${AGENTRT_ROOT}/commons" commons)
+    unset(BUILD_TESTS)
+
+    # body 断链回退锚：COMMON_MODULE_DIR 指向 agentrt 管理仓内 commons
+    set(CUPOLAS_COMMONS_DIR "${AGENTRT_ROOT}/commons")
+endif()
+
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
@@ -143,8 +246,12 @@ set(CUPOLAS_HEADERS
     src/policy/dpolicy_internal.h
 )
 
-# commons 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/commons)
+# commons 模块路径：embedded 维持根树形态（${CMAKE_SOURCE_DIR}/commons）；
+# standalone 由顶部 preamble 置 CUPOLAS_COMMONS_DIR 指向 agentrt 管理仓
+if(NOT CUPOLAS_COMMONS_DIR)
+    set(CUPOLAS_COMMONS_DIR ${CMAKE_SOURCE_DIR}/commons)
+endif()
+set(COMMON_MODULE_DIR ${CUPOLAS_COMMONS_DIR})
 
 # commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS
@@ -201,7 +308,10 @@ if(AIRY_HAS_OPENSSL)
     target_compile_definitions(cupolas PRIVATE CUPOLAS_USE_OPENSSL)
 endif()
 
-target_link_libraries(cupolas PRIVATE airy_common)
+# cupolas 公共头在契约面上暴露 commons 权威类型（airy_types/error/memory），
+# airy_common 因此是 PUBLIC 依赖：消费者经其自包含的接口头面解析，不依赖
+# 上层目录的全局 include 注入（embedded 根块与 standalone 均经此传承）。
+target_link_libraries(cupolas PUBLIC airy_common)
 
 if(AIRY_HAS_OPENSSL)
     target_link_libraries(cupolas PRIVATE ${OPENSSL_LIBRARIES})
