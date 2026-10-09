@@ -45,6 +45,9 @@ cupolas/
 ├── README_zh.md                          # Chinese version
 ├── LICENSE                               # Dual license texts (AGPL-3.0 + Apache-2.0)
 ├── NOTICE                                # Copyright notice
+├── daemon/                               # cupolas_d daemon shell (0.1.19 §255; mounted
+│   ├── CMakeLists.txt                    #   only by agentrt top-level assembly block)
+│   ├── include/ src/ modules/ tests/     # RPC surface + service + security-dome policy
 ├── include/                              # Public headers
 │   ├── cupolas.h                         # Cupolas unified entry
 │   ├── zero_trust_integration.h          # Zero-trust integration interface
@@ -218,6 +221,10 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 
 - `airy_cupolas` — static library aggregating all security subsystems
 - Public headers installed under `include/agentrt/cupolas`
+
+> `daemon/` (the `cupolas_d` shell) is **not** part of a standalone build: its
+> mechanism cores (`svc_common`, `airy_core`) are supplied by agentrt, so only
+> the agentrt top-level assembly block mounts it (fail-closed, 0.1.19 §255).
 
 ## API
 

@@ -45,6 +45,9 @@ cupolas/
 ├── README_zh.md                          # 本文件（中文）
 ├── LICENSE                               # 双许可证文本（AGPL-3.0 + Apache-2.0）
 ├── NOTICE                                # 版权声明
+├── daemon/                               # cupolas_d 守护进程壳（0.1.19 §255，仅由
+│   ├── CMakeLists.txt                    #   agentrt 顶层装配块挂入构建）
+│   ├── include/ src/ modules/ tests/     # RPC 门面 + 服务层 + 安全穹顶策略单元
 ├── include/                              # 公共头文件
 │   ├── cupolas.h                         # Cupolas 统一入口
 │   ├── zero_trust_integration.h          # 零信任集成接口
