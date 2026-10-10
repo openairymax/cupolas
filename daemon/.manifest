@@ -1,10 +1,10 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "daemon": "cupolas_d",
   "cname": "cupolas",
   "sd_type": "cupolas",
   "cupolas": "full",
-  "activate_noop": true,
+  "noop_hooks": ["activate", "attach", "teardown"],
   "facades": ["ingress", "execute", "governance"],
   "slots": ["authz", "validate", "record"],
   "rpc": {
