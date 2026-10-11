@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */
 /* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 
-/* @generated DO NOT EDIT — daemon_gen.py v1.13.1 (L3 SSoT) 生成。
+/* @generated DO NOT EDIT — daemon_gen.py v1.13.2 (L3 SSoT) 生成。
  * manifest 派生产物；装配机制在 daemons/common，策略在 src/svc.c
  * 与 modules（手写域）。
  * 改 .manifest 后: python3 agentrt/tools/codegen/daemon_gen.py --gen
@@ -32,24 +32,8 @@ static const daemon_op_t SVC_OPS[] = {
 int main(int argc, char **argv)
 {
     daemon_boot_t boot = {
-        .daemon = "cupolas_d",
-        .cname = "cupolas",
-        .env_debug = "AIRY_CUPOLAS_D_DEBUG",
-        .sd_type = "cupolas",
-        .tags = "cupolas,security",
-        .method_total = 22,
-        .running_lock = &g_running_lock_cupolas_d,
-        .signal_handler = signal_handler_cupolas_d,
-        .log_toggle = svc_log_toggle_handler_cupolas_d,
-        .print_usage = print_usage_cupolas_d,
-        .on_client = daemon_on_client_cupolas_d,
-        .dispatcher = &g_dispatcher_cupolas_d,
-        .event_driver = &g_event_driver_cupolas_d,
-        .bsd = &g_bsd_cupolas_d,
-        .pool_max_events = 64,
-        .pool_min = 4,
-        .pool_max = 8,
-        .pool_queue = 256,
+        DAEMON_BOOT_FILL(cupolas_d, "cupolas", "AIRY_CUPOLAS_D_DEBUG",
+                         "cupolas", "cupolas,security", 22, 64, 4, 8, 256, 0)
         DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS,
                          svc_activate_noop, svc_attach_noop,
                          svc_teardown_noop, daemon_dome_init,
