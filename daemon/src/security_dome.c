@@ -93,8 +93,7 @@ static airy_err_t dome_vault_store(void *handle, const char *cred_id,
 
     /* The storer is the default authorizer (read/write/delete); other agents
      * must be granted access explicitly (vault denies by default). A grant
-     * failure keeps the credential stored and is only reported as a warning,
-     * mirroring the historical daemon_store_credential semantics. */
+     * failure keeps the credential stored and is only reported as a warning. */
     const char *cred_owner = owner ? owner : "system";
     int acl_rc = cupolas_vault_grant_access(vault, cred_id, cred_owner,
                                             CUPOLAS_VAULT_OP_READ | CUPOLAS_VAULT_OP_WRITE |
@@ -184,9 +183,6 @@ static airy_err_t dome_bootstrap(const char *daemon_name, int pep_mode)
     }
     sec_config.permission_rules_path = g_perm_rules_path;
     sec_config.enable_permission_cache = true;
-    sec_config.enable_signature_verification = false;
-    sec_config.trusted_ca_path = NULL;
-    sec_config.expected_signer = NULL;
     sec_config.enable_vault = true;
     sec_config.vault_provider = &g_dome_vault_provider;
     sec_config.enable_audit_logging = true;
