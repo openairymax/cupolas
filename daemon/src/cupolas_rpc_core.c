@@ -15,12 +15,11 @@
 #include "cupolas_d_internal.h"
 
 #include "daemon_main.h"
+#include "daemon_replies.h"
 #include "param_validator.h"
 #include "svc_logger.h"
 
 #include "dynamic_policy_engine.h"
-
-#include <time.h>
 
 static void handle_check_permission(cJSON *params, int id, airy_sock_t fd);
 static void handle_sanitize(cJSON *params, int id, airy_sock_t fd);
@@ -244,12 +243,7 @@ static void handle_audit_flush(cJSON *params, int id, airy_sock_t client_fd)
 
 static void handle_health_check(int id, airy_sock_t client_fd)
 {
-    cJSON *result = cJSON_CreateObject();
-    cJSON_AddStringToObject(result, "service", "cupolas_d");
-    cJSON_AddBoolToObject(result, "healthy", g_service != NULL);
-    cJSON_AddNumberToObject(result, "timestamp", (double)(uint64_t)time(NULL) * 1000);
-
-    JSONRPC_SEND_SUCCESS(client_fd, result, id);
+    reply_health(client_fd, "cupolas_d", g_service != NULL, id);
 }
 
 static void handle_get_stats(int id, airy_sock_t client_fd)
@@ -259,17 +253,5 @@ static void handle_get_stats(int id, airy_sock_t client_fd)
         return;
     }
 
-    char *stats_json = cupolas_service_get_stats_json(g_service);
-    if (!stats_json) {
-        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Failed to collect stats", id);
-        return;
-    }
-
-    cJSON *result = cJSON_Parse(stats_json);
-    AIRY_FREE(stats_json);
-    if (!result) {
-        JSONRPC_SEND_ERROR(client_fd, JSONRPC_INTERNAL_ERROR, "Stats serialization failed", id);
-        return;
-    }
-    JSONRPC_SEND_SUCCESS(client_fd, result, id);
+    reply_stats(client_fd, cupolas_service_get_stats_json(g_service), id);
 }
