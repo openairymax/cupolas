@@ -27,11 +27,6 @@ static void config_load(const char *config_path)
                    CUPOLAS_D_SOCKET_WIN, CUPOLAS_D_TCP_PORT, NULL, NULL);
 }
 
-void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp)
-{
-    daemon_ep_apply(ep, cmdline_tcp);
-}
-
 int svc_prepare(const char *config_path)
 {
     airy_paths_init();
