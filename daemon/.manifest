@@ -1,8 +1,9 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 4,
   "daemon": "cupolas_d",
   "cname": "cupolas",
   "sd_type": "cupolas",
+  "endpoint": "apply",
   "cupolas": "full",
   "noop_hooks": ["activate", "attach", "teardown"],
   "facades": ["ingress", "execute", "governance"],
