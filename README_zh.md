@@ -177,10 +177,9 @@ cupolas/
 |------|----------|------|
 | **commons** | 是 | 同步原语、错误框架、类型定义（`airy_types.h`）、内存管理宏（`AIRY_MALLOC`/`FREE`）、security/resource 工具——直接消费基础层 |
 | OpenSSL | 否 | 数字签名、密钥库、entitlements、运行时保护、TLS——由 `AIRY_HAS_OPENSSL` 门控 |
-| libyaml | 否 | 完整 YAML 支持；内置 `yaml_minimal.c` 为回退 |
 | cJSON | 否 | JSON 配置解析 |
 
-> **依赖检测**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AIRY_HAS_OPENSSL`、`AIRY_HAS_YAML`、`AIRY_HAS_CJSON`）。
+> **依赖检测**：所有 `find_package` 调用集中在伞仓根 `CMakeLists.txt`；子模块仅消费缓存变量（`AIRY_HAS_OPENSSL`、`AIRY_HAS_CJSON`）。
 
 ## 下游消费者
 
@@ -212,7 +211,6 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 | `BUILD_WITH_SANITIZERS` | `OFF` | 启用 ASAN / MSAN / TSAN |
 | `BUILD_WITH_LOGGING` | `ON` | 启用详细日志 |
 | `AIRY_HAS_OPENSSL` | 自动 | 由伞仓 CMake 自动探测；门控 OpenSSL 条件模块 |
-| `AIRY_HAS_YAML` | 自动 | 由伞仓 CMake 自动探测 |
 | `AIRY_HAS_CJSON` | 自动 | 由伞仓 CMake 自动探测 |
 
 **强化构建标志（Linux）：** `-fstack-protector-strong`、`-D_FORTIFY_SOURCE=2`、`-fvisibility=hidden`、`-Wl,-z,relro,-z,now`、`-Wl,-z,noexecstack`。

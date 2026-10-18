@@ -149,7 +149,6 @@ Windows 源码构建默认不编译守护进程，需显式 `-DBUILD_DAEMON=ON`�
 | [`svc_common`](https://atomgit.com/openairymax/daemons)（`common/`） | 生命周期状态机、事件驱动、JSON-RPC dispatcher |
 | [commons](https://atomgit.com/openairymax/commons) | 平台路径、日志、cJSON 封装 |
 | [corekern](https://atomgit.com/openairymax/atoms) | `airy_init()` 核心引导 |
-| libyaml | 授权表 YAML 解析 |
 | [gateway_d](https://atomgit.com/openairymax/daemons) | 上游：`cupolas.*` 命名空间转发方 |
 
 ## 关系

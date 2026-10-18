@@ -177,10 +177,9 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 |------------|----------|---------|
 | **commons** | Yes | Sync primitives, error framework, type definitions (`airy_types.h`), memory management macros (`AIRY_MALLOC`/`FREE`), security/resource utilities — the foundational layer consumed directly |
 | OpenSSL | No | Digital signature, key vault, entitlements, runtime protection, TLS — gated by `AIRY_HAS_OPENSSL` |
-| libyaml | No | Full YAML support |
 | cJSON | No | JSON config parsing |
 
-> **Dependency detection**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_YAML`, `AIRY_HAS_CJSON`).
+> **Dependency detection**: All `find_package` calls are centralized in the umbrella root `CMakeLists.txt`; sub-modules only consume cache variables (`AIRY_HAS_OPENSSL`, `AIRY_HAS_CJSON`).
 
 ## Downstream Consumers
 
@@ -212,7 +211,6 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 | `BUILD_WITH_SANITIZERS` | `OFF` | Enable ASAN / MSAN / TSAN |
 | `BUILD_WITH_LOGGING` | `ON` | Enable verbose logging |
 | `AIRY_HAS_OPENSSL` | auto | Auto-detected by umbrella CMake; gates OpenSSL-conditional modules |
-| `AIRY_HAS_YAML` | auto | Auto-detected by umbrella CMake |
 | `AIRY_HAS_CJSON` | auto | Auto-detected by umbrella CMake |
 
 **Hardened build flags (Linux):** `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=2`, `-fvisibility=hidden`, `-Wl,-z,relro,-z,now`, `-Wl,-z,noexecstack`.
