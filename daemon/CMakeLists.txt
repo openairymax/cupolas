@@ -139,7 +139,6 @@ target_include_directories(airy_cupolas_service PUBLIC
 
 target_include_directories(airy_cupolas_service PRIVATE
     ${CJSON_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
 )
 
 # 链接库：经 airy_security_dome 策略单元传递取得 svc_common 机制核层与
@@ -153,10 +152,6 @@ if(AIRY_HAS_CJSON)
         target_link_libraries(airy_cupolas_service PUBLIC ${CJSON_LIBRARIES})
     endif()
 endif()
-if(AIRY_HAS_YAML AND YAML_FOUND AND YAML_LIBRARIES)
-    target_link_libraries(airy_cupolas_service PUBLIC ${YAML_LIBRARIES})
-endif()
-
 if(UNIX)
     target_link_libraries(airy_cupolas_service PUBLIC Threads::Threads airy_platform_libs)
 endif()
@@ -213,7 +208,6 @@ target_include_directories(cupolas_d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/ipc
     ${CUPOLAS_INCLUDE_DIR}
     ${CJSON_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
 )
 
 target_link_libraries(cupolas_d PRIVATE
