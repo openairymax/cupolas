@@ -36,8 +36,9 @@
 #include "dynamic_policy_engine.h"
 #include "svc_logger.h"
 
+#include "atomic_compat.h"
+
 #include <cjson/cJSON.h>
-#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,8 +52,8 @@
 struct cupolas_service {
     char *config_path;
     int64_t start_time;
-    atomic_uint_fast64_t permission_checks;
-    atomic_uint_fast64_t sanitize_count;
+    atomic_int64_t permission_checks;
+    atomic_int64_t sanitize_count;
     cupolas_entitlements_t *entitlements;
     char *entitlements_path;
     struct dpolicy_engine_s *dpolicy; /* PDP 动态策略引擎（M2-S2，非拥有） */
@@ -98,7 +99,7 @@ int cupolas_service_check_permission(cupolas_service_t *svc,
     if (!params->agent_id || !params->action || !params->resource)
         return AIRY_ERR_INVALID_PARAM;
 
-    atomic_fetch_add_explicit(&svc->permission_checks, 1, memory_order_relaxed);
+    atomic_fetch_add_64(&svc->permission_checks, 1, memory_order_relaxed);
 
     /* M2-S2 PDP overlay（0.1.9 §3.2）：已激活的动态策略命中即权威
      * （含显式 DENY，deny-wins）；未命中回退基础 ACL（下面原链路）。
@@ -169,7 +170,7 @@ int cupolas_service_sanitize(cupolas_service_t *svc, const cupolas_sanitize_para
         return AIRY_ERR_PERMISSION_DENIED;
     }
 
-    atomic_fetch_add_explicit(&svc->sanitize_count, 1, memory_order_relaxed);
+    atomic_fetch_add_64(&svc->sanitize_count, 1, memory_order_relaxed);
     out->sanitized = buf;
     out->err = ret;
     SVC_LOG_INFO("cupolas.sanitize: input_len=%zu rc=%d", in_len, ret);
@@ -278,11 +279,11 @@ char *cupolas_service_get_stats_json(cupolas_service_t *svc)
     cJSON_AddStringToObject(obj, "version", cupolas_version());
     cJSON_AddNumberToObject(obj, "uptime_s", (double)((int64_t)time(NULL) - svc->start_time));
     cJSON_AddNumberToObject(obj, "permission_checks",
-                            (double)atomic_load_explicit(&svc->permission_checks,
-                                                         memory_order_relaxed));
+                            (double)atomic_load_64(&svc->permission_checks,
+                                                   memory_order_relaxed));
     cJSON_AddNumberToObject(obj, "sanitize_count",
-                            (double)atomic_load_explicit(&svc->sanitize_count,
-                                                         memory_order_relaxed));
+                            (double)atomic_load_64(&svc->sanitize_count,
+                                                   memory_order_relaxed));
 
     char *json = cJSON_PrintUnformatted(obj);
     cJSON_Delete(obj);
