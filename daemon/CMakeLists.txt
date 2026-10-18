@@ -36,6 +36,14 @@ endif()
 set(DAEMON_COMMON_DIR ${AGENTRT_DAEMONS_ROOT}/common)
 set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 
+# 机制核头锚点（0.1.19）：产品壳 daemon 位于 daemons/ 目录作用域之外，无法
+# 继承该目录的 corekern 注入；生成入口 main.c 依赖 airy_rt.h，故由装配块
+# 显式供给，缺席时按 agentrt 根推导（与 products 寄宿位置无关）。
+if(NOT AIRY_COREKERN_INCLUDE_DIR)
+    get_filename_component(_agentrt_root "${AGENTRT_DAEMONS_ROOT}" DIRECTORY)
+    set(AIRY_COREKERN_INCLUDE_DIR "${_agentrt_root}/atoms/corekern/include")
+endif()
+
 set(COMMONS_DIR ${AGENTRT_COMMONS_ROOT})
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
@@ -193,6 +201,7 @@ endif()
 target_include_directories(cupolas_d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${AIRY_COREKERN_INCLUDE_DIR}
     ${DAEMON_COMMON_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}/platform/include
