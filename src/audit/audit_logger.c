@@ -283,7 +283,7 @@ audit_logger_t *audit_logger_create(const char *log_dir, const char *log_prefix,
                                     size_t max_file_size, int max_files)
 {
 
-    static atomic_int hash_lock_inited = {0};
+    static atomic_int hash_lock_inited;
     if (atomic_load_32(&hash_lock_inited, memory_order_seq_cst) == 0) {
         airy_mtx_init(&g_hash_chain_lock);
         atomic_store_32(&hash_lock_inited, 1, memory_order_seq_cst);
