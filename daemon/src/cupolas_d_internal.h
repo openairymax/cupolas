@@ -31,6 +31,12 @@ extern cupolas_service_t *g_service;
  * referenced by the policy RPC handlers). */
 extern struct dpolicy_engine_s *g_dpolicy;
 
+/* Canary governor lifecycle (svc_canary.c): mounts the canary ops onto
+ * g_dpolicy and drives the five-state reconciliation tick. Absent ops
+ * mean full bypass; on() failure is non-fatal by design. */
+int svc_canary_on(void);
+void svc_canary_off(void);
+
 #ifdef __cplusplus
 }
 #endif

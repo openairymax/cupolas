@@ -6,7 +6,8 @@
  *
  * 覆盖：规则增删改 / glob 匹配 / fail-closed / 冲突消解 4 策略 /
  * 版本 commit-rollback / 32 版上限 / JSON 往返 / 合规兜底 deny-all /
- * 变更回调。
+ * 变更回调 / canary 灰度挂载点（gate 拒绝透传 / route 采样分流 /
+ * revert-promote / 会话禁旁路固化）。
  */
 
 #include "dynamic_policy_engine.h"
@@ -35,6 +36,30 @@ static int s_fail = 0;
             TEST_FAIL(__func__, #cond);                                    \
         }                                                                  \
     } while (0)
+
+/* 宿主策略面替身：gate/route 返回值由测试用例控制 */
+static int fake_gate_val;
+static int fake_route_val;
+
+static int fake_gate(dpolicy_canary_kind_t kind, void *ud)
+{
+    (void)kind;
+    (void)ud;
+    return fake_gate_val;
+}
+
+static int fake_route(const char *s, const char *a, const char *r, void *ud)
+{
+    (void)s;
+    (void)a;
+    (void)r;
+    (void)ud;
+    return fake_route_val;
+}
+
+static const dpolicy_canary_ops_t fake_ops = {
+    .gate = fake_gate, .route = fake_route, .user_data = NULL
+};
 
 static void t_lifecycle(void)
 {
@@ -548,6 +573,185 @@ static void t_load_transaction(void)
     TEST_PASS("load_transaction");
 }
 
+static void t_canary_gate_reject(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    const char *doc = "{\"rules\":[{\"id\":\"n1\",\"effect\":\"deny\","
+                      "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                      "\"enabled\":true}]}";
+
+    CHECK(dpolicy_set_canary_ops(NULL, &fake_ops) == -1);
+    CHECK(dpolicy_set_canary_ops(e, NULL) == 0);
+    fake_gate_val = 0;
+    fake_route_val = 1;
+    CHECK(dpolicy_set_canary_ops(e, &fake_ops) == 0);
+
+    /* gate 拒绝：activate 透传错误码且暂存完整保留可重试 */
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    fake_gate_val = -1;
+    CHECK(dpolicy_activate(e, "blocked") == -1);
+    CHECK(dpolicy_has_staged(e) == 1);
+    CHECK(dpolicy_canary_active(e) == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 0);
+
+    /* gate 分流：进入灰度会话，epoch 不变，会话中禁换挂载点 */
+    fake_gate_val = 1;
+    CHECK(dpolicy_activate(e, "canary") == 0);
+    CHECK(dpolicy_canary_active(e) == 1);
+    CHECK(dpolicy_engine_get_epoch(e) == 0);
+    CHECK(dpolicy_set_canary_ops(e, NULL) == -2);
+
+    /* revert 退出会话后挂载点方可清除 */
+    CHECK(dpolicy_canary_revert(e) == 0);
+    CHECK(dpolicy_set_canary_ops(e, NULL) == 0);
+
+    dpolicy_engine_destroy(e);
+    TEST_PASS("canary_gate_reject");
+}
+
+static void t_canary_shadow_route(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    const char *doc = "{\"rules\":[{\"id\":\"n1\",\"effect\":\"deny\","
+                      "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                      "\"enabled\":true}]}";
+    dpolicy_rule_t o1;
+    int matched = -1;
+
+    CHECK(dpolicy_set_canary_ops(e, &fake_ops) == 0);
+    memset(&o1, 0, sizeof(o1));
+    strcpy(o1.id, "o1");
+    o1.effect = DPOLICY_EFFECT_ALLOW;
+    o1.enabled = true;
+    CHECK(dpolicy_engine_add_rule(e, &o1) == 0);
+    CHECK(dpolicy_engine_get_epoch(e) == 0);
+
+    /* 分流不固化：旧集快照、新集 live、epoch 与版本均不动 */
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    fake_gate_val = 1;
+    CHECK(dpolicy_activate(e, "canary") == 0);
+    CHECK(dpolicy_canary_active(e) == 1);
+    CHECK(dpolicy_engine_get_epoch(e) == 0);
+    CHECK(dpolicy_engine_get_version_count(e) == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+
+    /* route 采样分流：0=旧集（allow），1=新集（deny） */
+    fake_route_val = 0;
+    matched = -1;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_ALLOW);
+    CHECK(matched == 1);
+    fake_route_val = 1;
+    matched = -1;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_DENY);
+    CHECK(matched == 1);
+
+    /* revert：旧集换回运行集，epoch 单调，暂存新集被丢弃 */
+    fake_gate_val = 0;
+    CHECK(dpolicy_canary_revert(e) == 0);
+    CHECK(dpolicy_canary_active(e) == 0);
+    CHECK(dpolicy_engine_get_epoch(e) == 1);
+    CHECK(dpolicy_engine_get_version_count(e) == 0);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+    matched = -1;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_ALLOW);
+    CHECK(matched == 1);
+
+    dpolicy_engine_destroy(e);
+    TEST_PASS("canary_shadow_route");
+}
+
+static void t_canary_revert_promote(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    const char *deny_doc = "{\"rules\":[{\"id\":\"n1\",\"effect\":\"deny\","
+                           "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                           "\"enabled\":true}]}";
+    const char *allow_doc = "{\"rules\":[{\"id\":\"n2\",\"effect\":\"allow\","
+                            "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                            "\"enabled\":true}]}";
+    int matched = -1;
+
+    CHECK(dpolicy_set_canary_ops(e, &fake_ops) == 0);
+
+    /* 无灰度会话：revert/promote 一律拒绝 */
+    CHECK(dpolicy_canary_revert(e) == -2);
+    CHECK(dpolicy_canary_promote(e) == -2);
+
+    /* promote：释放旧集并固化新集为正式版本（epoch 与版本号前移） */
+    CHECK(dpolicy_stage_json(e, deny_doc) == 0);
+    fake_gate_val = 1;
+    fake_route_val = 1;
+    CHECK(dpolicy_activate(e, "canary") == 0);
+    CHECK(dpolicy_canary_promote(e) == 0);
+    CHECK(dpolicy_canary_active(e) == 0);
+    CHECK(dpolicy_engine_get_epoch(e) == 1);
+    CHECK(dpolicy_engine_get_version_count(e) == 1);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+    /* 固化后无会话：eval 直读运行集，不再咨询 route */
+    fake_route_val = 0;
+    matched = -1;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_DENY);
+    CHECK(matched == 1);
+    CHECK(dpolicy_canary_revert(e) == -2);
+
+    /* 二轮灰度：revert 回到上一固化版本（deny），版本号不动 */
+    CHECK(dpolicy_stage_json(e, allow_doc) == 0);
+    fake_gate_val = 1;
+    CHECK(dpolicy_activate(e, "canary-2") == 0);
+    CHECK(dpolicy_canary_revert(e) == 0);
+    CHECK(dpolicy_engine_get_epoch(e) == 2);
+    CHECK(dpolicy_engine_get_version_count(e) == 1);
+    CHECK(dpolicy_engine_get_rule_count(e) == 1);
+    matched = -1;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_DENY);
+    CHECK(matched == 1);
+    CHECK(dpolicy_canary_revert(e) == -2);
+
+    dpolicy_engine_destroy(e);
+    TEST_PASS("canary_revert_promote");
+}
+
+static void t_canary_commit_blocked(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    const char *doc = "{\"rules\":[{\"id\":\"n1\",\"effect\":\"deny\","
+                      "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                      "\"enabled\":true}]}";
+
+    CHECK(dpolicy_set_canary_ops(e, &fake_ops) == 0);
+    fake_gate_val = 0;
+    fake_route_val = 1;
+    CHECK(dpolicy_engine_commit_version(e, "base") == 0);
+    CHECK(dpolicy_engine_get_version_count(e) == 1);
+
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    fake_gate_val = 1;
+    CHECK(dpolicy_activate(e, "canary") == 0);
+    CHECK(dpolicy_canary_active(e) == 1);
+
+    /* 灰度会话禁旁路固化：gate 任意非 0 均透传拒绝 */
+    fake_gate_val = -1;
+    CHECK(dpolicy_engine_commit_version(e, "sneak") == -1);
+    CHECK(dpolicy_engine_get_version_count(e) == 1);
+    fake_gate_val = 1;
+    CHECK(dpolicy_engine_commit_version(e, "sneak") == 1);
+    CHECK(dpolicy_engine_get_version_count(e) == 1);
+
+    /* revert 退出会话后 commit 恢复放行 */
+    fake_gate_val = 0;
+    CHECK(dpolicy_canary_revert(e) == 0);
+    CHECK(dpolicy_engine_commit_version(e, "post") == 0);
+    CHECK(dpolicy_engine_get_version_count(e) == 2);
+
+    dpolicy_engine_destroy(e);
+    TEST_PASS("canary_commit_blocked");
+}
+
 int main(void)
 {
     t_lifecycle();
@@ -566,6 +770,10 @@ int main(void)
     t_stage_activate();
     t_stage_conflicts();
     t_load_transaction();
+    t_canary_gate_reject();
+    t_canary_shadow_route();
+    t_canary_revert_promote();
+    t_canary_commit_blocked();
 
     printf("dynamic_policy_engine: %d pass, %d fail\n", s_pass, s_fail);
     return s_fail == 0 ? 0 : 1;

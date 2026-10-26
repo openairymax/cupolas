@@ -227,6 +227,12 @@ target_link_libraries(cupolas_d PRIVATE
     airy_platform_libs
 )
 
+# W6（0.1.20 §7）：canary 治理面（svc_canary.c）——根构建挂载 products/canary
+# 时链接（include 经 PUBLIC BUILD_INTERFACE 传播）；缺席即旁路，无桩实现
+if(TARGET airy_canary)
+    target_link_libraries(cupolas_d PRIVATE airy_canary)
+endif()
+
 if(NOT MSVC)
 target_compile_options(cupolas_d PRIVATE
     -Wall -Wextra -Wpedantic
