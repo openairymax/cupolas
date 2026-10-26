@@ -164,10 +164,12 @@ set(CUPOLAS_SOURCES
     src/guards/safety_guard_audit.c
     src/guards/safety_guard_ctrl.c
     # 动态策略引擎（版本/冲突消解/热更/回滚，epoch SSoT）
-    # 按功能域拆分：核心评估与 CRUD / 版本管理 / JSON 导入导出与两段式生效
+    # 按功能域拆分：核心评估与 CRUD / 版本管理 / JSON 导入导出与两段式生效 /
+    # canary 灰度会话机制（W6 挂载点）
     src/policy/dynamic_policy_engine.c
     src/policy/dpolicy_version.c
     src/policy/dpolicy_json.c
+    src/policy/dpolicy_canary.c
 )
 # OpenSSL-dependent sources
 if(AIRY_HAS_OPENSSL)

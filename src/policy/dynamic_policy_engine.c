@@ -172,6 +172,7 @@ void dpolicy_engine_destroy(dpolicy_engine_t *engine)
     for (size_t i = 0; i < engine->staged_count; i++)
         dpol_rule_free(&engine->staged[i]);
     AIRY_FREE(engine->staged);
+    dpol_can_free(engine);
     for (size_t i = 0; i < engine->version_count; i++)
         dpol_version_free(&engine->versions[i]);
     airy_mtx_unlock(&engine->lock);
@@ -279,9 +280,13 @@ static dpolicy_effect_t eval_locked(const dpolicy_engine_t *engine, const char *
     int best_prio = -1;
     dpolicy_effect_t best_effect = DPOLICY_EFFECT_DENY;
     int has_deny = 0, has_allow = 0, has_cond = 0;
+    const dpolicy_rule_t *rules;
+    size_t count;
 
-    for (size_t i = 0; i < engine->rule_count; i++) {
-        const dpolicy_rule_t *r = &engine->rules[i];
+    /* 灰度会话期按 route 采样选源（旧集/新集），否则恒为运行集 */
+    dpol_can_source(engine, subject, action, resource, &rules, &count);
+    for (size_t i = 0; i < count; i++) {
+        const dpolicy_rule_t *r = &rules[i];
         if (!rule_matches(r, subject, action, resource))
             continue;
         matched_any = 1;
