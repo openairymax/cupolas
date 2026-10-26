@@ -136,6 +136,30 @@ int dpolicy_engine_export_policies_json(dpolicy_engine_t *engine, char **json);
 int dpolicy_stage_json(dpolicy_engine_t *engine, const char *json);
 int dpolicy_activate(dpolicy_engine_t *engine, const char *description);
 
+/* 灰度挂载点（canary 自演化）：宿主注入 gate/route，缺席即旁路。
+ * gate 契约：0=传统放行；1=canary 分流（仅 ACTIVATE 有效，COMMIT 非 0
+ * 一律透传拒绝——灰度会话中禁止旁路固化）；<0 拒绝并透传错误码。
+ * route 热路径采样（同请求元组恒同侧），锁外回调须多线程安全。 */
+typedef enum {
+    DPOLICY_CANARY_COMMIT = 1,
+    DPOLICY_CANARY_ACTIVATE = 2
+} dpolicy_canary_kind_t;
+
+typedef struct {
+    int (*gate)(dpolicy_canary_kind_t kind, void *user_data);
+    int (*route)(const char *subject, const char *action, const char *resource,
+                 void *user_data);
+    void *user_data;
+} dpolicy_canary_ops_t;
+
+/* 设置/清除挂载点（ops=NULL 清除）；灰度会话进行中禁止更换 */
+int dpolicy_set_canary_ops(dpolicy_engine_t *engine, const dpolicy_canary_ops_t *ops);
+/* 灰度会话进行中返回 1；revert 将旧集换回运行集（epoch+1）；
+ * promote 释放旧集并固化新集为正式版本。 */
+int dpolicy_canary_active(dpolicy_engine_t *engine);
+int dpolicy_canary_revert(dpolicy_engine_t *engine);
+int dpolicy_canary_promote(dpolicy_engine_t *engine);
+
 int dpolicy_engine_set_change_callback(dpolicy_engine_t *engine, dpolicy_change_callback_t callback,
                                        void *user_data);
 

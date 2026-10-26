@@ -231,6 +231,16 @@ int dpolicy_activate(dpolicy_engine_t *engine, const char *description)
         airy_mtx_unlock(&engine->lock);
         return -5; /* 无暂存文档：policy.activate 前置需 policy.load */
     }
+    /* gate 先于消费暂存：拒绝路径 staged 完整保留，宿主处理后可重试 */
+    int can = dpol_can_gate(engine, DPOLICY_CANARY_ACTIVATE);
+    if (can < 0) {
+        airy_mtx_unlock(&engine->lock);
+        return can;
+    }
+    if (can == 1 && dpol_can_snap(engine) != 0) {
+        airy_mtx_unlock(&engine->lock); /* OOM：staged 保留可重试 */
+        return -3;
+    }
     /* 暂存 → 运行原子提交（同一临界区，evaluate 观察不到撕裂状态） */
     rule_array_t staged_doc = {.items = engine->staged, .count = engine->staged_count,
                                .cap = engine->staged_cap};
@@ -238,6 +248,13 @@ int dpolicy_activate(dpolicy_engine_t *engine, const char *description)
     engine->staged_count = engine->staged_cap = 0;
     engine->staged_valid = 0;
     live_replace_locked(engine, &staged_doc);
+    if (can == 1) {
+        /* 灰度分流：epoch 不变不固化，会话期按 route 采样分流 */
+        engine->shadow_active = 1;
+        airy_mtx_unlock(&engine->lock);
+        dpol_fire_change(engine, DPOLICY_CHANGE_COMMIT, NULL, NULL, NULL, description);
+        return 0;
+    }
     int rc = dpol_commit_locked(engine, description);
     airy_mtx_unlock(&engine->lock);
     if (rc == 0)

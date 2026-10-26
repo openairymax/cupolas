@@ -80,6 +80,12 @@ int dpolicy_engine_commit_version(dpolicy_engine_t *engine, const char *descript
     if (!engine)
         return -1;
     airy_mtx_lock(&engine->lock);
+    int can = dpol_can_gate(engine, DPOLICY_CANARY_COMMIT);
+    if (can != 0) {
+        /* 灰度会话中禁止旁路固化：COMMIT 路径 gate 非 0 一律透传拒绝 */
+        airy_mtx_unlock(&engine->lock);
+        return can;
+    }
     int rc = dpol_commit_locked(engine, description);
     airy_mtx_unlock(&engine->lock);
     if (rc == 0)
@@ -129,6 +135,8 @@ int dpolicy_engine_rollback(dpolicy_engine_t *engine, const char *version)
     }
     engine->rule_count = target->rule_count;
     engine->epoch++;
+    /* 外部版本回滚优先于灰度会话：解除会话并丢弃旧集锚点 */
+    dpol_can_free(engine);
     airy_mtx_unlock(&engine->lock);
     dpol_fire_change(engine, DPOLICY_CHANGE_ROLLBACK, NULL, NULL, NULL, version);
     return 0;

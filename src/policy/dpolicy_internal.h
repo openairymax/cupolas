@@ -38,6 +38,13 @@ struct dpolicy_engine_s {
     dpolicy_version_t versions[DPOLICY_MAX_VERSIONS];
     size_t version_count;
     uint64_t epoch;
+    /* canary 灰度会话：ops 缺席即旁路；shadow 为旧集深拷贝（回滚锚点），
+     * shadow_active 期间 evaluate 按 route 分流且 epoch 不变 */
+    const dpolicy_canary_ops_t *canary;
+    dpolicy_rule_t *shadow;
+    size_t shadow_count;
+    size_t shadow_cap;
+    int shadow_active;
     dpolicy_change_callback_t cb;
     void *cb_ud;
     airy_mtx_t lock;
@@ -59,5 +66,15 @@ void dpol_fire_change(dpolicy_engine_t *e, dpolicy_change_type_t type, const cha
 
 /* 锁内版本固化：快照当前运行集 → 版本历史 + epoch+1（commit/activate 共用） */
 int dpol_commit_locked(dpolicy_engine_t *e, const char *description);
+
+/* canary 灰度会话机制（dpolicy_canary.c；除 source 外均须锁内调用） */
+int dpol_can_gate(dpolicy_engine_t *e, dpolicy_canary_kind_t kind);
+/* 评估源选择：route==0 走旧集（shadow），否则运行集（热路径，锁内调用） */
+void dpol_can_source(const dpolicy_engine_t *e, const char *subject, const char *action,
+                     const char *resource, const dpolicy_rule_t **rules, size_t *count);
+/* 旧集深拷入 shadow（canary activate 前置；失败 shadow 不变） */
+int dpol_can_snap(dpolicy_engine_t *e);
+/* 释放 shadow 并结束会话（promote/rollback/destroy 共用） */
+void dpol_can_free(dpolicy_engine_t *e);
 
 #endif /* CUPOLAS_DPOLICY_INTERNAL_H */
