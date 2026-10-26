@@ -41,6 +41,10 @@ int svc_prepare(const char *config_path)
         return -1;
     }
 
+    /* W6（0.1.20 §7）：金丝雀治理面挂载——失败仅旁路不阻断服务 */
+    if (svc_canary_on() != 0)
+        SVC_LOG_WARN("Canary governor offline, policy bypass active");
+
     g_service = cupolas_service_create(config_path);
     if (!g_service) {
         SVC_LOG_ERROR("Failed to create cupolas service");
@@ -57,6 +61,7 @@ int svc_prepare(const char *config_path)
 
 void svc_destroy(void)
 {
+    svc_canary_off();
     if (g_service) {
         cupolas_service_destroy(g_service);
         g_service = NULL;

@@ -12,4 +12,5 @@ set(CUPOLAS_D_SOURCES
     src/cupolas_rpc_vault.c
     src/cupolas_rpc_net_entitlements.c
     src/cupolas_rpc_policy.c
+    src/svc_canary.c
 )
