@@ -50,7 +50,6 @@ cupolas/
 │   ├── include/ src/ modules/ tests/     # RPC surface + service + security-dome policy
 ├── include/                              # Public headers
 │   ├── cupolas.h                         # Cupolas unified entry
-│   ├── zero_trust_integration.h          # Zero-trust integration interface
 │   ├── dynamic_policy_engine.h           # Dynamic policy engine
 │   └── safety_guard.h                    # Safety guard interface
 ├── tests/                                # Test suite
@@ -187,7 +186,7 @@ When `AIRY_HAS_OPENSSL` is defined, the following iOS-grade security modules are
 |----------|---------------|
 | **daemons** | Every daemon calls cupolas for permission checks (`cupolas_check_permission`), input sanitization (`cupolas_sanitize_input`), and to emit audit events; the workbench hosts untrusted tool execution (e.g. `tool_d` runs tool commands inside `cupolas_execute_command`) |
 | **gateway** | Gateway invokes cupolas for request authentication and input sanitization at the protocol boundary, before translating HTTP/WS/stdio into JSON-RPC |
-| External SDK / Agent apps | Use `cupolas_check_permission` and `cupolas_sanitize_input` to participate in the security contract; the safety_guard / zero_trust_integration interfaces let external agents plug into the dome |
+| External SDK / Agent apps | Use `cupolas_check_permission` and `cupolas_sanitize_input` to participate in the security contract; the safety_guard interface lets external agents plug into the dome |
 
 ## Build
 
@@ -226,7 +225,7 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 
 ## API
 
-Public API surface is exported through `include/cupolas.h` (unified entry) and companion headers `zero_trust_integration.h`, `dynamic_policy_engine.h`, `safety_guard.h`.
+Public API surface is exported through `include/cupolas.h` (unified entry) and companion headers `dynamic_policy_engine.h`, `safety_guard.h`.
 
 | Function | Description |
 |----------|-------------|

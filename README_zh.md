@@ -50,7 +50,6 @@ cupolas/
 │   ├── include/ src/ modules/ tests/     # RPC 门面 + 服务层 + 安全穹顶策略单元
 ├── include/                              # 公共头文件
 │   ├── cupolas.h                         # Cupolas 统一入口
-│   ├── zero_trust_integration.h          # 零信任集成接口
 │   ├── dynamic_policy_engine.h           # 动态策略引擎
 │   └── safety_guard.h                    # 安全 guard 接口
 ├── tests/                                # 测试套件
@@ -187,7 +186,7 @@ cupolas/
 |--------|------|
 | **daemons** | 每个守护进程调用 cupolas 进行权限检查（`cupolas_check_permission`）、输入净化（`cupolas_sanitize_input`），并发射审计事件；workbench 托管不可信工具执行（如 `tool_d` 在 `cupolas_execute_command` 内运行工具命令） |
 | **gateway** | 网关在协议边界调用 cupolas 进行请求认证和输入净化，在将 HTTP/WS/stdio 翻译为 JSON-RPC 之前 |
-| 外部 SDK / 智能体应用 | 使用 `cupolas_check_permission` 和 `cupolas_sanitize_input` 参与安全契约；safety_guard / zero_trust_integration 接口让外部智能体接入穹顶 |
+| 外部 SDK / 智能体应用 | 使用 `cupolas_check_permission` 和 `cupolas_sanitize_input` 参与安全契约；safety_guard 接口让外部智能体接入穹顶 |
 
 ## 构建
 
@@ -222,7 +221,7 @@ cmake --install /tmp/cupolas-build --prefix /opt/airymax
 
 ## API
 
-公共 API 接口通过 `include/cupolas.h`（统一入口）及配套头 `zero_trust_integration.h`、`dynamic_policy_engine.h`、`safety_guard.h` 导出。
+公共 API 接口通过 `include/cupolas.h`（统一入口）及配套头 `dynamic_policy_engine.h`、`safety_guard.h` 导出。
 
 | 函数 | 说明 |
 |------|------|
