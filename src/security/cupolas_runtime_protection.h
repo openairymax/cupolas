@@ -444,42 +444,6 @@ int cupolas_verify_data(const uint8_t *expected_hash);
 int cupolas_integ_set_cb(void (*callback)(int result));
 
 /**
- * @brief Set violation handler callback
- * @param[in] callback Callback function
- * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads
- * @reentrant No
- */
-int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t *event));
-
-/**
- * @brief Get last violation event
- * @param[out] event Event output
- * @return 0 on success, negative if no event
- * @note Thread-safe: Safe to call from multiple threads concurrently
- * @reentrant Yes
- * @ownership event: caller provides buffer, function writes to it
- */
-int cupolas_violation_get_last(cupolas_violation_event_t *event);
-
-/**
- * @brief Clear violation events
- * @note Thread-safe: Safe to call from multiple threads
- * @reentrant No
- */
-void cupolas_violation_clear(void);
-
-/**
- * @brief Get violation statistics
- * @param[out] stats Statistics output
- * @return 0 on success, negative on failure
- * @note Thread-safe: Safe to call from multiple threads concurrently
- * @reentrant Yes
- * @ownership stats: caller provides buffer, function writes to it
- */
-int cupolas_violation_get_stats(cupolas_protection_stats_t *stats);
-
-/**
  * @brief Get protection level string
  * @param[in] level Protection level
  * @return Level name string (static, do not free)

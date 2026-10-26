@@ -225,40 +225,6 @@ void workbench_result_free(workbench_result_t *result);
  */
 void workbench_default_config(workbench_config_t *config);
 
-/**
- * @brief Set resource limits
- * @param[in] wb Workbench handle (must not be NULL)
- * @param[in] limits Resource limits (NULL to disable limits)
- * @return 0 on success, negative on failure
- * @note Thread-safe: Yes (but should not change limits while executing)
- * @reentrant Yes
- * @ownership limits: caller retains ownership
- */
-int workbench_set_limits(workbench_t *wb, const workbench_limits_t *limits);
-
-/**
- * @brief Get resource limits
- * @param[in] wb Workbench handle (must not be NULL)
- * @param[out] limits Resource limits output (must not be NULL)
- * @return 0 on success, negative on failure
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @ownership limits: callee writes, caller owns
- */
-int workbench_get_limits(workbench_t *wb, workbench_limits_t *limits);
-
-/**
- * @brief Get current resource usage
- * @param[in] wb Workbench handle (must not be NULL)
- * @param[out] memory_usage Memory usage in bytes output (may be NULL)
- * @param[out] cpu_usage CPU time in milliseconds output (may be NULL)
- * @return 0 on success, negative on failure
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @ownership memory_usage, cpu_usage: callee writes, caller owns
- */
-int workbench_get_usage(workbench_t *wb, size_t *memory_usage, uint64_t *cpu_usage);
-
 #ifdef __cplusplus
 }
 #endif
