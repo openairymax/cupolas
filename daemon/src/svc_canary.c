@@ -9,10 +9,13 @@
  * 30s 对账周期驱动五态转移：灰度会话建立时执行 G30 准入（以运行集
  * 规则条数为行数代理，经 export JSON 的 rule_count 取数——gate 回调
  * 运行于引擎锁内，禁调任何拿引擎锁的 API，故度量移出 gate）、C0
- * 爆炸半径申报、C1 影子、C2 阶梯（10%→50%→100%，每级 ≥2h）；满级
- * 经门禁后先 adopt（manifest 落盘）再 promote（引擎固化），保证
- * 崩溃窗口内两侧一致。kill switch 走 500ms 分片快通道独立探测（不受
- * 30s 对账周期约束），命中即 revert + 回滚，最坏熔断时延约 1s。
+ * 爆炸半径申报、C1 影子。影子→灰度与满级采纳前均先查门禁可判定性：
+ * K1/K2 决策判据流量缺席时显式报未知（K_UNKNOWN），会话驻留影子，
+ * 不滚、不推进、告警一次（Q7 采样契约随决策面投产接线）；C2 阶梯
+ * （10%→50%→100%，每级 ≥2h）满级经门禁后先 adopt（manifest 落盘）
+ * 再 promote（引擎固化），保证崩溃窗口内两侧一致。kill switch 走
+ * 500ms 分片快通道独立探测（不受 30s 对账周期约束），命中即 revert
+ * + 回滚，最坏熔断时延约 1s。
  *
  * 生命周期约定：实例与进程同寿命，终态（ROLLED/ADOPTED 收尾）后
  * 治理面静默，gate 放行传统固化路径，重启开新一轮——避免宿主在
@@ -42,6 +45,8 @@
 static canary_t *g_can;
 static airy_atomic_int_t g_run;
 static airy_thread_t g_thr;
+static uint64_t g_rb_ms;
+static int g_hold_warned;
 
 static const char *const CAN_FILES[] = { "policy.json" };
 
@@ -114,14 +119,40 @@ static int can_fp(uint8_t hash[32])
     return 0;
 }
 
-/* 统一回滚：先恢复引擎旧集（会话未建立时无害），再落状态机终态 */
+/* 统一回滚：先恢复引擎旧集（会话未建立时无害），再落状态机终态。
+ * 回滚耗时实测打点（K4 真值源，rb_secs=0 即未发生） */
 static void can_roll(void)
 {
+    uint64_t t0 = airy_time_ms();
+
     if (g_dpolicy && dpolicy_canary_active(g_dpolicy) &&
         dpolicy_canary_revert(g_dpolicy) != 0)
         SVC_LOG_WARN("canary revert failed, engine session kept");
     if (canary_rollback(g_can) != 0)
         SVC_LOG_WARN("canary rollback deferred");
+    g_rb_ms = airy_time_ms() - t0;
+}
+
+/* K1-K6 唯一采集点（INV-8）：K1/K2 决策判据流量生产缺席，显式报
+ * 未知（0），canary_gates 裁定 K_UNKNOWN；K3 存活由 tick 背书；
+ * K4 用最近一次回滚实测耗时（0=未发生）；K5/K6 走申报位 */
+static int can_gates(canary_gates_t *g)
+{
+    g->ok_pm = 0u;
+    g->perf_ppm = 0u;
+    g->crashes = 0u;
+    g->rb_secs = (uint32_t)(g_rb_ms / 1000u);
+    g->flags = CANARY_G_EXPLAIN | CANARY_G_BOUNDARY;
+    return canary_gates(g);
+}
+
+/* 不可判定处置：不滚、不推进，告警一次（新会话恢复可观测性） */
+static void can_hold(void)
+{
+    if (!g_hold_warned) {
+        g_hold_warned = 1;
+        SVC_LOG_WARN("canary metrics unknown, holding stage");
+    }
 }
 
 /* 运行集规则条数（G30 行数代理），失败返回 -1 由下轮重试 */
@@ -146,12 +177,16 @@ static int can_rules(size_t *out)
     return v > 0 ? 0 : -1;
 }
 
-/* C0→C1→C2：灰度会话建立信号（引擎 active 而状态机仍在 NONE/PROPOSED） */
-static void can_seed(uint64_t now)
+/* C0→C1：灰度会话建立信号（引擎 active 而状态机仍在 NONE/PROPOSED）。
+ * 只推进到影子；影子→灰度由对账按门禁可判定性放行，新会话重置
+ * 回滚观测与告警位 */
+static void can_seed(void)
 {
     canary_blast_t b;
     size_t n;
 
+    g_rb_ms = 0;
+    g_hold_warned = 0;
     if (can_rules(&n) != 0)
         return;
     if (canary_admit(n, n) != 0) {
@@ -163,24 +198,22 @@ static void can_seed(uint64_t now)
     b.files = CAN_FILES;
     b.nfiles = 1u;
     b.lines = n;
-    if (canary_propose(g_can, &b) != 0 || canary_to_shadow(g_can) != 0 ||
-        canary_to_canary(g_can, now) != 0) {
+    if (canary_propose(g_can, &b) != 0 || canary_to_shadow(g_can) != 0) {
         can_roll();
         return;
     }
-    SVC_LOG_INFO("canary session entered C2, 10%% canary");
+    SVC_LOG_INFO("canary session entered shadow");
 }
 
-/* C2 判定：驻留推进；满级经门禁后先 adopt 后 promote（崩溃窗口一致）。
- * 门禁申报语义：存活即 K3=0（崩溃则 tick 不复存在）；K1/K2 无运行时
- * 指标源前以"未观测到异常"申报；K5=采纳经 manifest 可追溯，
- * K6=爆炸半径已经 G30+申报约束。 */
+/* C2 判定：满级先查门禁可判定性——未知则冻结阶梯（不滚、不推进），
+ * 已判失败即回滚，全绿先 adopt 后 promote（崩溃窗口一致）。
+ * K3 存活由 tick 背书；K4 用回滚实测耗时；K5/K6 走申报位。 */
 static void can_judge(uint64_t now)
 {
-    canary_gates_t g = { CANARY_OK_FLOOR, CANARY_PERF_FLOOR, 0u, 0u,
-                         CANARY_G_EXPLAIN | CANARY_G_BOUNDARY };
+    canary_gates_t g;
     uint8_t fp[32];
     int r = canary_step(g_can, now);
+    int gr;
 
     if (r == -2)
         return;
@@ -193,8 +226,13 @@ static void can_judge(uint64_t now)
         can_roll();
         return;
     }
-    if (canary_gates(&g) != 0) {
-        SVC_LOG_WARN("canary gates rejected, rolling back");
+    gr = can_gates(&g);
+    if (gr == CANARY_K_UNKNOWN) {
+        can_hold();
+        return;
+    }
+    if (gr != 0) {
+        SVC_LOG_WARN("canary gates rejected (K%d), rolling back", -gr);
         can_roll();
         return;
     }
@@ -231,18 +269,28 @@ static void can_watch(void)
 static void can_reckon(void)
 {
     canary_state_t st;
+    canary_gates_t g;
     uint64_t now = airy_time_ms();
+    int gr;
 
     if (!g_can || !g_dpolicy)
         return;
     st = canary_state(g_can);
     if (dpolicy_canary_active(g_dpolicy)) {
         if (st == CANARY_ST_NONE || st == CANARY_ST_PROPOSED)
-            can_seed(now);
+            can_seed();
         else if (st == CANARY_ST_CANARY)
             can_judge(now);
-        else if (st == CANARY_ST_SHADOW)
-            canary_to_canary(g_can, now);
+        else if (st == CANARY_ST_SHADOW) {
+            /* 影子→灰度门：不可判定驻留影子；已判失败不进灰度 */
+            gr = can_gates(&g);
+            if (gr == CANARY_K_UNKNOWN)
+                can_hold();
+            else if (gr != 0)
+                can_roll();
+            else if (canary_to_canary(g_can, now) == 0)
+                SVC_LOG_INFO("canary session entered C2, 10%% canary");
+        }
         else if (st == CANARY_ST_ADOPTED &&
                  dpolicy_canary_promote(g_dpolicy) != 0)
             SVC_LOG_WARN("canary promote pending, will retry");
