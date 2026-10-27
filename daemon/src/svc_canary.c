@@ -6,10 +6,11 @@
  * @brief cupolas_d 金丝雀治理面（0.1.20 W6 策略侧适配器）。
  *
  * 将 products/canary 五态机挂载到 g_dpolicy 的 canary 挂载点，并以
- * 30s 对账周期驱动五态转移：灰度会话建立时执行 G30 准入（以运行集
- * 规则条数为行数代理，经 export JSON 的 rule_count 取数——gate 回调
- * 运行于引擎锁内，禁调任何拿引擎锁的 API，故度量移出 gate）、C0
- * 爆炸半径申报、C1 影子。影子→灰度与满级采纳前均先查门禁可判定性：
+ * 30s 对账周期驱动五态转移：灰度会话建立时执行 C0 爆炸半径申报。
+ * 策略集无函数级 diff 度量来源，G30 静态判据（函数行数）不适用：
+ * 宿主不向 admit 喂代理量（禁止冒充实测量），申报 lines=0 由账本
+ * 标注 unmeasured，运行期风险由 K1-K6 门禁与 kill switch 兜底。
+ * 影子→灰度与满级采纳前均先查门禁可判定性：
  * K1/K2 决策判据流量缺席时显式报未知（K_UNKNOWN），会话驻留影子，
  * 不滚、不推进、告警一次（Q7 采样契约随决策面投产接线）；C2 阶梯
  * （10%→50%→100%，每级 ≥2h）满级经门禁后先 adopt（manifest 落盘）
@@ -155,50 +156,25 @@ static void can_hold(void)
     }
 }
 
-/* 运行集规则条数（G30 行数代理），失败返回 -1 由下轮重试 */
-static int can_rules(size_t *out)
-{
-    char *json = NULL;
-    cJSON *root;
-    cJSON *n;
-    size_t v = 0;
-
-    if (!g_dpolicy || dpolicy_engine_export_policies_json(g_dpolicy, &json) != 0)
-        return -1;
-    root = cJSON_Parse(json);
-    if (root) {
-        n = cJSON_GetObjectItem(root, "rule_count");
-        if (cJSON_IsNumber(n) && n->valueint > 0)
-            v = (size_t)n->valueint;
-        cJSON_Delete(root);
-    }
-    cJSON_free(json);
-    *out = v;
-    return v > 0 ? 0 : -1;
-}
-
 /* C0→C1：灰度会话建立信号（引擎 active 而状态机仍在 NONE/PROPOSED）。
- * 只推进到影子；影子→灰度由对账按门禁可判定性放行，新会话重置
- * 回滚观测与告警位 */
+ * 策略集无函数级 diff 度量来源，G30 静态判据不适用：不向 admit 喂
+ * 代理量，爆炸半径全零申报（账本标注 unmeasured）。提案被拒属输入
+ * 非法类：报错并降级为无灰度（治理面终态静默）。只推进到影子；
+ * 影子→灰度由对账按门禁可判定性放行，新会话重置回滚观测与告警位 */
 static void can_seed(void)
 {
     canary_blast_t b;
-    size_t n;
 
     g_rb_ms = 0;
     g_hold_warned = 0;
-    if (can_rules(&n) != 0)
-        return;
-    if (canary_admit(n, n) != 0) {
-        SVC_LOG_WARN("canary G30 admit reject (rules=%zu), rolling back", n);
-        can_roll();
-        return;
-    }
     b.module = "policy";
     b.files = CAN_FILES;
     b.nfiles = 1u;
-    b.lines = n;
+    b.lines = 0; /* 无 diff 来源：unmeasured，不伪造行数 */
+    b.fn_new = 0;
+    b.fn_mod = 0;
     if (canary_propose(g_can, &b) != 0 || canary_to_shadow(g_can) != 0) {
+        SVC_LOG_ERROR("canary proposal invalid, degrading to no canary");
         can_roll();
         return;
     }
