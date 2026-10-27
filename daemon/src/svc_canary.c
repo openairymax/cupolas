@@ -11,7 +11,8 @@
  * 运行于引擎锁内，禁调任何拿引擎锁的 API，故度量移出 gate）、C0
  * 爆炸半径申报、C1 影子、C2 阶梯（10%→50%→100%，每级 ≥2h）；满级
  * 经门禁后先 adopt（manifest 落盘）再 promote（引擎固化），保证
- * 崩溃窗口内两侧一致。kill switch 命中即 revert + 回滚。
+ * 崩溃窗口内两侧一致。kill switch 走 500ms 分片快通道独立探测（不受
+ * 30s 对账周期约束），命中即 revert + 回滚，最坏熔断时延约 1s。
  *
  * 生命周期约定：实例与进程同寿命，终态（ROLLED/ADOPTED 收尾）后
  * 治理面静默，gate 放行传统固化路径，重启开新一轮——避免宿主在
@@ -209,6 +210,24 @@ static void can_judge(uint64_t now)
         SVC_LOG_INFO("canary adopted and promoted");
 }
 
+/* kill switch 快通道：逐片探测（ks TTL ≤1s），命中即停止一切演化写入。
+ * 30s 对账周期只负责状态推进，不得成为熔断时延下界。 */
+static void can_watch(void)
+{
+    canary_state_t st;
+
+    if (!g_can)
+        return;
+    if (!canary_ks_hit(g_can, airy_time_ms()))
+        return;
+    st = canary_state(g_can);
+    if (st == CANARY_ST_ROLLED &&
+        !(g_dpolicy && dpolicy_canary_active(g_dpolicy)))
+        return;
+    SVC_LOG_WARN("canary kill switch hit, rolling back");
+    can_roll();
+}
+
 static void can_reckon(void)
 {
     canary_state_t st;
@@ -216,11 +235,6 @@ static void can_reckon(void)
 
     if (!g_can || !g_dpolicy)
         return;
-    if (canary_ks_hit(g_can, now)) {
-        SVC_LOG_WARN("canary kill switch hit, rolling back");
-        can_roll();
-        return;
-    }
     st = canary_state(g_can);
     if (dpolicy_canary_active(g_dpolicy)) {
         if (st == CANARY_ST_NONE || st == CANARY_ST_PROPOSED)
@@ -249,9 +263,12 @@ static void *can_tick(void *arg)
 {
     (void)arg;
     while (airy_atomic_load(&g_run)) {
+        can_watch();
         can_reckon();
-        for (int i = 0; i < CAN_TICK_SLICES && airy_atomic_load(&g_run); i++)
+        for (int i = 0; i < CAN_TICK_SLICES && airy_atomic_load(&g_run); i++) {
             airy_sleep_ms(CAN_SLICE_MS);
+            can_watch();
+        }
     }
     return NULL;
 }
