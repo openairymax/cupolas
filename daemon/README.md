@@ -76,7 +76,7 @@
 | `entitlements_check` | `{kind, param1, param2?}` | `{allowed: bool}` | 授权裁决（kind ∈ fs/net/ipc/syscall/capability/vault） |
 | `policy_load` | `{json: string}` | `{staged: true, rule_count, conflict_count, strategy, epoch, conflicts: [{rule_a, rule_b, reason}]}` | 策略文档入暂存集并做冲突检测，**不改变运行裁决** |
 | `policy_activate` | `{description?: string}` | `{epoch, version_count, rule_count}` | 将暂存集生效为新版本，`epoch` 递增并广播 PEP |
-| `policy_rollback` | `{version: int}` | `{epoch, version_count, rule_count}` | 回滚到指定历史版本 |
+| `policy_rollback` | `{version: string}` | `{epoch, version_count, rule_count}` | 回滚到指定历史版本（标签形如 `"v3"`，即某次 `policy_activate` 返回的 `epoch`；要撤销当前版本回退到上一版时传 `"v<epoch-1>"`） |
 | `policy_status` | `{}` | `{enabled, epoch, version_count, rule_count, staged, staged_rule_count, strategy, max_versions}` | 策略引擎状态 |
 | `health_check` | `{}` | `{service, healthy, timestamp}` | 服务健康检查 |
 | `get_stats` | `{}` | 统计 JSON | 版本 / 运行时长 / 裁决数 / 净化数等真实计数 |
