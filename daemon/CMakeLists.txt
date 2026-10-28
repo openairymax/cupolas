@@ -201,9 +201,6 @@ if(WIN32)
         NOMINMAX
         _CRT_SECURE_NO_WARNINGS
     )
-    target_link_libraries(cupolas_d PRIVATE airy_common ws2_32 bcrypt)
-elseif(UNIX)
-    target_link_libraries(cupolas_d PRIVATE airy_common Threads::Threads airy_platform_libs)
 endif()
 
 target_include_directories(cupolas_d PRIVATE
@@ -227,13 +224,18 @@ target_include_directories(cupolas_d PRIVATE
     ${CJSON_INCLUDE_DIRS}
 )
 
+# 链接面（G13 fan=3）：Threads::Threads / airy_platform_libs 由
+# airy_cupolas_service 的 PUBLIC 依赖传递到可执行体，此处直链是同一事实的第二
+# 处登记——既抬高扇出，又让平台依赖出现两个真相。ws2_32/bcrypt 为 Windows
+# 系统库（非项目库，不入 link-whitelist）。
 target_link_libraries(cupolas_d PRIVATE
     airy_cupolas_service
     airy_core # WS-8 8.4.1: corekern link for airy_init() in main.c
     airy_common
-    Threads::Threads
-    airy_platform_libs
 )
+if(WIN32)
+    target_link_libraries(cupolas_d PRIVATE ws2_32 bcrypt)
+endif()
 
 # W6（0.1.20 §7）：canary 治理面（svc_canary.c）——根构建挂载 products/canary
 # 时链接（include 经链接 INTERFACE 传播）并开放 AIRY_HAS_CANARY 编译期守卫；
