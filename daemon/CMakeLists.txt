@@ -181,6 +181,14 @@ endif()
 # 服务域 service.c 单独编译为 airy_cupolas_service 静态库（上方）。
 include(${CMAKE_CURRENT_SOURCE_DIR}/modules/sources.cmake)
 
+# W6 可换件装配（0.1.20 plan V7）：canary 治理面是可换件，根构建未挂
+# products/canary（BUILD_CANARY=OFF）时整面旁路，svc.c 经 AIRY_HAS_CANARY
+# 编译期守卫调用，无桩实现——关掉就编不过的件不是件，是耦合。生成的
+# sources.cmake 保持全量声明（manifest L3 SSoT），装配去留由本装配域裁决。
+if(NOT TARGET airy_canary)
+    list(REMOVE_ITEM CUPOLAS_D_SOURCES src/svc_canary.c)
+endif()
+
 add_executable(cupolas_d ${CUPOLAS_D_SOURCES})
 
 # M2-S3 (0.1.9 §3.2 PDP)：policy.* RPC 需要 dynamic_policy_engine V2 API
@@ -228,9 +236,11 @@ target_link_libraries(cupolas_d PRIVATE
 )
 
 # W6（0.1.20 §7）：canary 治理面（svc_canary.c）——根构建挂载 products/canary
-# 时链接（include 经 PUBLIC BUILD_INTERFACE 传播）；缺席即旁路，无桩实现
+# 时链接（include 经链接 INTERFACE 传播）并开放 AIRY_HAS_CANARY 编译期守卫；
+# 缺席即旁路，无桩实现
 if(TARGET airy_canary)
     target_link_libraries(cupolas_d PRIVATE airy_canary)
+    target_compile_definitions(cupolas_d PRIVATE AIRY_HAS_CANARY=1)
 endif()
 
 if(NOT MSVC)
