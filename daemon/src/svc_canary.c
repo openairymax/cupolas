@@ -11,8 +11,10 @@
  * 宿主不向 admit 喂代理量（禁止冒充实测量），申报 lines=0 由账本
  * 标注 unmeasured，运行期风险由 K1-K6 门禁与 kill switch 兜底。
  * 影子→灰度与满级采纳前均先查门禁可判定性：
- * K1/K2 决策判据流量缺席时显式报未知（K_UNKNOWN），会话驻留影子，
- * 不滚、不推进、告警一次（Q7 采样契约随决策面投产接线）；C2 阶梯
+ * K1/K2 的度量源是引擎裁决观测（dpolicy_canary_obs_t）——会话期同一
+ * 请求在新旧两集上各裁一次，K1 = 与基线裁决一致的比例，K2 = 旧集
+ * 耗时/新集耗时；样本不足判据下限时显式报未知（K_UNKNOWN），会话驻留
+ * 影子，不滚、不推进、告警一次。C2 阶梯
  * （10%→50%→100%，每级 ≥2h）满级经门禁后先 adopt（manifest 落盘）
  * 再 promote（引擎固化），保证崩溃窗口内两侧一致。kill switch 走
  * 500ms 分片快通道独立探测（不受 30s 对账周期约束），命中即 revert
@@ -42,12 +44,26 @@
 
 #define CAN_TICK_SLICES 60
 #define CAN_SLICE_MS 500u
+/* 判据样本下限：宿主策略参数（A-3，机制核只收原始样本计数）。
+ * 样本不足报未知而非按小样本噪声驱动回滚/推进。 */
+#define CAN_MIN_SAMPLES 200u
 
 static canary_t *g_can;
 static airy_atomic_int_t g_run;
 static airy_thread_t g_thr;
 static uint64_t g_rb_ms;
 static int g_hold_warned;
+
+/* K1/K2 观测累计：observe 在引擎锁内写入，治理线程 30s 对账读取。
+ * 只在灰度会话期累加——会话外引擎不做双集评估，热路径零开销。 */
+static struct {
+    airy_mtx_t mtx;
+    uint64_t pairs;
+    uint64_t diverge;
+    uint64_t live_ns;
+    uint64_t old_ns;
+    int open;
+} g_obs;
 
 static const char *const CAN_FILES[] = { "policy.json" };
 
@@ -102,9 +118,39 @@ static int can_route(const char *s, const char *a, const char *r, void *ud)
     return canary_route(g_can, can_hash3(s, a, r));
 }
 
+/* K1/K2 观测源：引擎在灰度会话期于锁内回调，此处只做样本累加，
+ * 不得回调任何引擎锁 API（否则自锁）。会话未开启即丢弃。 */
+static void can_observe(const dpolicy_canary_obs_t *o, void *ud)
+{
+    (void)ud;
+    if (!o)
+        return;
+    airy_mtx_lock(&g_obs.mtx);
+    if (g_obs.open) {
+        g_obs.pairs++;
+        g_obs.diverge += o->diverge ? 1u : 0u;
+        g_obs.live_ns += o->live_ns;
+        g_obs.old_ns += o->old_ns;
+    }
+    airy_mtx_unlock(&g_obs.mtx);
+}
+
+/* 新会话复位：不同基线的样本不可混算，老样本会稀释新基线的真实
+ * 一致率（K1）与耗时比（K2） */
+static void can_obs_reset(void)
+{
+    airy_mtx_lock(&g_obs.mtx);
+    g_obs.pairs = 0;
+    g_obs.diverge = 0;
+    g_obs.live_ns = 0;
+    g_obs.old_ns = 0;
+    airy_mtx_unlock(&g_obs.mtx);
+}
+
 static const dpolicy_canary_ops_t g_ops = {
     .gate = can_gate,
     .route = can_route,
+    .observe = can_observe,
     .user_data = NULL
 };
 
@@ -134,13 +180,31 @@ static void can_roll(void)
     g_rb_ms = airy_time_ms() - t0;
 }
 
-/* K1-K6 唯一采集点（INV-8）：K1/K2 决策判据流量生产缺席，显式报
- * 未知（0），canary_gates 裁定 K_UNKNOWN；K3 存活由 tick 背书；
+/* K1-K6 唯一采集点（INV-8）：K1/K2 取引擎双集评估的累计样本（样本
+ * 低于下限即报未知，不以小样本噪声驱动决策）；K3 存活由 tick 背书；
  * K4 用最近一次回滚实测耗时（0=未发生）；K5/K6 走申报位 */
 static int can_gates(canary_gates_t *g)
 {
+    uint64_t pairs, diverge, live_ns, old_ns;
+
+    airy_mtx_lock(&g_obs.mtx);
+    pairs = g_obs.pairs;
+    diverge = g_obs.diverge;
+    live_ns = g_obs.live_ns;
+    old_ns = g_obs.old_ns;
+    airy_mtx_unlock(&g_obs.mtx);
+
     g->ok_pm = 0u;
     g->perf_ppm = 0u;
+    if (pairs >= CAN_MIN_SAMPLES) {
+        g->ok_pm = (uint32_t)((pairs - diverge) * 10000u / pairs);
+        if (live_ns > 0u) {
+            /* K2 = 旧集耗时/新集耗时：新集更快则封顶 10000，
+             * 慢于 5% 即跌破 CANARY_PERF_FLOOR */
+            uint64_t ppm = old_ns * 10000u / live_ns;
+            g->perf_ppm = (uint32_t)(ppm > 10000u ? 10000u : ppm);
+        }
+    }
     g->crashes = 0u;
     g->rb_secs = (uint32_t)(g_rb_ms / 1000u);
     g->flags = CANARY_G_EXPLAIN | CANARY_G_BOUNDARY;
@@ -167,6 +231,7 @@ static void can_seed(void)
 
     g_rb_ms = 0;
     g_hold_warned = 0;
+    can_obs_reset();
     b.module = "policy";
     b.files = CAN_FILES;
     b.nfiles = 1u;
@@ -309,12 +374,22 @@ int svc_canary_on(void)
     /* 启动对账：上次采纳的 manifest 与当前基线比对，漂移即标记待重放 */
     if (can_fp(fp) == 0 && canary_verify(g_can, fp) == -2)
         SVC_LOG_WARN("canary manifest replay pending (base drift)");
-    if (dpolicy_set_canary_ops(g_dpolicy, &g_ops) != 0)
+    /* 观测锁先于挂载初始化：挂载后引擎可能在任意线程回调 observe */
+    if (airy_mtx_init(&g_obs.mtx) != 0)
         goto fail;
+    can_obs_reset();
+    g_obs.open = 1;
+    if (dpolicy_set_canary_ops(g_dpolicy, &g_ops) != 0) {
+        g_obs.open = 0;
+        airy_mtx_destroy(&g_obs.mtx);
+        goto fail;
+    }
     airy_atomic_store(&g_run, 1);
     if (airy_thread_create(&g_thr, can_tick, NULL) != 0) {
         airy_atomic_store(&g_run, 0);
+        g_obs.open = 0;
         dpolicy_set_canary_ops(g_dpolicy, NULL);
+        airy_mtx_destroy(&g_obs.mtx);
         goto fail;
     }
     SVC_LOG_INFO("canary governor online (policy)");
@@ -338,6 +413,9 @@ void svc_canary_off(void)
     airy_thread_join(g_thr, NULL);
     if (g_dpolicy)
         dpolicy_set_canary_ops(g_dpolicy, NULL);
+    /* 摘挂载点后引擎不再回调 observe，此处销毁无竞态 */
+    g_obs.open = 0;
+    airy_mtx_destroy(&g_obs.mtx);
     canary_free(g_can);
     g_can = NULL;
     SVC_LOG_INFO("canary governor offline");

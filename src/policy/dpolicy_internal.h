@@ -45,6 +45,8 @@ struct dpolicy_engine_s {
     size_t shadow_count;
     size_t shadow_cap;
     int shadow_active;
+    /* 观测双集评估的先后交替位（奇偶抵消缓存预热顺序偏差） */
+    uint32_t obs_seq;
     dpolicy_change_callback_t cb;
     void *cb_ud;
     airy_mtx_t lock;
@@ -69,9 +71,13 @@ int dpol_commit_locked(dpolicy_engine_t *e, const char *description);
 
 /* canary 灰度会话机制（dpolicy_canary.c；除 source 外均须锁内调用） */
 int dpol_can_gate(dpolicy_engine_t *e, dpolicy_canary_kind_t kind);
-/* 评估源选择：route==0 走旧集（shadow），否则运行集（热路径，锁内调用） */
+/* 评估源选择：route==0 走旧集（shadow），否则运行集（热路径，锁内调用）。
+ * live 输出 1 表示裁决取自运行集（灰度会话进行中即新集） */
 void dpol_can_source(const dpolicy_engine_t *e, const char *subject, const char *action,
-                     const char *resource, const dpolicy_rule_t **rules, size_t *count);
+                     const char *resource, const dpolicy_rule_t **rules, size_t *count,
+                     int *live);
+/* 裁决观测上报（锁内调用）：无会话或无 observe 回调即空操作 */
+void dpol_can_obs(const dpolicy_engine_t *e, uint64_t live_ns, uint64_t old_ns, int diverge);
 /* 旧集深拷入 shadow（canary activate 前置；失败 shadow 不变） */
 int dpol_can_snap(dpolicy_engine_t *e);
 /* 释放 shadow 并结束会话（promote/rollback/destroy 共用） */

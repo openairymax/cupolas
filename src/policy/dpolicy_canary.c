@@ -23,15 +23,33 @@ int dpol_can_gate(dpolicy_engine_t *e, dpolicy_canary_kind_t kind)
 }
 
 void dpol_can_source(const dpolicy_engine_t *e, const char *subject, const char *action,
-                     const char *resource, const dpolicy_rule_t **rules, size_t *count)
+                     const char *resource, const dpolicy_rule_t **rules, size_t *count,
+                     int *live)
 {
     *rules = e->rules;
     *count = e->rule_count;
+    if (live)
+        *live = 1;
     if (e->canary && e->shadow_active && e->canary->route &&
         e->canary->route(subject, action, resource, e->canary->user_data) == 0) {
         *rules = e->shadow;
         *count = e->shadow_count;
+        if (live)
+            *live = 0;
     }
+}
+
+/* 观测转发：会话期外的裁决不产生 K1/K2 样本，零开销 */
+void dpol_can_obs(const dpolicy_engine_t *e, uint64_t live_ns, uint64_t old_ns, int diverge)
+{
+    dpolicy_canary_obs_t o;
+
+    if (!e || !e->canary || !e->canary->observe || !e->shadow_active)
+        return;
+    o.live_ns = live_ns;
+    o.old_ns = old_ns;
+    o.diverge = diverge;
+    e->canary->observe(&o, e->canary->user_data);
 }
 
 int dpol_can_snap(dpolicy_engine_t *e)
