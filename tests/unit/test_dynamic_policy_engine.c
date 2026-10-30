@@ -7,7 +7,7 @@
  * 覆盖：规则增删改 / glob 匹配 / fail-closed / 冲突消解 4 策略 /
  * 版本 commit-rollback / 32 版上限 / JSON 往返 / 合规兜底 deny-all /
  * 变更回调 / canary 灰度挂载点（gate 拒绝透传 / route 采样分流 /
- * revert-promote / 会话禁旁路固化）。
+ * revert-promote / 会话禁旁路固化 / 会话期裁决观测上报）。
  */
 
 #include "dynamic_policy_engine.h"
@@ -40,6 +40,10 @@ static int s_fail = 0;
 /* 宿主策略面替身：gate/route 返回值由测试用例控制 */
 static int fake_gate_val;
 static int fake_route_val;
+/* observe 观测面替身：样本数与分歧数由用例断言 */
+static int s_obs_calls;
+static int s_obs_diverge;
+static uint64_t s_obs_live_ns;
 
 static int fake_gate(dpolicy_canary_kind_t kind, void *ud)
 {
@@ -57,8 +61,21 @@ static int fake_route(const char *s, const char *a, const char *r, void *ud)
     return fake_route_val;
 }
 
+static void fake_observe(const dpolicy_canary_obs_t *o, void *ud)
+{
+    (void)ud;
+    s_obs_calls++;
+    s_obs_diverge += o->diverge ? 1u : 0u;
+    s_obs_live_ns += o->live_ns;
+}
+
 static const dpolicy_canary_ops_t fake_ops = {
     .gate = fake_gate, .route = fake_route, .user_data = NULL
+};
+
+static const dpolicy_canary_ops_t obs_ops = {
+    .gate = fake_gate, .route = fake_route, .observe = fake_observe,
+    .user_data = NULL
 };
 
 static void t_lifecycle(void)
@@ -752,6 +769,62 @@ static void t_canary_commit_blocked(void)
     TEST_PASS("canary_commit_blocked");
 }
 
+/* 裁决观测：灰度会话期同一请求双集各裁一次并上报，会话外零样本。
+ * K1/K2 的度量源正确性由此用例背书（样本计数、分歧判定、生命期） */
+static void t_canary_observe(void)
+{
+    dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
+    const char *doc = "{\"rules\":[{\"id\":\"n1\",\"effect\":\"deny\","
+                      "\"subject\":\"*\",\"action\":\"*\",\"resource\":\"*\","
+                      "\"enabled\":true}]}";
+    dpolicy_rule_t o1;
+    int matched = -1;
+
+    CHECK(dpolicy_set_canary_ops(e, &obs_ops) == 0);
+    memset(&o1, 0, sizeof(o1));
+    strcpy(o1.id, "o1");
+    o1.effect = DPOLICY_EFFECT_ALLOW;
+    o1.enabled = true;
+    CHECK(dpolicy_engine_add_rule(e, &o1) == 0);
+
+    /* 无会话：不评估、不上报（热路径零开销） */
+    s_obs_calls = 0;
+    s_obs_diverge = 0;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_ALLOW);
+    CHECK(s_obs_calls == 0);
+
+    /* 会话期（全量走旧集）：裁决仍取旧集 allow，但双集评估产生分歧 */
+    CHECK(dpolicy_stage_json(e, doc) == 0);
+    fake_gate_val = 1;
+    fake_route_val = 0;
+    CHECK(dpolicy_activate(e, "canary") == 0);
+    s_obs_calls = 0;
+    s_obs_diverge = 0;
+    s_obs_live_ns = 0;
+    for (int i = 0; i < 16; i++) {
+        matched = -1;
+        CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+              DPOLICY_EFFECT_ALLOW);
+        CHECK(matched == 1);
+    }
+    CHECK(s_obs_calls == 16);
+    CHECK(s_obs_diverge == 16);
+    /* 耗时样本必须真实非零：全零会让宿主 K2 恒判未知（原缺陷） */
+    CHECK(s_obs_live_ns > 0u);
+
+    /* 会话结束：上报随即停止，无残留 */
+    fake_gate_val = 0;
+    CHECK(dpolicy_canary_revert(e) == 0);
+    s_obs_calls = 0;
+    CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
+          DPOLICY_EFFECT_ALLOW);
+    CHECK(s_obs_calls == 0);
+
+    dpolicy_engine_destroy(e);
+    TEST_PASS("canary_observe");
+}
+
 int main(void)
 {
     t_lifecycle();
@@ -774,6 +847,7 @@ int main(void)
     t_canary_shadow_route();
     t_canary_revert_promote();
     t_canary_commit_blocked();
+    t_canary_observe();
 
     printf("dynamic_policy_engine: %d pass, %d fail\n", s_pass, s_fail);
     return s_fail == 0 ? 0 : 1;

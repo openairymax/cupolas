@@ -271,20 +271,17 @@ int dpolicy_engine_update_rule(dpolicy_engine_t *engine, const char *rule_id,
 
 /* ── 评估（fail-closed：无匹配默认 DENY） ─────────────────────────── */
 
-/* 锁内评估：返回效果；matched 输出是否命中（可 NULL，服务层 overlay 用） */
-static dpolicy_effect_t eval_locked(const dpolicy_engine_t *engine, const char *subject,
-                                    const char *action, const char *resource, int *matched)
+/* 单一规则集裁决：效果归并只看入参规则集，不含来源选择与观测 */
+static dpolicy_effect_t eval_rules(const dpolicy_engine_t *engine, const dpolicy_rule_t *rules,
+                                   size_t count, const char *subject, const char *action,
+                                   const char *resource, int *matched)
 {
     dpolicy_effect_t result = DPOLICY_EFFECT_DENY;
     int matched_any = 0;
     int best_prio = -1;
     dpolicy_effect_t best_effect = DPOLICY_EFFECT_DENY;
     int has_deny = 0, has_allow = 0, has_cond = 0;
-    const dpolicy_rule_t *rules;
-    size_t count;
 
-    /* 灰度会话期按 route 采样选源（旧集/新集），否则恒为运行集 */
-    dpol_can_source(engine, subject, action, resource, &rules, &count);
     for (size_t i = 0; i < count; i++) {
         const dpolicy_rule_t *r = &rules[i];
         if (!rule_matches(r, subject, action, resource))
@@ -327,6 +324,54 @@ static dpolicy_effect_t eval_locked(const dpolicy_engine_t *engine, const char *
     if (matched)
         *matched = matched_any;
     return result;
+}
+
+/* 灰度会话观测：同一请求在新旧两集上各裁一次，取两集耗时与裁决差异。
+ * 先后交替（obs_seq 奇偶）——顺序固定会让后跑的集恒占缓存预热便宜，
+ * K2 是两集耗时之比，系统性偏差足以盖过 5% 判据。 */
+static dpolicy_effect_t eval_obs(dpolicy_engine_t *engine, const dpolicy_rule_t *rules,
+                                 size_t count, int live, const char *subject,
+                                 const char *action, const char *resource, int *matched)
+{
+    const dpolicy_rule_t *alt = live ? engine->shadow : engine->rules;
+    size_t alt_n = live ? engine->shadow_count : engine->rule_count;
+    dpolicy_effect_t result, other;
+    uint64_t t0, t1, used_ns, other_ns;
+
+    t0 = airy_time_ns();
+    if (engine->obs_seq++ & 1u) {
+        other = eval_rules(engine, alt, alt_n, subject, action, resource, NULL);
+        t1 = airy_time_ns();
+        result = eval_rules(engine, rules, count, subject, action, resource, matched);
+        other_ns = t1 - t0;
+        used_ns = airy_time_ns() - t1;
+    } else {
+        result = eval_rules(engine, rules, count, subject, action, resource, matched);
+        t1 = airy_time_ns();
+        other = eval_rules(engine, alt, alt_n, subject, action, resource, NULL);
+        used_ns = t1 - t0;
+        other_ns = airy_time_ns() - t1;
+    }
+    if (live)
+        dpol_can_obs(engine, used_ns, other_ns, other != result);
+    else
+        dpol_can_obs(engine, other_ns, used_ns, other != result);
+    return result;
+}
+
+/* 锁内评估：返回效果；matched 输出是否命中（可 NULL，服务层 overlay 用） */
+static dpolicy_effect_t eval_locked(dpolicy_engine_t *engine, const char *subject,
+                                    const char *action, const char *resource, int *matched)
+{
+    const dpolicy_rule_t *rules;
+    size_t count;
+    int live = 1;
+
+    /* 灰度会话期按 route 采样选源（旧集/新集），否则恒为运行集 */
+    dpol_can_source(engine, subject, action, resource, &rules, &count, &live);
+    if (!engine->canary || !engine->canary->observe || !engine->shadow_active)
+        return eval_rules(engine, rules, count, subject, action, resource, matched);
+    return eval_obs(engine, rules, count, live, subject, action, resource, matched);
 }
 
 dpolicy_effect_t dpolicy_engine_evaluate(dpolicy_engine_t *engine, const char *subject,

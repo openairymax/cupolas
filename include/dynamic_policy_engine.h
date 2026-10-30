@@ -145,10 +145,22 @@ typedef enum {
     DPOLICY_CANARY_ACTIVATE = 2
 } dpolicy_canary_kind_t;
 
+/* 裁决观测（K1/K2 判据的真实度量源）：灰度会话期每次裁决后回调一次，
+ * 同一请求在新旧两集上各裁一次，交替先后抵消缓存预热顺序偏差。
+ * live_ns/old_ns 为两集各自的裁决耗时，diverge 为两集裁决是否不同——
+ * 正确率取「与基线一致」的比例，性能保持取旧集耗时/新集耗时。
+ * 锁内回调，禁止再入引擎 API；缺席则不做双集评估（会话外零开销）。 */
+typedef struct {
+    uint64_t live_ns;
+    uint64_t old_ns;
+    int diverge;
+} dpolicy_canary_obs_t;
+
 typedef struct {
     int (*gate)(dpolicy_canary_kind_t kind, void *user_data);
     int (*route)(const char *subject, const char *action, const char *resource,
                  void *user_data);
+    void (*observe)(const dpolicy_canary_obs_t *obs, void *user_data);
     void *user_data;
 } dpolicy_canary_ops_t;
 
