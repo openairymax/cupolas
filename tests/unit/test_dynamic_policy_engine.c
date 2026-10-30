@@ -44,6 +44,9 @@ static int fake_route_val;
 static int s_obs_calls;
 static int s_obs_diverge;
 static uint64_t s_obs_live_ns;
+static uint64_t s_obs_old_ns;
+/* 逐样本最小耗时：任一零样本都会让宿主 K2（旧集/新集耗时比）退化 */
+static uint64_t s_obs_min_ns;
 
 static int fake_gate(dpolicy_canary_kind_t kind, void *ud)
 {
@@ -67,6 +70,11 @@ static void fake_observe(const dpolicy_canary_obs_t *o, void *ud)
     s_obs_calls++;
     s_obs_diverge += o->diverge ? 1u : 0u;
     s_obs_live_ns += o->live_ns;
+    s_obs_old_ns += o->old_ns;
+    if (o->live_ns < s_obs_min_ns)
+        s_obs_min_ns = o->live_ns;
+    if (o->old_ns < s_obs_min_ns)
+        s_obs_min_ns = o->old_ns;
 }
 
 static const dpolicy_canary_ops_t fake_ops = {
@@ -802,6 +810,8 @@ static void t_canary_observe(void)
     s_obs_calls = 0;
     s_obs_diverge = 0;
     s_obs_live_ns = 0;
+    s_obs_old_ns = 0;
+    s_obs_min_ns = UINT64_MAX;
     for (int i = 0; i < 16; i++) {
         matched = -1;
         CHECK(dpolicy_eval_match(e, "s", "a", "r", NULL, &matched) ==
@@ -810,8 +820,12 @@ static void t_canary_observe(void)
     }
     CHECK(s_obs_calls == 16);
     CHECK(s_obs_diverge == 16);
-    /* 耗时样本必须真实非零：全零会让宿主 K2 恒判未知（原缺陷） */
+    /* 耗时样本必须真实非零：全零会让宿主 K2 恒判未知（原缺陷）。
+     * 逐样本判定而非只看总和——粗粒度时钟宿主（Darwin 计数粒度约
+     * 41ns）下单次评估可能落进同一 tick，零样本足以污染比值判据。 */
     CHECK(s_obs_live_ns > 0u);
+    CHECK(s_obs_old_ns > 0u);
+    CHECK(s_obs_min_ns > 0u);
 
     /* 会话结束：上报随即停止，无残留 */
     fake_gate_val = 0;
