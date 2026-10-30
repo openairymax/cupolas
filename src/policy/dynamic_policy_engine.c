@@ -326,6 +326,14 @@ static dpolicy_effect_t eval_rules(const dpolicy_engine_t *engine, const dpolicy
     return result;
 }
 
+/* 耗时量化下界：两次读数落在同一时钟 tick 时差值为 0，而 0 会让宿主
+ * K2（旧集耗时/新集耗时）分母为零、恒判未知，灰度停在原阶段。以时钟
+ * 分辨率为下界报出——粒度以下的两集差异本不可分辨，比值回落到 1。 */
+static uint64_t obs_ns(uint64_t raw)
+{
+    return raw ? raw : airy_time_res_ns();
+}
+
 /* 灰度会话观测：同一请求在新旧两集上各裁一次，取两集耗时与裁决差异。
  * 先后交替（obs_seq 奇偶）——顺序固定会让后跑的集恒占缓存预热便宜，
  * K2 是两集耗时之比，系统性偏差足以盖过 5% 判据。 */
@@ -353,9 +361,9 @@ static dpolicy_effect_t eval_obs(dpolicy_engine_t *engine, const dpolicy_rule_t 
         other_ns = airy_time_ns() - t1;
     }
     if (live)
-        dpol_can_obs(engine, used_ns, other_ns, other != result);
+        dpol_can_obs(engine, obs_ns(used_ns), obs_ns(other_ns), other != result);
     else
-        dpol_can_obs(engine, other_ns, used_ns, other != result);
+        dpol_can_obs(engine, obs_ns(other_ns), obs_ns(used_ns), other != result);
     return result;
 }
 
