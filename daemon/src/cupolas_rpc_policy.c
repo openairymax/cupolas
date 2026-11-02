@@ -13,6 +13,8 @@
  *                        （热更新唯一生效点，触发 PEP 缓存失效广播）
  *   - policy.rollback ：回滚到历史版本，epoch+1（秒级回退，32 版历史）
  *   - policy.status   ：epoch/版本数/运行规则数/暂存数/冲突策略快照
+ *   - policy.canary   ：金丝雀治理面只读快照（K1/K2 实测、阶段、
+ *                       熔断位、分流计数）；治理面未挂载属正常旁路
  *
  * epoch 单调递增为引擎 SSoT，M2-S4 广播经 notify_d 下发，
  * M2-S5 作为各 daemon PEP 缓存失效键。
@@ -287,4 +289,42 @@ void m_policy_rollback(cJSON *params, int id, void *user_data)
 void m_policy_status(cJSON *params, int id, void *user_data)
 {
     handle_policy_status(params, id, *(airy_sock_t *)user_data);
+}
+
+static void handle_policy_canary(cJSON *params, int id, airy_sock_t client_fd)
+{
+    cJSON *result = NULL;
+
+    (void)params;
+    /* 治理面未挂载不是错误：BUILD_CANARY=OFF 或挂载失败即整件旁路，
+     * 如实报 enabled=false，避免把可换性设计误报成故障。 */
+#ifdef AIRY_HAS_CANARY
+    svc_canary_snap_t s;
+
+    if (svc_canary_stat(&s) == 0) {
+        result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "enabled", true);
+        cJSON_AddStringToObject(result, "state", s.state);
+        cJSON_AddNumberToObject(result, "permille", (double)s.permille);
+        cJSON_AddBoolToObject(result, "kill_switch", s.ks_hit ? true : false);
+        cJSON_AddStringToObject(result, "gate", s.gate);
+        cJSON_AddNumberToObject(result, "samples", (double)s.samples);
+        cJSON_AddNumberToObject(result, "diverge", (double)s.diverge);
+        cJSON_AddNumberToObject(result, "ok_pm", (double)s.ok_pm);
+        cJSON_AddNumberToObject(result, "perf_ppm", (double)s.perf_ppm);
+        cJSON_AddNumberToObject(result, "rb_secs", (double)s.rb_secs);
+        cJSON_AddNumberToObject(result, "routed_total", (double)s.routed_total);
+        cJSON_AddNumberToObject(result, "routed_picked", (double)s.routed_picked);
+    }
+#endif
+    if (!result) {
+        result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "enabled", false);
+    }
+    JSONRPC_SEND_SUCCESS(client_fd, result, id);
+}
+
+void m_policy_canary(cJSON *params, int id, void *user_data)
+{
+    handle_policy_canary(params, id, *(airy_sock_t *)user_data);
 }

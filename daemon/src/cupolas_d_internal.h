@@ -37,6 +37,25 @@ extern struct dpolicy_engine_s *g_dpolicy;
 int svc_canary_on(void);
 void svc_canary_off(void);
 
+/* Read-only K1/K2 snapshot for policy.canary: the governor owns the only
+ * aggregated observation samples, so the RPC layer must not recompute
+ * them. stat() returning -1 means the governor is unmounted (bypass). */
+typedef struct {
+    const char *state;
+    const char *gate;
+    int ks_hit;
+    unsigned permille;
+    uint64_t samples;
+    uint64_t diverge;
+    uint32_t ok_pm;
+    uint32_t perf_ppm;
+    uint32_t rb_secs;
+    uint64_t routed_total;
+    uint64_t routed_picked;
+} svc_canary_snap_t;
+
+int svc_canary_stat(svc_canary_snap_t *out);
+
 #ifdef __cplusplus
 }
 #endif

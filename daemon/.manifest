@@ -36,7 +36,8 @@
       "policy_load",
       "policy_activate",
       "policy_rollback",
-      "policy_status"
+      "policy_status",
+      "policy_canary"
     ]
   },
   "deps": { "required": [], "optional": [] },
