@@ -18,6 +18,6 @@ static const daemon_op_t SVC_OPS[] = {
 };
 
 DAEMON_MAIN(cupolas_d, CUPOLAS_D, "cupolas", "AIRY_CUPOLAS_D_DEBUG",
-            "cupolas", "cupolas,security", 22, 64, 4, 8, 256, 0,
+            "cupolas", "cupolas,security", 23, 64, 4, 8, 256, 0,
             svc_activate_noop, svc_attach_noop, svc_teardown_noop,
             daemon_dome_init, daemon_dome_cleanup)
