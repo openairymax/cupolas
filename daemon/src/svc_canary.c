@@ -20,6 +20,9 @@
  * 500ms 分片快通道独立探测（不受 30s 对账周期约束），命中即 revert
  * + 回滚，最坏熔断时延约 1s。
  *
+ * 度量出口：K1/K2/回滚耗时的唯一累加器在本文件，经 svc_canary_stat()
+ * 只读导出给 policy.canary；RPC 层不得另立口径重算。
+ *
  * 生命周期约定：实例与进程同寿命，终态（ROLLED/ADOPTED 收尾）后
  * 治理面静默，gate 放行传统固化路径，重启开新一轮——避免宿主在
  * 引擎锁内读到悬垂实例，route 热路径保持无锁。挂载点缺席即旁路。
@@ -419,4 +422,62 @@ void svc_canary_off(void)
     canary_free(g_can);
     g_can = NULL;
     SVC_LOG_INFO("canary governor offline");
+}
+
+/* 只读快照：K1/K2 累加器归治理面私有，RPC 层不得重算，否则出现
+ * 两套口径。gate 取 can_gates 的判定（green / unknown / K1-K6），与
+ * 推进/回滚决策同源。 */
+static const char *can_state_str(canary_state_t st)
+{
+    switch (st) {
+    case CANARY_ST_PROPOSED:
+        return "proposed";
+    case CANARY_ST_SHADOW:
+        return "shadow";
+    case CANARY_ST_CANARY:
+        return "canary";
+    case CANARY_ST_ADOPTED:
+        return "adopted";
+    case CANARY_ST_ROLLED:
+        return "rolled";
+    case CANARY_ST_NONE:
+    default:
+        return "none";
+    }
+}
+
+static const char *can_gate_str(int gr)
+{
+    static const char *const kn[] = { "K1", "K2", "K3", "K4", "K5", "K6" };
+    int idx = -gr - 2;
+
+    if (gr == 0)
+        return "green";
+    if (gr == CANARY_K_UNKNOWN)
+        return "unknown";
+    return (idx >= 0 && idx < 6) ? kn[idx] : "invalid";
+}
+
+int svc_canary_stat(svc_canary_snap_t *out)
+{
+    canary_gates_t g;
+
+    if (!out)
+        return -1;
+    *out = (svc_canary_snap_t){ 0 };
+    if (!g_can)
+        return -1;
+    out->state = can_state_str(canary_state(g_can));
+    out->permille = canary_permille(g_can);
+    out->ks_hit = canary_ks_hit(g_can, airy_time_ms());
+    out->gate = can_gate_str(can_gates(&g));
+    out->ok_pm = g.ok_pm;
+    out->perf_ppm = g.perf_ppm;
+    out->rb_secs = g.rb_secs;
+    airy_mtx_lock(&g_obs.mtx);
+    out->samples = g_obs.pairs;
+    out->diverge = g_obs.diverge;
+    airy_mtx_unlock(&g_obs.mtx);
+    canary_counts(g_can, &out->routed_total, &out->routed_picked);
+    return 0;
 }

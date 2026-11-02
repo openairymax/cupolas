@@ -63,7 +63,8 @@ void svc_destroy(void);
     X("policy_load", m_policy_load) \
     X("policy_activate", m_policy_activate) \
     X("policy_rollback", m_policy_rollback) \
-    X("policy_status", m_policy_status)
+    X("policy_status", m_policy_status) \
+    X("policy_canary", m_policy_canary)
 
 #define SVC_CUPOLAS_D_METHODS(X) \
     SVC_CUPOLAS_D_RPC_METHODS(X) \
