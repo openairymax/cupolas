@@ -371,6 +371,66 @@ static void test_long_scan(void)
     PASS();
 }
 
+/* 映射装配的终点槽回归（0.1.20 r141）。yaml_size()/free_node() 以首个
+ * key == NULL 判终点，装配器若把条目写到容量上限，扫描就会越过分配块读
+ * 堆残留并当 key 解引用——llm_d 的 16 键 model.yaml 行即此崩。断言容量
+ * 边界（等于/略多/略少于倍增后的容量）两侧都留得住终点槽。 */
+static void test_map_slot_bounds(void)
+{
+    static const size_t sizes[] = {8, 9, 15, 16, 17, 32, 33};
+    TEST("Mapping terminal slot at capacity bounds");
+    for (size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); s++) {
+        size_t n = sizes[s];
+        char yaml[4096];
+        int w = snprintf(yaml, sizeof(yaml), "root:\n");
+        for (size_t i = 0; i < n && w > 0 && (size_t)w < sizeof(yaml); i++)
+            w += snprintf(yaml + w, sizeof(yaml) - (size_t)w, "  k%zu: v%zu\n", i, i);
+        ASSERT(w > 0 && (size_t)w < sizeof(yaml), "test input must fit");
+
+        yaml_document_t *doc = yaml_create();
+        ASSERT(doc != NULL, "yaml_create returned NULL");
+        ASSERT(yaml_parse_string(doc, yaml, (size_t)w) == 0, "parse should succeed");
+
+        struct yaml_node *map = yaml_get(doc->root, "root");
+        ASSERT(map != NULL, "mapping key should exist");
+        ASSERT(yaml_size(map) == n, "entry count must equal keys written");
+
+        char last[32];
+        snprintf(last, sizeof(last), "k%zu", n - 1);
+        struct yaml_node *tail = yaml_get(map, last);
+        ASSERT(tail != NULL, "last key readable");
+        snprintf(last, sizeof(last), "v%zu", n - 1);
+        ASSERT(strcmp(yaml_as_string(tail, ""), last) == 0, "last value intact");
+
+        yaml_destroy(doc);
+    }
+    PASS();
+}
+
+/* 现场形态：同一行重复 16 次 `capabilities`，条目数恰好等于容量，
+ * 终点槽被占满即崩（llm_d 的 model.yaml 行）。 */
+static void test_dup_entries(void)
+{
+    TEST("Repeated key fills to capacity");
+    char yaml[1024];
+    int w = snprintf(yaml, sizeof(yaml), "root:\n");
+    for (int i = 0; i < 16 && w > 0; i++)
+        w += snprintf(yaml + w, sizeof(yaml) - (size_t)w, "  capabilities: %d\n", i);
+    ASSERT(w > 0 && (size_t)w < sizeof(yaml), "test input must fit");
+
+    yaml_document_t *doc = yaml_create();
+    ASSERT(doc != NULL, "yaml_create returned NULL");
+    ASSERT(yaml_parse_string(doc, yaml, (size_t)w) == 0, "parse should succeed");
+
+    struct yaml_node *map = yaml_get(doc->root, "root");
+    ASSERT(map != NULL, "mapping key should exist");
+    ASSERT(yaml_size(map) == 16, "duplicates kept as separate entries");
+    ASSERT(yaml_get(map, "capabilities") != NULL, "repeated key readable");
+
+    yaml_destroy(doc);
+    PASS();
+}
+
 int main(void)
 {
     printf("\n=== YAML Minimal Parser Unit Tests ===\n\n");
@@ -397,6 +457,8 @@ int main(void)
     test_has_key_null_node();
     test_sequence_get_index_negative();
     test_long_scan();
+    test_map_slot_bounds();
+    test_dup_entries();
 
     printf("\n=== Results: %d/%d tests passed ===\n\n", tests_passed, tests_run);
     return (tests_passed == tests_run) ? 0 : 1;
