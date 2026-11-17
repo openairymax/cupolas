@@ -17,9 +17,209 @@
 
 #if defined(_WIN32)
 #include <direct.h>
+#include <io.h>
 #else
+#include <dirent.h>
 #include <sys/stat.h>
 #endif
+
+/* A-5：统计目录下以 prefix 开头的普通文件数；清理同前缀文件。 */
+static int t_count_files(const char *dir, const char *prefix)
+{
+    int n = 0;
+#if defined(_WIN32)
+    char pat[512];
+    snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
+    struct _finddata_t fd;
+    intptr_t h = _findfirst(pat, &fd);
+    if (h == -1)
+        return 0;
+    do {
+        if (!(fd.attrib & _A_SUBDIR))
+            n++;
+    } while (_findnext(h, &fd) == 0);
+    _findclose(h);
+#else
+    DIR *d = opendir(dir);
+    if (!d)
+        return 0;
+    struct dirent *e;
+    size_t plen = strlen(prefix);
+    while ((e = readdir(d)) != NULL) {
+        if (strncmp(e->d_name, prefix, plen) == 0) {
+            char path[768];
+            snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
+            struct stat st;
+            if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
+                n++;
+        }
+    }
+    closedir(d);
+#endif
+    return n;
+}
+
+static void t_clean_files(const char *dir, const char *prefix)
+{
+#if defined(_WIN32)
+    char pat[512];
+    snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
+    struct _finddata_t fd;
+    intptr_t h = _findfirst(pat, &fd);
+    if (h == -1)
+        return;
+    do {
+        if (!(fd.attrib & _A_SUBDIR)) {
+            char path[768];
+            snprintf(path, sizeof(path), "%s/%s", dir, fd.name);
+            remove(path);
+        }
+    } while (_findnext(h, &fd) == 0);
+    _findclose(h);
+#else
+    DIR *d = opendir(dir);
+    if (!d)
+        return;
+    struct dirent *e;
+    size_t plen = strlen(prefix);
+    while ((e = readdir(d)) != NULL) {
+        if (strncmp(e->d_name, prefix, plen) == 0) {
+            char path[768];
+            snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
+            remove(path);
+        }
+    }
+    closedir(d);
+#endif
+}
+
+static void t_make_dir(const char *dir)
+{
+#if defined(_WIN32)
+    (void)_mkdir(dir);
+#else
+    (void)mkdir(dir, 0755);
+#endif
+}
+
+/* 首个匹配文件的大小；无匹配返回 -1。 */
+static long t_first_size(const char *dir, const char *prefix)
+{
+#if defined(_WIN32)
+    char pat[512];
+    snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
+    struct _finddata_t fd;
+    intptr_t h = _findfirst(pat, &fd);
+    if (h == -1)
+        return -1;
+    long n = (fd.attrib & _A_SUBDIR) ? -1 : (long)fd.size;
+    _findclose(h);
+    return n;
+#else
+    DIR *d = opendir(dir);
+    if (!d)
+        return -1;
+    struct dirent *e;
+    size_t plen = strlen(prefix);
+    long n = -1;
+    while ((e = readdir(d)) != NULL) {
+        if (strncmp(e->d_name, prefix, plen) != 0)
+            continue;
+        char path[768];
+        snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+            n = (long)st.st_size;
+            break;
+        }
+    }
+    closedir(d);
+    return n;
+#endif
+}
+
+/* A-5-01：零溢出事件的 handler 生命周期内不得落盘任何文件。 */
+static void test_overflow_lazy_no_file(void)
+{
+    printf("Test: overflow_lazy_no_file... ");
+
+    const char *dir = AIRY_TMP_DIR "/cupolas_lazy_test";
+    t_make_dir(dir);
+    t_clean_files(dir, "audit_overflow_");
+
+    overflow_handler_t *handler = overflow_handler_create(dir, 1, 10);
+    assert(handler != NULL);
+
+    overflow_handler_flush(handler);
+    assert(t_count_files(dir, "audit_overflow_") == 0);
+
+    overflow_handler_destroy(handler);
+    assert(t_count_files(dir, "audit_overflow_") == 0);
+
+    printf("PASS\n");
+}
+
+/* A-5-02：首个真实溢出事件才建文件，且内容非空。 */
+static void test_overflow_first_event(void)
+{
+    printf("Test: overflow_first_event... ");
+
+    const char *dir = AIRY_TMP_DIR "/cupolas_first_event";
+    t_make_dir(dir);
+    t_clean_files(dir, "audit_overflow_");
+
+    overflow_handler_t *handler = overflow_handler_create(dir, 1, 10);
+    assert(handler != NULL);
+
+    audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_PERMISSION, "lazy_agent",
+                                              "lazy_action", "lazy_resource", "lazy_detail", 1);
+    assert(entry != NULL);
+    assert(overflow_handler_write(handler, entry) == 0);
+    audit_entry_destroy(entry);
+    overflow_handler_flush(handler);
+
+    assert(t_count_files(dir, "audit_overflow_") == 1);
+    assert(t_first_size(dir, "audit_overflow_") > 0);
+
+    overflow_handler_destroy(handler);
+    t_clean_files(dir, "audit_overflow_");
+
+    printf("PASS\n");
+}
+
+/* A-5-03：越过 max_file_size 必须换新名字续写，不得重开旧文件清零计数。
+ * 旧缺陷下 6000 条只会留下 1 个不断增长的文件。 */
+static void test_overflow_rotate_unique(void)
+{
+    printf("Test: overflow_rotate_unique... ");
+
+    const char *dir = AIRY_TMP_DIR "/cupolas_rotate_test";
+    t_make_dir(dir);
+    t_clean_files(dir, "audit_overflow_");
+
+    overflow_handler_t *handler = overflow_handler_create(dir, 1, 10);
+    assert(handler != NULL);
+
+    for (int i = 0; i < 12000; i++) {
+        char action[32];
+        snprintf(action, sizeof(action), "act_%d", i);
+        audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_SANITIZER, "rot_agent", action,
+                                                  "rot_resource", "rot_detail", 1);
+        assert(entry != NULL);
+        assert(overflow_handler_write(handler, entry) == 0);
+        audit_entry_destroy(entry);
+    }
+    overflow_handler_flush(handler);
+
+    int files = t_count_files(dir, "audit_overflow_");
+    assert(files >= 2);
+
+    overflow_handler_destroy(handler);
+    t_clean_files(dir, "audit_overflow_");
+
+    printf("PASS (%d files)\n", files);
+}
+
 
 static void test_overflow_handler_create_destroy(void)
 {
@@ -267,6 +467,9 @@ int main(void)
 
     test_overflow_handler_create_destroy();
     test_overflow_dir_already_exists();
+    test_overflow_lazy_no_file();
+    test_overflow_first_event();
+    test_overflow_rotate_unique();
     test_overflow_level_check();
     test_overflow_write_and_stats();
     test_overflow_null_handling();

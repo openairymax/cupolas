@@ -60,6 +60,54 @@ static void get_timestamp_filename(char *buffer, size_t buffer_size)
     }
 }
 
+/* A-5：默认惰性创建——零溢出事件不得留下 0 字节 audit_overflow_*.log。
+ * AIRY_PREOPEN_OVERFLOW=1 恢复旧行为（创建即 fopen），仅排障用。 */
+static int overflow_preopen_enabled(void)
+{
+    const char *env = getenv("AIRY_PREOPEN_OVERFLOW");
+    return env && env[0] == '1';
+}
+
+/* 备份名唯一化：时间戳精确到秒，同一秒内轮转/重启会撞名；
+ * 撞名即追加到旧文件，既污染上一份内容又重置计数（旧缺陷）。
+ * 依次尝试 base、base 的 stem 加 _1.._999 序号，取首个不存在的名字。 */
+static int make_unique_name(const char *dir, char *out, size_t out_size)
+{
+    char base[MAX_FILENAME_LEN];
+    get_timestamp_filename(base, sizeof(base));
+
+    char stem[MAX_FILENAME_LEN];
+    char ext[16] = ".log";
+    const char *dot = strrchr(base, '.');
+    if (dot && strlen(dot) < sizeof(ext)) {
+        snprintf(ext, sizeof(ext), "%s", dot);
+        size_t n = (size_t)(dot - base);
+        if (n >= sizeof(stem))
+            n = sizeof(stem) - 1;
+        snprintf(stem, sizeof(stem), "%.*s", (int)n, base);
+    } else {
+        snprintf(stem, sizeof(stem), "%s", base);
+        ext[0] = '\0';
+    }
+
+    char path[768];
+    if (snprintf(path, sizeof(path), "%s/%s", dir, base) < (int)sizeof(path) &&
+        !airy_file_exists(path)) {
+        snprintf(out, out_size, "%s", base);
+        return 0;
+    }
+    for (int seq = 1; seq < 1000; seq++) {
+        snprintf(base, sizeof(base), "%s_%d%s", stem, seq, ext);
+        if (snprintf(path, sizeof(path), "%s/%s", dir, base) >= (int)sizeof(path))
+            continue;
+        if (!airy_file_exists(path)) {
+            snprintf(out, out_size, "%s", base);
+            return 0;
+        }
+    }
+    return -1;
+}
+
 static int ensure_overflow_dir(const char *dir)
 {
     if (!dir)
@@ -82,6 +130,14 @@ static FILE *open_new_overflow_file(overflow_handler_t *handler)
     if (handler->current_file) {
         fclose(handler->current_file);
         handler->current_file = NULL;
+    }
+
+    /* 每次打开都生成新名字：旧实现沿用 create 时算好的名字，越过
+     * max_file_size 后重开同一文件并把计数清零，导致单文件无限增长。 */
+    if (make_unique_name(handler->overflow_dir, handler->current_filename,
+                         sizeof(handler->current_filename)) != 0) {
+        handler->disk_write_errors++;
+        return NULL;
     }
 
     char filepath[768];
@@ -239,9 +295,10 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
         return NULL;
     }
 
-    get_timestamp_filename(handler->current_filename, sizeof(handler->current_filename));
-
-    if (open_new_overflow_file(handler) == NULL) {
+    /* A-5 惰性创建：默认不在 create 时落盘，首个真实溢出事件才开文件，
+     * 避免「零事件也留 0 字节 audit_overflow_*.log」。
+     * AIRY_PREOPEN_OVERFLOW=1 恢复旧行为，仅排障用。 */
+    if (overflow_preopen_enabled() && open_new_overflow_file(handler) == NULL) {
         airy_mtx_destroy(&handler->lock);
         AIRY_FREE(handler);
         return NULL;
@@ -250,7 +307,8 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
     handler->running = true;
     if (airy_platform_thread_create(&handler->flush_thread, flush_thread_func, handler) != cupolas_OK) {
         handler->running = false;
-        fclose(handler->current_file);
+        if (handler->current_file)
+            fclose(handler->current_file);
         airy_mtx_destroy(&handler->lock);
         AIRY_FREE(handler);
         return NULL;
