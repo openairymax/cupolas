@@ -103,7 +103,10 @@ static void t_make_dir(const char *dir)
 #endif
 }
 
-/* 首个匹配文件的大小；无匹配返回 -1。 */
+/* 首个匹配文件的大小；无匹配或首匹配为目录返回 -1。
+ * windows 分支不得读 FindFirstFile 的 nFileSizeLow：文件仍被 handler 的
+ * fopen(...,"a") 持有，目录索引中的大小要等关闭才刷新，读到 0 会误判空文件。
+ * 改为按名字打开实测内容长度。 */
 static long t_first_size(const char *dir, const char *prefix)
 {
 #if defined(_WIN32)
@@ -113,10 +116,19 @@ static long t_first_size(const char *dir, const char *prefix)
     HANDLE h = FindFirstFileA(pat, &fd);
     if (h == INVALID_HANDLE_VALUE)
         return -1;
-    long n = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                 ? -1
-                 : (long)fd.nFileSizeLow;
+    char name[512];
+    snprintf(name, sizeof(name), "%s", fd.cFileName);
+    int is_dir = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
     FindClose(h);
+    if (is_dir)
+        return -1;
+    char path[768];
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return -1;
+    long n = (fseek(f, 0, SEEK_END) == 0) ? (long)ftell(f) : -1;
+    fclose(f);
     return n;
 #else
     DIR *d = opendir(dir);
