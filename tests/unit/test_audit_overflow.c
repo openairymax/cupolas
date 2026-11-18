@@ -345,7 +345,9 @@ static void test_overflow_null_handling(void)
 
     overflow_handler_flush(NULL);
 
-    overflow_stats_t stats;
+    /* get_stats 对 NULL 句柄不写输出，断言「未写」必须从零值起步，
+     * 否则读的是未初始化栈内容（windows 腿实测非零而假红）。 */
+    overflow_stats_t stats = { 0 };
     overflow_handler_get_stats(NULL, &stats);
     assert(stats.total_events_received == 0);
 
