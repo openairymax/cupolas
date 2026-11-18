@@ -18,6 +18,10 @@
 #if defined(_WIN32)
 #include <direct.h>
 #include <io.h>
+#ifndef _A_SUBDIR
+/* 部分 SDK 组合下 io.h 不导出该属性位；MS 文档固定值 0x10。 */
+#define _A_SUBDIR 0x10
+#endif
 #else
 #include <dirent.h>
 #include <sys/stat.h>
