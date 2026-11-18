@@ -17,11 +17,8 @@
 
 #if defined(_WIN32)
 #include <direct.h>
-#include <io.h>
-#ifndef _A_SUBDIR
-/* 部分 SDK 组合下 io.h 不导出该属性位；MS 文档固定值 0x10。 */
-#define _A_SUBDIR 0x10
-#endif
+/* 该 SDK 组合的 io.h 未定义 struct _finddata_t，枚举改用 Win32 原生面。 */
+#include <windows.h>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -34,15 +31,15 @@ static int t_count_files(const char *dir, const char *prefix)
 #if defined(_WIN32)
     char pat[512];
     snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
-    struct _finddata_t fd;
-    intptr_t h = _findfirst(pat, &fd);
-    if (h == -1)
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE)
         return 0;
     do {
-        if (!(fd.attrib & _A_SUBDIR))
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             n++;
-    } while (_findnext(h, &fd) == 0);
-    _findclose(h);
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
 #else
     DIR *d = opendir(dir);
     if (!d)
@@ -68,18 +65,18 @@ static void t_clean_files(const char *dir, const char *prefix)
 #if defined(_WIN32)
     char pat[512];
     snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
-    struct _finddata_t fd;
-    intptr_t h = _findfirst(pat, &fd);
-    if (h == -1)
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE)
         return;
     do {
-        if (!(fd.attrib & _A_SUBDIR)) {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
             char path[768];
-            snprintf(path, sizeof(path), "%s/%s", dir, fd.name);
+            snprintf(path, sizeof(path), "%s/%s", dir, fd.cFileName);
             remove(path);
         }
-    } while (_findnext(h, &fd) == 0);
-    _findclose(h);
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
 #else
     DIR *d = opendir(dir);
     if (!d)
@@ -112,12 +109,14 @@ static long t_first_size(const char *dir, const char *prefix)
 #if defined(_WIN32)
     char pat[512];
     snprintf(pat, sizeof(pat), "%s/%s*", dir, prefix);
-    struct _finddata_t fd;
-    intptr_t h = _findfirst(pat, &fd);
-    if (h == -1)
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE)
         return -1;
-    long n = (fd.attrib & _A_SUBDIR) ? -1 : (long)fd.size;
-    _findclose(h);
+    long n = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                 ? -1
+                 : (long)fd.nFileSizeLow;
+    FindClose(h);
     return n;
 #else
     DIR *d = opendir(dir);
