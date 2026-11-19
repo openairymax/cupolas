@@ -22,17 +22,71 @@
 #include "daemon_security.h"
 #include "svc_logger.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Vault policy: identity of the runtime keystore and where its passphrase
- * comes from. Production deployments must set the passphrase env var; an
- * unset value falls back to an empty passphrase (obfuscation only). */
+ * comes from. A missing passphrase is a configuration error, not a default:
+ * an empty passphrase only obfuscates the store, so the vault refuses to
+ * open unless the deployment explicitly opts in for development. */
 #define DOME_VAULT_ID "agentrt"
 #define DOME_VAULT_PASSWORD_ENV "AIRY_VAULT_PASSWORD"
+#define DOME_EMPTY_OK_ENV "AIRY_ALLOW_EMPTY_VAULT"
 
 static int g_dome_initialized = 0;
 static int g_dome_pep_mode = 0;
 static cupolas_vault_t *g_dome_vault = NULL;
+
+static int dome_empty_ok(void)
+{
+    const char *v = getenv(DOME_EMPTY_OK_ENV);
+    if (!v || !v[0]) {
+        return 0;
+    }
+    return strcmp(v, "1") == 0 || strcmp(v, "true") == 0 || strcmp(v, "yes") == 0 ||
+           strcmp(v, "on") == 0;
+}
+
+/* 口令来源：环境变量优先，其次安装面 config/install.env（安装器生成，600）。
+ * 安装口令必须对任意启动路径生效（启动器 / CLI / systemd / 容器），
+ * 否则生产可用性被押在"运维记得导出变量"上，缺一次就拒启。 */
+static int dome_pass(char *buf, size_t size)
+{
+    const char *env = getenv(DOME_VAULT_PASSWORD_ENV);
+    if (env && env[0]) {
+        snprintf(buf, size, "%s", env);
+        return 1;
+    }
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/install.env", airy_config_dir());
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        return 0;
+    }
+
+    static const char prefix[] = DOME_VAULT_PASSWORD_ENV "=";
+    int found = 0;
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, prefix, sizeof(prefix) - 1) != 0) {
+            continue;
+        }
+        const char *v = line + sizeof(prefix) - 1;
+        size_t n = strlen(v);
+        while (n > 0 && (v[n - 1] == '\n' || v[n - 1] == '\r')) {
+            n--;
+        }
+        if (n > 0 && n < size) {
+            snprintf(buf, size, "%.*s", (int)n, v);
+            found = 1;
+        }
+        break;
+    }
+    fclose(fp);
+    return found;
+}
 
 /* ---------- cupolas vault provider (policy backend) ---------- */
 
@@ -42,12 +96,18 @@ static airy_err_t dome_vault_open(void **out_handle)
         return AIRY_ERR_INVALID_PARAM;
     }
 
-    const char *vault_password = getenv(DOME_VAULT_PASSWORD_ENV);
-    if (!vault_password) {
-        vault_password = "";
-        SVC_LOG_WARN("dome_vault_open: %s not set - vault uses empty passphrase, "
-                     "set it in production",
-                     DOME_VAULT_PASSWORD_ENV);
+    char vault_password[256];
+    if (!dome_pass(vault_password, sizeof(vault_password))) {
+        if (!dome_empty_ok()) {
+            SVC_LOG_ERROR("dome_vault_open: %s not set — refusing to open credential "
+                          "vault (set %s, or opt in for development with %s=1)",
+                          DOME_VAULT_PASSWORD_ENV, DOME_VAULT_PASSWORD_ENV, DOME_EMPTY_OK_ENV);
+            return AIRY_ERR_PERMISSION_DENIED;
+        }
+        SVC_LOG_WARN("dome_vault_open: %s not set — empty passphrase allowed by %s, "
+                     "development only, never in production",
+                     DOME_VAULT_PASSWORD_ENV, DOME_EMPTY_OK_ENV);
+        vault_password[0] = '\0';
     }
 
     cupolas_vault_t *vault = NULL;
@@ -183,8 +243,10 @@ static airy_err_t dome_bootstrap(const char *daemon_name, int pep_mode)
     }
     sec_config.permission_rules_path = g_perm_rules_path;
     sec_config.enable_permission_cache = true;
-    sec_config.enable_vault = true;
-    sec_config.vault_provider = &g_dome_vault_provider;
+    /* PEP 的凭证经 PDP RPC 取得，本进程既不持有也不消费本地 vault；
+     * 无条件开启只会在每个守护里重复打开一次（并因缺少口令而告警）。 */
+    sec_config.enable_vault = !pep_mode;
+    sec_config.vault_provider = pep_mode ? NULL : &g_dome_vault_provider;
     sec_config.enable_audit_logging = true;
     sec_config.audit_log_dir = NULL;
 
@@ -192,9 +254,9 @@ static airy_err_t dome_bootstrap(const char *daemon_name, int pep_mode)
     int sec_rc = daemon_security_init(&sec_config, &sec_err);
     if (sec_rc != 0) {
         SVC_LOG_ERROR("dome_bootstrap: daemon_security_init FAILED for daemon='%s' "
-                      "(rc=%d, err=%d) — security layer unavailable, "
-                      "service-layer fail-closed will deny all privileged operations",
+                      "(rc=%d, err=%d) — refusing to start without the security layer",
                       daemon_name, sec_rc, (int)sec_err);
+        return sec_err != AIRY_OK ? sec_err : AIRY_ERR_UNKNOWN;
     }
 
     airy_err_t cupolas_err = AIRY_OK;
