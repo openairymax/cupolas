@@ -33,6 +33,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #else
+#include <direct.h>
 #include <process.h>
 #endif
 
@@ -298,6 +299,41 @@ static int t_svc_state_err(void)
 
 int main(void)
 {
+    /* 隔离安装根：本机 $AIRY_HOME/config/install.env 若存在就会提供口令，
+     * 必须先把配置面切到空目录，"无口令"才可判定。 */
+#ifdef _WIN32
+    char home[512];
+    const char *tmp = getenv("TEMP");
+    snprintf(home, sizeof(home), "%s\\airy-cupolas-%u", tmp ? tmp : ".",
+             (unsigned)_getpid());
+    _mkdir(home);
+    _putenv_s("AIRY_HOME", home);
+#else
+    char home[] = "/tmp/airy-cupolas-XXXXXX";
+    if (mkdtemp(home)) {
+        setenv("AIRY_HOME", home, 1);
+    }
+#endif
+
+    /* R13 生产口径：未设 AIRY_VAULT_PASSWORD 时必须拒启，而不是拿空口令
+     * 打开一个只做混淆的库。先证拒绝（证据），再显式打开开发开关证可用。 */
+#ifndef _WIN32
+    unsetenv("AIRY_VAULT_PASSWORD");
+    unsetenv("AIRY_ALLOW_EMPTY_VAULT");
+#else
+    _putenv_s("AIRY_VAULT_PASSWORD", "");
+    _putenv_s("AIRY_ALLOW_EMPTY_VAULT", "");
+#endif
+    if (daemon_dome_init("cupolas_d") == AIRY_OK) {
+        printf("dome accepted an empty vault passphrase without explicit opt-in\n");
+        return 1;
+    }
+#ifndef _WIN32
+    setenv("AIRY_ALLOW_EMPTY_VAULT", "1", 1);
+#else
+    _putenv_s("AIRY_ALLOW_EMPTY_VAULT", "1");
+#endif
+
     /* 全量引导（非 PEP 最小 guard）：vault + entitlements + network 真实
      * 初始化，测试驱动的是完整安全穹顶。 */
     if (daemon_dome_init("cupolas_d") != AIRY_OK) {
