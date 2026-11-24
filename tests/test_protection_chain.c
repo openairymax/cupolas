@@ -26,12 +26,17 @@
  * ============================================================================ */
 
 #define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                      \
-    do {                                    \
-        printf("  Running " #name "...\n"); \
-        test_##name();                      \
-        printf("  PASSED\n");               \
-        g_tests_passed++;                   \
+#define RUN_TEST(name)                          \
+    do {                                        \
+        int _failed_before = g_tests_failed;    \
+        printf("  Running " #name "...\n");     \
+        test_##name();                          \
+        if (g_tests_failed > _failed_before)    \
+            printf("  FAILED\n");               \
+        else {                                  \
+            g_tests_passed++;                   \
+            printf("  PASSED\n");               \
+        }                                       \
     } while (0)
 
 static int g_tests_passed = 0;

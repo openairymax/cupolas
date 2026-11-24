@@ -21,13 +21,18 @@ static int tests_passed = 0;
 static int tests_failed = 0;
 
 #define TEST(name) static void name(void)
-#define RUN_TEST(name)                   \
-    do {                                 \
-        tests_run++;                     \
-        printf("Running %s... ", #name); \
-        name();                          \
-        tests_passed++;                  \
-        printf("PASSED\n");              \
+#define RUN_TEST(name)                        \
+    do {                                      \
+        int _failed_before = tests_failed;    \
+        tests_run++;                          \
+        printf("Running %s... ", #name);      \
+        name();                               \
+        if (tests_failed > _failed_before)    \
+            printf("FAILED\n");               \
+        else {                                \
+            tests_passed++;                   \
+            printf("PASSED\n");               \
+        }                                     \
     } while (0)
 
 #define ASSERT(condition, message)           \
