@@ -16,12 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <direct.h>
-#else
-#include <sys/stat.h>
-#endif
-
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
@@ -38,30 +32,26 @@
 static int s_pass = 0;
 static int s_fail = 0;
 
-static const char *s_dir = AIRY_TMP_DIR "/cupolas_policy_baseline";
+static char s_dir[AIRY_PATH_MAX];
 
-/* 夹具目录分两级：AIRY_TMP_DIR 在干净主机上可能整体不存在，先把父级
- * 建出来再建子目录；创建失败必须显式失败，否则后续断言会以「文件写不
- * 进去」的形式误报为功能缺陷。 */
+/* 夹具根取运行期 SSoT：产品自身经 airy_tmp_dir() 解析临时目录，用例必须
+ * 与之同源。编译期 AIRY_TMP_DIR 是机器级常量（Windows 为
+ * C:\ProgramData\agentrt\tmp），干净主机上其父目录既不存在也无权创建，
+ * 夹具会在建目录处先失败，再沿断言链误报为策略功能缺陷。
+ * airy_mkdir_p() 逐级创建并回传失败，避免「父目录缺失 → 写入静默失败」。 */
 static int t_mkdir(void)
 {
-#if defined(_WIN32)
-    if (_mkdir(AIRY_TMP_DIR) != 0 && errno != EEXIST)
+    snprintf(s_dir, sizeof(s_dir), "%s/%s", airy_tmp_dir(), "cupolas_policy_baseline");
+    if (airy_mkdir_p(s_dir) != 0) {
+        printf("mkdir failed: %s (errno=%d %s)\n", s_dir, errno, strerror(errno));
         return -1;
-    if (_mkdir(s_dir) != 0 && errno != EEXIST)
-        return -1;
-#else
-    if (mkdir(AIRY_TMP_DIR, 0755) != 0 && errno != EEXIST)
-        return -1;
-    if (mkdir(s_dir, 0755) != 0 && errno != EEXIST)
-        return -1;
-#endif
+    }
     return 0;
 }
 
 static int t_write(const char *name, const char *text)
 {
-    char path[512];
+    char path[AIRY_PATH_MAX + 64];
     snprintf(path, sizeof(path), "%s/%s", s_dir, name);
     FILE *f = fopen(path, "wb");
     if (!f)
@@ -91,7 +81,7 @@ static const char *k_valid =
 /* 基线导入后规则可参与裁决，且未在基线中声明的维度取通配。 */
 static void t_valid(void)
 {
-    char path[512];
+    char path[AIRY_PATH_MAX + 64];
     t_path(path, sizeof(path), "valid.yaml");
     CHECK(t_write("valid.yaml", k_valid) == 0);
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
@@ -110,7 +100,7 @@ static void t_valid(void)
 /* 顶层直接为序列同样可导入。 */
 static void t_sequence(void)
 {
-    char path[512];
+    char path[AIRY_PATH_MAX + 64];
     t_path(path, sizeof(path), "seq.yaml");
     CHECK(t_write("seq.yaml",
                   "- id: all-allow\n"
@@ -130,8 +120,8 @@ static void t_sequence(void)
 /* 非法基线整体失败，运行集保持导入前状态（先以合法基线打底）。 */
 static void t_reject(const char *name, const char *body)
 {
-    char good[512];
-    char bad[512];
+    char good[AIRY_PATH_MAX + 64];
+    char bad[AIRY_PATH_MAX + 64];
     t_path(good, sizeof(good), "valid.yaml");
     t_path(bad, sizeof(bad), name);
     CHECK(t_write(name, body) == 0);
@@ -173,8 +163,10 @@ static void t_rejects(void)
 /* 文件缺席返回失败；调用方据此区分“未配置”与“配置非法”。 */
 static void t_missing(void)
 {
+    char path[AIRY_PATH_MAX + 64];
+    t_path(path, sizeof(path), "none.yaml");
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
-    CHECK(dpolicy_base_load(e, AIRY_TMP_DIR "/cupolas_policy_baseline/none.yaml") < 0);
+    CHECK(dpolicy_base_load(e, path) < 0);
     CHECK(dpolicy_engine_get_rule_count(e) == 0);
     dpolicy_engine_destroy(e);
     TEST_PASS("missing");
@@ -182,12 +174,14 @@ static void t_missing(void)
 
 int main(void)
 {
+    /* 输出不缓冲：用例被杀（超时）时仍能看到最后一条进度，便于定位挂起点。 */
+    setvbuf(stdout, NULL, _IONBF, 0);
     CHECK(t_mkdir() == 0);
     t_valid();
     t_sequence();
     t_rejects();
     t_missing();
-    char path[512];
+    char path[AIRY_PATH_MAX + 64];
     t_path(path, sizeof(path), "valid.yaml");
     remove(path);
     t_path(path, sizeof(path), "seq.yaml");
