@@ -148,6 +148,7 @@ set(CUPOLAS_SOURCES
     src/audit/audit_queue.c
     src/audit/audit_rotator.c
     src/audit/audit_overflow.c
+    src/audit/audit_overflow_io.c
     src/sanitizer/sanitizer_core.c
     src/sanitizer/sanitizer_rules.c
     src/sanitizer/sanitizer_cache.c
@@ -214,6 +215,7 @@ set(CUPOLAS_HEADERS
     src/audit/audit_queue.h
     src/audit/audit_rotator.h
     src/audit/audit_overflow.h
+    src/audit/audit_overflow_internal.h
     src/sanitizer/sanitizer.h
     src/sanitizer/sanitizer_rules.h
     src/sanitizer/sanitizer_cache.h

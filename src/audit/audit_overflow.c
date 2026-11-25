@@ -5,60 +5,22 @@
 #include "cupolas.h"
 /*
  *
- * audit_overflow.c - Audit Overflow Handler: Disk Spillover for Queue Backpressure
+ * audit_overflow.c - 审计溢出处理器：背压分级、回调与生命周期
+ *
+ * 落盘域（命名/目录/序列化/打开）见 audit_overflow_io.c。
  */
 
-#include "audit_overflow.h"
+#include "audit_overflow_internal.h"
 
+#include "airy_memory.h"
 #include "platform.h"
 #include "security/cupolas_error.h"
 #include "utils/cupolas_utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 #include "error.h"
-
-#define DEFAULT_MAX_FILE_SIZE_MB 100
-#define DEFAULT_FLUSH_INTERVAL_MS 1000
-#define MAX_FILENAME_LEN 256
-#define JSON_ENTRY_MAX_LEN 2048
-
-struct overflow_handler {
-    char overflow_dir[512];
-    size_t max_file_size_bytes;
-    uint32_t flush_interval_ms;
-    FILE *current_file;
-    char current_filename[MAX_FILENAME_LEN];
-    uint64_t current_file_size;
-    uint64_t events_written;
-    uint64_t disk_write_errors;
-    uint64_t total_events_received;
-    airy_mtx_t lock;
-    airy_thread_t flush_thread;
-    volatile bool running;
-    overflow_callback_t callback;
-    void *callback_user_data;
-    overflow_stats_t stats;
-};
-
-static void get_timestamp_filename(char *buffer, size_t buffer_size)
-{
-    time_t now = time(NULL);
-#if AIRY_PLATFORM_WINDOWS
-    struct tm *tm_info = localtime(&now);
-#else
-    struct tm tm_buf;
-    struct tm *tm_info = localtime_r(&now, &tm_buf);
-#endif
-    if (tm_info) {
-        strftime(buffer, buffer_size, "audit_overflow_%Y%m%d_%H%M%S.log", tm_info);
-    } else {
-        snprintf(buffer, buffer_size, "audit_overflow_unknown.log");
-    }
-}
 
 /* A-5：默认惰性创建——零溢出事件不得留下 0 字节 audit_overflow_*.log。
  * AIRY_PREOPEN_OVERFLOW=1 恢复旧行为（创建即 fopen），仅排障用。 */
@@ -66,182 +28,6 @@ static int overflow_preopen_enabled(void)
 {
     const char *env = getenv("AIRY_PREOPEN_OVERFLOW");
     return env && env[0] == '1';
-}
-
-/* 备份名唯一化：时间戳精确到秒，同一秒内轮转/重启会撞名；
- * 撞名即追加到旧文件，既污染上一份内容又重置计数（旧缺陷）。
- * 依次尝试 base、base 的 stem 加 _1.._999 序号，取首个不存在的名字。 */
-static int make_unique_name(const char *dir, char *out, size_t out_size)
-{
-    char base[MAX_FILENAME_LEN];
-    get_timestamp_filename(base, sizeof(base));
-
-    char stem[MAX_FILENAME_LEN];
-    char ext[16] = ".log";
-    const char *dot = strrchr(base, '.');
-    if (dot && strlen(dot) < sizeof(ext)) {
-        snprintf(ext, sizeof(ext), "%s", dot);
-        size_t n = (size_t)(dot - base);
-        if (n >= sizeof(stem))
-            n = sizeof(stem) - 1;
-        snprintf(stem, sizeof(stem), "%.*s", (int)n, base);
-    } else {
-        snprintf(stem, sizeof(stem), "%s", base);
-        ext[0] = '\0';
-    }
-
-    char path[768];
-    if (snprintf(path, sizeof(path), "%s/%s", dir, base) < (int)sizeof(path) &&
-        !airy_file_exists(path)) {
-        snprintf(out, out_size, "%s", base);
-        return 0;
-    }
-    for (int seq = 1; seq < 1000; seq++) {
-        snprintf(base, sizeof(base), "%s_%d%s", stem, seq, ext);
-        if (snprintf(path, sizeof(path), "%s/%s", dir, base) >= (int)sizeof(path))
-            continue;
-        if (!airy_file_exists(path)) {
-            snprintf(out, out_size, "%s", base);
-            return 0;
-        }
-    }
-    return -1;
-}
-
-static int ensure_overflow_dir(const char *dir)
-{
-    if (!dir)
-        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
-
-    /* 目录创建收敛至 airy_mkdir_p 递归通道（audit_rotator 同范式）。
-     * 历史单级 mkdir：父级缺失即 ENOENT，回退路径同样单级且忽略返回值，
-     * fopen 失败致 overflow_handler_create 返回 NULL——windows run
-     * 36393198095 audit_overflow_tests 首轮 0xc0000409 即此形态，
-     * 恰因同批测试套件先补建了 tmp 根目录才在重跑时通过。
-     * 已存在属成功语义（同名非目录由后续 fopen 失败兜底）。 */
-    if (airy_mkdir_p(dir) == 0)
-        return 0;
-
-    return airy_file_exists(dir) ? 0 : -1;
-}
-
-static FILE *open_new_overflow_file(overflow_handler_t *handler)
-{
-    if (handler->current_file) {
-        fclose(handler->current_file);
-        handler->current_file = NULL;
-    }
-
-    /* 每次打开都生成新名字：旧实现沿用 create 时算好的名字，越过
-     * max_file_size 后重开同一文件并把计数清零，导致单文件无限增长。 */
-    if (make_unique_name(handler->overflow_dir, handler->current_filename,
-                         sizeof(handler->current_filename)) != 0) {
-        handler->disk_write_errors++;
-        return NULL;
-    }
-
-    char filepath[768];
-    snprintf(filepath, sizeof(filepath), "%s/%s", handler->overflow_dir, handler->current_filename);
-
-    handler->current_file = fopen(filepath, "a");
-    if (!handler->current_file) {
-        handler->disk_write_errors++;
-        return NULL;
-    }
-
-    handler->current_file_size = 0;
-    handler->events_written = 0;
-
-    return handler->current_file;
-}
-
-static void json_escape_string(const char *src, char *dst, size_t dst_size)
-{
-    if (!src || !dst || dst_size == 0) {
-        if (dst && dst_size > 0)
-            *dst = '\0';
-        return;
-    }
-
-    size_t pos = 0;
-    while (*src && pos < dst_size - 2) {
-        switch (*src) {
-        case '"':
-            if (pos + 2 >= dst_size - 1)
-                goto done;
-            dst[pos++] = '\\';
-            dst[pos++] = '"';
-            break;
-        case '\\':
-            if (pos + 2 >= dst_size - 1)
-                goto done;
-            dst[pos++] = '\\';
-            dst[pos++] = '\\';
-            break;
-        case '\n':
-            if (pos + 2 >= dst_size - 1)
-                goto done;
-            dst[pos++] = '\\';
-            dst[pos++] = 'n';
-            break;
-        case '\r':
-            if (pos + 2 >= dst_size - 1)
-                goto done;
-            dst[pos++] = '\\';
-            dst[pos++] = 'r';
-            break;
-        case '\t':
-            if (pos + 2 >= dst_size - 1)
-                goto done;
-            dst[pos++] = '\\';
-            dst[pos++] = 't';
-            break;
-        default:
-            if ((unsigned char)*src < 0x20) {
-                if (pos + 4 >= dst_size - 1)
-                    goto done;
-                pos += snprintf(dst + pos, dst_size - pos, "\\u%04x", (unsigned char)*src);
-            } else {
-                dst[pos++] = *src;
-            }
-            break;
-        }
-        src++;
-    }
-done:
-    dst[pos] = '\0';
-}
-
-static int write_entry_to_file(FILE *file, audit_entry_t *entry)
-{
-    if (!file || !entry)
-        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
-
-    char agent_escaped[256], action_escaped[256], resource_escaped[256], detail_escaped[512];
-
-    json_escape_string(entry->agent_id ? entry->agent_id : "", agent_escaped,
-                       sizeof(agent_escaped));
-    json_escape_string(entry->action ? entry->action : "", action_escaped, sizeof(action_escaped));
-    json_escape_string(entry->resource ? entry->resource : "", resource_escaped,
-                       sizeof(resource_escaped));
-    json_escape_string(entry->detail ? entry->detail : "", detail_escaped, sizeof(detail_escaped));
-
-    char json_buffer[JSON_ENTRY_MAX_LEN];
-    int len = snprintf(json_buffer, sizeof(json_buffer),
-                       "{\"ts\":%llu,\"type\":%d,\"agent\":\"%s\",\"action\":\"%s\",\"resource\":"
-                       "\"%s\",\"detail\":\"%s\",\"result\":%d}\n",
-                       (unsigned long long)entry->timestamp_ms, entry->type, agent_escaped,
-                       action_escaped, resource_escaped, detail_escaped, entry->result);
-
-    if (len < 0 || (size_t)len >= sizeof(json_buffer)) {
-        AIRY_RET_ERR(AIRY_ERR_BUFFER_TOO_SMALL);
-    }
-
-    if (fwrite(json_buffer, 1, len, file) != (size_t)len) {
-        AIRY_RET_ERR(AIRY_ERR_IO);
-    }
-
-    return len;
 }
 
 static void *flush_thread_func(void *arg)
@@ -284,10 +70,10 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
     handler->flush_interval_ms =
         flush_interval_ms > 0 ? flush_interval_ms : DEFAULT_FLUSH_INTERVAL_MS;
 
-    if (ensure_overflow_dir(handler->overflow_dir) != 0) {
+    if (ovf_ensure_dir(handler->overflow_dir) != 0) {
         snprintf(handler->overflow_dir, sizeof(handler->overflow_dir),
                  AIRY_TMP_DIR "/cupolas_audit");
-        ensure_overflow_dir(handler->overflow_dir);
+        ovf_ensure_dir(handler->overflow_dir);
     }
 
     if (airy_mtx_init(&handler->lock) != cupolas_OK) {
@@ -298,7 +84,7 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
     /* A-5 惰性创建：默认不在 create 时落盘，首个真实溢出事件才开文件，
      * 避免「零事件也留 0 字节 audit_overflow_*.log」。
      * AIRY_PREOPEN_OVERFLOW=1 恢复旧行为，仅排障用。 */
-    if (overflow_preopen_enabled() && open_new_overflow_file(handler) == NULL) {
+    if (overflow_preopen_enabled() && ovf_open_new(handler) != 0) {
         airy_mtx_destroy(&handler->lock);
         AIRY_FREE(handler);
         return NULL;
@@ -352,13 +138,13 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
     handler->total_events_received++;
 
     if (!handler->current_file || handler->current_file_size >= handler->max_file_size_bytes) {
-        if (open_new_overflow_file(handler) == NULL) {
+        if (ovf_open_new(handler) != 0) {
             airy_mtx_unlock(&handler->lock);
             AIRY_RET_ERR(AIRY_ERR_IO);
         }
     }
 
-    int written = write_entry_to_file(handler->current_file, entry);
+    int written = ovf_write_entry(handler->current_file, entry);
     if (written < 0) {
         handler->disk_write_errors++;
         airy_mtx_unlock(&handler->lock);
