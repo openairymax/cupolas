@@ -69,6 +69,7 @@ overflow_handler_t *overflow_handler_create(const char *overflow_dir, size_t max
         (max_file_size_mb > 0 ? max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB) * 1024 * 1024;
     handler->flush_interval_ms =
         flush_interval_ms > 0 ? flush_interval_ms : DEFAULT_FLUSH_INTERVAL_MS;
+    handler->keep_files = OVERFLOW_KEEP_FILES;
 
     if (ovf_ensure_dir(handler->overflow_dir) != 0) {
         snprintf(handler->overflow_dir, sizeof(handler->overflow_dir),
@@ -139,8 +140,13 @@ int overflow_handler_write(overflow_handler_t *handler, audit_entry_t *entry)
 
     if (!handler->current_file || handler->current_file_size >= handler->max_file_size_bytes) {
         if (ovf_open_new(handler) != 0) {
-            airy_mtx_unlock(&handler->lock);
-            AIRY_RET_ERR(AIRY_ERR_IO);
+            /* 盘满时先回收历史溢出件再重试一次：回收是恢复通道的最后手段，
+             * 不能只记一次写失败就让溢出永久失效。 */
+            ovf_reclaim(handler, 1, NULL);
+            if (ovf_open_new(handler) != 0) {
+                airy_mtx_unlock(&handler->lock);
+                AIRY_RET_ERR(AIRY_ERR_IO);
+            }
         }
     }
 
@@ -236,6 +242,23 @@ int overflow_handler_set_callback(overflow_handler_t *handler, overflow_callback
 
     handler->callback = callback;
     handler->callback_user_data = user_data;
+
+    return 0;
+}
+
+int overflow_handler_set_retention(overflow_handler_t *handler, int keep_files)
+{
+    if (!handler)
+        AIRY_RET_ERR(AIRY_ERR_NULL_POINTER);
+
+    if (keep_files <= 0)
+        keep_files = OVERFLOW_KEEP_FILES;
+    if (keep_files > OVERFLOW_KEEP_MAX)
+        keep_files = OVERFLOW_KEEP_MAX;
+
+    airy_mtx_lock(&handler->lock);
+    handler->keep_files = keep_files;
+    airy_mtx_unlock(&handler->lock);
 
     return 0;
 }

@@ -61,6 +61,9 @@ overflow_level_t overflow_handler_check_level(size_t current_size, size_t max_si
 int overflow_handler_set_callback(overflow_handler_t *handler, overflow_callback_t callback,
                                   void *user_data);
 
+/* 溢出件保留份数（含当前件），<=0 恢复默认，超上限按上限收敛。 */
+int overflow_handler_set_retention(overflow_handler_t *handler, int keep_files);
+
 typedef struct audit_queue_ex audit_queue_ex_t;
 
 audit_queue_ex_t *audit_queue_ex_create(size_t max_size, const char *overflow_dir,

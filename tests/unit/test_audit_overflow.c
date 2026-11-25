@@ -236,6 +236,38 @@ static void test_overflow_rotate_unique(void)
 }
 
 
+/* A-5-04：溢出件保留裁剪——多轮换后只保留最新 keep 份，不得只增不减。 */
+static void test_overflow_retention(void)
+{
+    printf("Test: overflow_retention... ");
+
+    const char *dir = AIRY_TMP_DIR "/cupolas_retain_test";
+    t_make_dir(dir);
+    t_clean_files(dir, "audit_overflow_");
+
+    overflow_handler_t *handler = overflow_handler_create(dir, 1, 10);
+    assert(handler != NULL);
+    assert(overflow_handler_set_retention(handler, 1) == 0);
+
+    for (int i = 0; i < 12000; i++) {
+        char action[32];
+        snprintf(action, sizeof(action), "keep_%d", i);
+        audit_entry_t *entry = audit_entry_create(AUDIT_EVENT_SANITIZER, "keep_agent", action,
+                                                  "keep_resource", "keep_detail", 1);
+        assert(entry != NULL);
+        assert(overflow_handler_write(handler, entry) == 0);
+        audit_entry_destroy(entry);
+    }
+    overflow_handler_flush(handler);
+
+    assert(t_count_files(dir, "audit_overflow_") == 1);
+
+    overflow_handler_destroy(handler);
+    t_clean_files(dir, "audit_overflow_");
+
+    printf("PASS\n");
+}
+
 static void test_overflow_handler_create_destroy(void)
 {
     printf("Test: overflow_handler_create_destroy... ");
@@ -487,6 +519,7 @@ int main(void)
     test_overflow_lazy_no_file();
     test_overflow_first_event();
     test_overflow_rotate_unique();
+    test_overflow_retention();
     test_overflow_level_check();
     test_overflow_write_and_stats();
     test_overflow_null_handling();

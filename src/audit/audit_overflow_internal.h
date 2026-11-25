@@ -20,7 +20,8 @@
 #define OVERFLOW_NAME_MAX 256
 #define OVERFLOW_JSON_MAX 2048
 #define OVERFLOW_SCAN_MAX 512
-#define OVERFLOW_KEEP_FILES 16
+/* 保留份数与 A-3 审计 500MB 上限对齐：默认件 100MB × 5。 */
+#define OVERFLOW_KEEP_FILES 5
 #define OVERFLOW_KEEP_MAX 1024
 #define DEFAULT_MAX_FILE_SIZE_MB 100
 #define DEFAULT_FLUSH_INTERVAL_MS 1000
@@ -47,5 +48,6 @@ struct overflow_handler {
 int ovf_ensure_dir(const char *dir);
 int ovf_open_new(overflow_handler_t *handler);
 int ovf_write_entry(FILE *file, audit_entry_t *entry);
+void ovf_reclaim(overflow_handler_t *handler, int keep, const char *skip);
 
 #endif /* CUPOLAS_AUDIT_OVERFLOW_INTERNAL_H */

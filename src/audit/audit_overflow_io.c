@@ -10,10 +10,12 @@
 
 #include "audit_overflow_internal.h"
 
+#include "airy_dirent.h"
 #include "airy_memory.h"
 #include "platform.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -92,6 +94,70 @@ int ovf_ensure_dir(const char *dir)
     return airy_file_exists(dir) ? 0 : -1;
 }
 
+#define OVF_PREFIX "audit_overflow_"
+
+static int ovf_is_spill(const char *name)
+{
+    size_t len = strlen(name);
+    return strncmp(name, OVF_PREFIX, sizeof(OVF_PREFIX) - 1) == 0 && len > 4 &&
+           strcmp(name + len - 4, ".log") == 0;
+}
+
+static int ovf_cmp(const void *lhs, const void *rhs)
+{
+    return strcmp((const char *)lhs, (const char *)rhs);
+}
+
+static size_t ovf_collect(const char *dir, char *slots, size_t max)
+{
+    DIR *d = opendir(dir);
+    if (!d)
+        return 0;
+
+    size_t count = 0;
+    struct dirent *ent;
+    while (count < max && (ent = readdir(d)) != NULL) {
+        if (!ovf_is_spill(ent->d_name))
+            continue;
+        snprintf(slots + count * OVERFLOW_NAME_MAX, OVERFLOW_NAME_MAX, "%s", ent->d_name);
+        count++;
+    }
+    closedir(d);
+    return count;
+}
+
+/* 溢出件保留裁剪：文件名时间戳单调，字典序即新旧序，保留最新 keep 份。
+ * 溢出件此前只增不减，磁盘被历史件占满后 fopen 失败，溢出通道本身失效。 */
+void ovf_reclaim(overflow_handler_t *handler, int keep, const char *skip)
+{
+    if (!handler || keep < 1)
+        return;
+
+    char *slots = (char *)AIRY_MALLOC((size_t)OVERFLOW_SCAN_MAX * OVERFLOW_NAME_MAX);
+    if (!slots)
+        return;
+
+    size_t count = ovf_collect(handler->overflow_dir, slots, OVERFLOW_SCAN_MAX);
+    size_t remain = count;
+    if (count > (size_t)keep) {
+        qsort(slots, count, OVERFLOW_NAME_MAX, ovf_cmp);
+        for (size_t i = 0; i < count && remain > (size_t)keep; i++) {
+            const char *name = slots + i * OVERFLOW_NAME_MAX;
+            if (skip && strcmp(name, skip) == 0)
+                continue;
+
+            char path[768];
+            if (snprintf(path, sizeof(path), "%s/%s", handler->overflow_dir, name) >=
+                (int)sizeof(path))
+                continue;
+            if (airy_file_remove(path) == 0)
+                remain--;
+        }
+    }
+
+    AIRY_FREE(slots);
+}
+
 int ovf_open_new(overflow_handler_t *handler)
 {
     if (handler->current_file) {
@@ -118,6 +184,9 @@ int ovf_open_new(overflow_handler_t *handler)
 
     handler->current_file_size = 0;
     handler->events_written = 0;
+
+    /* 新件落定后再裁剪：保留含当前件在内的最新 keep 份。 */
+    ovf_reclaim(handler, handler->keep_files, handler->current_filename);
 
     return 0;
 }

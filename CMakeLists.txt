@@ -248,6 +248,8 @@ set(COMMON_MODULE_DIR ${CUPOLAS_COMMONS_DIR})
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/include
+    # 可移植 dirent：溢出件清理由 airy_dirent 统一 Windows/POSIX 遍历
+    ${COMMON_MODULE_DIR}/utils/compat
     # cache_common 原子件：sanitizer/permission 缓存策略复用同一 LRU 存储
     ${COMMON_MODULE_DIR}/utils/cache
     ${COMMON_MODULE_DIR}/utils/error
