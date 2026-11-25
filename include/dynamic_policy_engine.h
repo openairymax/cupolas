@@ -130,6 +130,11 @@ int dpolicy_engine_rollback(dpolicy_engine_t *engine, const char *version);
 int dpolicy_engine_load_policies_json(dpolicy_engine_t *engine, const char *json);
 int dpolicy_engine_export_policies_json(dpolicy_engine_t *engine, char **json);
 
+/* 策略基线单点导入：YAML 文档（顶层序列或 {rules: [...]}）→ 规则文档 →
+ * 原子替换运行集。成功后基线即运行集的启动形态，不构成第二真相源。
+ * 返回 0 成功；<0 失败（-2 为规则非法/重复 id，运行集保持原状）。 */
+int dpolicy_base_load(dpolicy_engine_t *engine, const char *path);
+
 /* 两段式生效：stage_json 装载入暂存集（运行裁决与
  * epoch 不变）；activate 将暂存集原子提交为运行集并版本固化 + epoch+1。
  * activate 前置需 stage_json（无暂存返回 -5）。 */

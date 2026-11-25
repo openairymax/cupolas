@@ -18,6 +18,8 @@
 #include "dynamic_policy_engine.h"
 #include "platform.h"
 
+#include <stdio.h>
+
 cupolas_service_t *g_service = NULL;
 dpolicy_engine_t *g_dpolicy = NULL;
 
@@ -25,6 +27,16 @@ static void config_load(const char *config_path)
 {
     daemon_ep_load(daemon_ep_slot(), config_path, CUPOLAS_D_SOCKET_UNIX,
                    CUPOLAS_D_SOCKET_WIN, CUPOLAS_D_TCP_PORT, NULL, NULL);
+}
+
+/* 策略基线落点：随运行期 AIRY_HOME 解析（与 permission_rules.yaml 同族）。 */
+static void svc_base_path(char *buf, size_t size)
+{
+#ifdef _WIN32
+    snprintf(buf, size, "%s\\cupolas\\policy_baseline.yaml", airy_config_dir());
+#else
+    snprintf(buf, size, "%s/cupolas/policy_baseline.yaml", airy_config_dir());
+#endif
 }
 
 int svc_prepare(const char *config_path)
@@ -39,6 +51,22 @@ int svc_prepare(const char *config_path)
     if (!g_dpolicy) {
         SVC_LOG_ERROR("Failed to create dynamic policy engine");
         return -1;
+    }
+
+    /* S5（§30.6 S30-P1-6）：策略基线单点导入。文件缺席即视为未配置；
+     * 存在但装载失败即拒绝启用，绝不以半套策略参与裁决（fail-closed）。 */
+    char base[512];
+    svc_base_path(base, sizeof(base));
+    if (airy_file_exists(base)) {
+        int rc = dpolicy_base_load(g_dpolicy, base);
+        if (rc != 0) {
+            SVC_LOG_ERROR("C-L01: CUPOLAS: POLICY-BASE 基线装载失败 rc=%d，拒绝启用", rc);
+            dpolicy_engine_destroy(g_dpolicy);
+            g_dpolicy = NULL;
+            return -1;
+        }
+        SVC_LOG_INFO("C-L01: CUPOLAS: POLICY-BASE 已导入基线 rules=%zu",
+                     dpolicy_engine_get_rule_count(g_dpolicy));
     }
 
     /* W6（0.1.20 §7）：金丝雀治理面挂载——失败仅旁路不阻断服务；

@@ -170,6 +170,7 @@ set(CUPOLAS_SOURCES
     src/policy/dynamic_policy_engine.c
     src/policy/dpolicy_version.c
     src/policy/dpolicy_json.c
+    src/policy/dpolicy_baseline.c
     src/policy/dpolicy_canary.c
 )
 # OpenSSL-dependent sources
@@ -478,6 +479,19 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_dynamic_policy_engine cupolas ${CJSON_LIBRARIES})
     add_test(NAME cupolas_dpolicy_engine_tests COMMAND test_dynamic_policy_engine)
+
+    # 策略基线（YAML）单点导入单测
+    add_executable(test_dpolicy_baseline tests/unit/test_dpolicy_baseline.c)
+    target_compile_definitions(test_dpolicy_baseline PRIVATE
+        AIRY_COMPLIANCE_IMPL AIRY_ENABLE_V2_API=1)
+    target_include_directories(test_dpolicy_baseline PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+        ${CJSON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_dpolicy_baseline cupolas ${CJSON_LIBRARIES})
+    add_test(NAME cupolas_policy_baseline_tests COMMAND test_dpolicy_baseline)
 
     # L1-B 接线：四重防护链独立集成测试（INT-11 全链，tests/ 根）
     add_executable(test_protection_chain tests/test_protection_chain.c)
