@@ -11,6 +11,7 @@
 #include "dynamic_policy_engine.h"
 #include "platform.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,24 +40,35 @@ static int s_fail = 0;
 
 static const char *s_dir = AIRY_TMP_DIR "/cupolas_policy_baseline";
 
-static void t_mkdir(void)
+/* 夹具目录分两级：AIRY_TMP_DIR 在干净主机上可能整体不存在，先把父级
+ * 建出来再建子目录；创建失败必须显式失败，否则后续断言会以「文件写不
+ * 进去」的形式误报为功能缺陷。 */
+static int t_mkdir(void)
 {
 #if defined(_WIN32)
-    (void)_mkdir(s_dir);
+    if (_mkdir(AIRY_TMP_DIR) != 0 && errno != EEXIST)
+        return -1;
+    if (_mkdir(s_dir) != 0 && errno != EEXIST)
+        return -1;
 #else
-    (void)mkdir(s_dir, 0755);
+    if (mkdir(AIRY_TMP_DIR, 0755) != 0 && errno != EEXIST)
+        return -1;
+    if (mkdir(s_dir, 0755) != 0 && errno != EEXIST)
+        return -1;
 #endif
+    return 0;
 }
 
-static void t_write(const char *name, const char *text)
+static int t_write(const char *name, const char *text)
 {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", s_dir, name);
     FILE *f = fopen(path, "wb");
     if (!f)
-        return;
-    fwrite(text, 1, strlen(text), f);
-    fclose(f);
+        return -1;
+    size_t n = fwrite(text, 1, strlen(text), f);
+    int closed = fclose(f);
+    return (n == strlen(text) && closed == 0) ? 0 : -1;
 }
 
 static void t_path(char *buf, size_t size, const char *name)
@@ -81,7 +93,7 @@ static void t_valid(void)
 {
     char path[512];
     t_path(path, sizeof(path), "valid.yaml");
-    t_write("valid.yaml", k_valid);
+    CHECK(t_write("valid.yaml", k_valid) == 0);
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
     CHECK(e != NULL);
     CHECK(dpolicy_base_load(e, path) == 0);
@@ -100,12 +112,12 @@ static void t_sequence(void)
 {
     char path[512];
     t_path(path, sizeof(path), "seq.yaml");
-    t_write("seq.yaml",
-            "- id: all-allow\n"
-            "  effect: allow\n"
-            "  subject: \"*\"\n"
-            "  action: \"*\"\n"
-            "  resource: \"*\"\n");
+    CHECK(t_write("seq.yaml",
+                  "- id: all-allow\n"
+                  "  effect: allow\n"
+                  "  subject: \"*\"\n"
+                  "  action: \"*\"\n"
+                  "  resource: \"*\"\n") == 0);
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
     CHECK(dpolicy_base_load(e, path) == 0);
     CHECK(dpolicy_engine_get_rule_count(e) == 1);
@@ -122,7 +134,7 @@ static void t_reject(const char *name, const char *body)
     char bad[512];
     t_path(good, sizeof(good), "valid.yaml");
     t_path(bad, sizeof(bad), name);
-    t_write(name, body);
+    CHECK(t_write(name, body) == 0);
     dpolicy_engine_t *e = dpolicy_engine_create(DPOLICY_CONFLICT_DENY_WINS);
     CHECK(dpolicy_base_load(e, good) == 0);
     size_t before = dpolicy_engine_get_rule_count(e);
@@ -170,7 +182,7 @@ static void t_missing(void)
 
 int main(void)
 {
-    t_mkdir();
+    CHECK(t_mkdir() == 0);
     t_valid();
     t_sequence();
     t_rejects();
