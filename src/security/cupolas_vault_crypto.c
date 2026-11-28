@@ -45,44 +45,85 @@ const char *cupolas_vault_operation_string(cupolas_vault_operation_t op)
     }
 }
 
+static int vrand_bytes(unsigned char *buf, size_t len)
+{
+    if (!buf || len == 0) {
+        return -1;
+    }
+#ifdef CUPOLAS_USE_OPENSSL
+    return RAND_bytes(buf, (int)len) == 1 ? 0 : -1;
+#else
+    FILE *urandom = fopen("/dev/urandom", "rb");
+    if (!urandom) {
+        return -1;
+    }
+    size_t got = fread(buf, 1, len, urandom);
+    fclose(urandom);
+    return got == len ? 0 : -1;
+#endif
+}
+
+/* 拒绝采样：避免 `byte % len` 的取模偏置，并保证字符表尾段可达。
+ * 旧实现 256 % 66 == 58，特殊字符区（下标 62..65）永远取不到。 */
+static int vrand_below(size_t bound, size_t *out)
+{
+    unsigned char b;
+    unsigned limit;
+
+    if (!out || bound == 0 || bound > 256) {
+        return -1;
+    }
+    limit = (unsigned)(256 - (256 % bound));
+    do {
+        if (vrand_bytes(&b, 1) != 0) {
+            return -1;
+        }
+    } while ((unsigned)b >= limit);
+    *out = (size_t)b % bound;
+    return 0;
+}
+
 int cupolas_vault_generate_password(char *password_out, size_t length)
 {
+    static const char *const classes[] = {"abcdefghijklmnopqrstuvwxyz",
+                                          "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                                          "0123456789",
+                                          "!@#$%^&*"};
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    const size_t nclass = sizeof(classes) / sizeof(classes[0]);
+    size_t n, i, j, idx;
+    char tmp;
+
     if (!password_out || length < 8) {
         return AIRY_ERR_UNKNOWN;
     }
+    n = length - 1;
 
-    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-    size_t charset_len = strlen(charset);
-
-#ifdef CUPOLAS_USE_OPENSSL
-    for (size_t i = 0; i < length - 1; i++) {
-        unsigned char c;
-        if (RAND_bytes(&c, 1) != 1) {
-            password_out[length - 1] = '\0';
-            return cupolas_ERR_INVALID_PARAM;
+    /* 每类先占一席，保证混合字符构成；其余位取全集，末位整体洗牌消除位置相关。 */
+    for (i = 0; i < nclass; i++) {
+        if (vrand_below(strlen(classes[i]), &idx) != 0) {
+            password_out[0] = '\0';
+            return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
         }
-        password_out[i] = charset[c % charset_len];
+        password_out[i] = classes[i][idx];
     }
-#else
-    FILE *urandom = fopen("/dev/urandom", "rb");
-    if (urandom) {
-        for (size_t i = 0; i < length - 1; i++) {
-            unsigned char c;
-            if (fread(&c, 1, 1, urandom) != 1) {
-                fclose(urandom);
-                password_out[length - 1] = '\0';
-                return cupolas_ERR_INVALID_PARAM;
-            }
-            password_out[i] = charset[c % charset_len];
+    for (; i < n; i++) {
+        if (vrand_below(sizeof(charset) - 1, &idx) != 0) {
+            password_out[0] = '\0';
+            return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
         }
-        fclose(urandom);
-    } else {
-        password_out[length - 1] = '\0';
-        return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
+        password_out[i] = charset[idx];
     }
-#endif
-
-    password_out[length - 1] = '\0';
+    for (i = n; i > 1; i--) {
+        if (vrand_below(i, &j) != 0) {
+            password_out[0] = '\0';
+            return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
+        }
+        tmp = password_out[i - 1];
+        password_out[i - 1] = password_out[j];
+        password_out[j] = tmp;
+    }
+    password_out[n] = '\0';
     return 0;
 }
 
